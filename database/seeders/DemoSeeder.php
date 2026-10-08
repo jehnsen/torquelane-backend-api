@@ -22,6 +22,7 @@ use App\Tenancy\TenantManager;
 use Brick\Money\Money;
 use Carbon\CarbonImmutable;
 use Database\Seeders\Demo\FleetSeed;
+use Database\Seeders\Demo\PartsSeed;
 use Database\Seeders\Demo\WorkOrderSeed;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -46,7 +47,8 @@ use RuntimeException;
  *    ../web/lib/technicians.ts in the repair branch. Both are VAT-registered
  *    and quote prices exclusive of VAT (VAT on top, as ../web bills);
  *  - the fleet (Demo\FleetSeed), then the work orders and approval settings
- *    (Demo\WorkOrderSeed), booked into the repair branch.
+ *    (Demo\WorkOrderSeed), booked into the repair branch; then the vendors,
+ *    each client's own spare parts and its purchase orders (Demo\PartsSeed).
  *
  * API-only additions, marked below: a branch manager and a cashier demo
  * account, and a small detailing floor at Samahuzai-Biñan.
@@ -182,6 +184,7 @@ final class DemoSeeder extends Seeder
 
         FleetSeed::run($organization->id, $data, $this->ids);
         WorkOrderSeed::run($organization->id, $repair->id, $data, $this->ids);
+        PartsSeed::run($organization->id, $data, $this->ids);
     }
 
     /**

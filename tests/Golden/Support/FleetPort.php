@@ -215,7 +215,7 @@ final class FleetPort
      *
      * @param  array<string, mixed>  $h
      */
-    private static function healthFrom(array $h): VehicleHealth
+    public static function healthFrom(array $h): VehicleHealth
     {
         $items = array_map(fn (mixed $item): PmsItem => self::itemFrom(self::map($item)), self::list($h['items'] ?? []));
 
@@ -302,7 +302,7 @@ final class FleetPort
     /**
      * @param  array<string, mixed>  $order
      */
-    private static function costOf(array $order, bool $withLabour): int
+    public static function costOf(array $order, bool $withLabour): int
     {
         $parts = null;
         if (is_array($order['parts'] ?? null) && $order['parts'] !== []) {

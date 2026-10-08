@@ -9,7 +9,7 @@ use App\Domain\Modules\Module;
 use App\Models\CustomerAccount;
 use App\Models\User;
 use App\Models\WorkOrder;
-use App\Tenancy\ModuleGate;
+use Closure;
 use Illuminate\Auth\Access\Response;
 
 /**
@@ -108,11 +108,14 @@ final class WorkOrderPolicy extends TenantPolicy
         return $order->branch_id === null || $context->branchAllowed($order->branch_id);
     }
 
-    /** Throws module_disabled when repair is off where the order lives; never denies otherwise. */
-    private function repairOn(WorkOrder $order): null
+    /**
+     * Throws module_disabled when repair is off where the order lives; never
+     * denies otherwise. Deferred: it runs only once the order is visible.
+     *
+     * @return Closure(): null
+     */
+    private function repairOn(WorkOrder $order): Closure
     {
-        app(ModuleGate::class)->ensure(Module::RepairPms, $order->branch_id);
-
-        return null;
+        return $this->module(Module::RepairPms, $order->branch_id);
     }
 }

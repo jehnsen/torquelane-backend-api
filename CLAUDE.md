@@ -572,7 +572,8 @@ work-order and approval-SLA alerts, per scope with each scope's own SLA.
 (../web's), and the 484 work orders with lines, tasks, parts, history and
 approval log, all in the repair branch. **Drafts are seeded unnumbered** (the
 frontend's seed numbers them); the `work_order` series continues after the
-highest seeded number (1656 → next 1657). Approvers and event actors keep
+highest number seeded as issued (1655 → next 1656; the frontend numbers its draft
+WO-2026-1656, seeded here unnumbered). Approvers and event actors keep
 their recorded names (no user ids); collections are credited to the demo user
 of that name.
 

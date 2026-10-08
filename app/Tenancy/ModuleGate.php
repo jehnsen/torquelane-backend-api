@@ -50,6 +50,24 @@ final class ModuleGate
     }
 
     /**
+     * The branches the session can reach where `$module` is active.
+     *
+     * @return list<string>
+     */
+    public function branchesWith(Module $module): array
+    {
+        $organization = $this->organizationEnabled();
+        $branches = [];
+        foreach ($this->branchEnabled($this->reachableBranches($this->tenancy->require())) as $branchId => $enabled) {
+            if (in_array($module, ModuleEntitlements::activeForBranch($organization, $enabled), true)) {
+                $branches[] = (string) $branchId;
+            }
+        }
+
+        return $branches;
+    }
+
+    /**
      * @return list<Module>
      */
     public function organizationEnabled(): array

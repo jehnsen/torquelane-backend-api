@@ -15,6 +15,7 @@ use App\Models\Invitation;
 use App\Models\Organization;
 use App\Models\Technician;
 use App\Models\User;
+use App\Models\Vendor;
 use App\Tenancy\TenantManager;
 use Illuminate\Contracts\Pagination\CursorPaginator;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -177,6 +178,16 @@ final class DirectoryQueries
             ->whereIn('branch_id', $context->branchFilter())
             ->orderBy('name')
             ->paginate($perPage);
+    }
+
+    /**
+     * The organization's vendor list, by name.
+     *
+     * @return LengthAwarePaginator<int, Vendor>
+     */
+    public function vendors(int $perPage): LengthAwarePaginator
+    {
+        return Vendor::query()->orderBy('name')->orderBy('id')->paginate($perPage);
     }
 
     /** The session's own organization; never one named by the caller. */

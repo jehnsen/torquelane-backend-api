@@ -11,7 +11,8 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Which branch new repair work lands in. Staff work in a branch: the one they
- * name, else the one selected (X-Branch-Id), else their only one. A portal
+ * name, else the one selected (X-Branch-Id), else the only branch they reach
+ * where repair is on. A portal
  * request names none — it waits to be taken in by staff. Either way the
  * repair module must be on where the work lands.
  */
@@ -31,7 +32,8 @@ final class WorkOrderBranch
             return null;
         }
 
-        $branchId = $requested ?? $context->selectedBranchId ?? (count($context->allowedBranchIds) === 1 ? $context->allowedBranchIds[0] : null);
+        $repairBranches = $this->modules->branchesWith(Module::RepairPms);
+        $branchId = $requested ?? $context->selectedBranchId ?? (count($repairBranches) === 1 ? $repairBranches[0] : null);
         if ($branchId === null) {
             throw ValidationException::withMessages(['branch_id' => 'Choose the branch taking this work in.']);
         }

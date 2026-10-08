@@ -25,7 +25,7 @@ it('derives alerts with deterministic ids and counts', function () {
 
     expect($ids)->not->toBeEmpty();
     foreach ($ids as $id) {
-        expect($id)->toMatch('/^(pms|doc|licence):[0-9a-z]{26}(:[0-9a-z]{26})?$/');
+        expect($id)->toMatch('/^(pms|doc|licence|wo|approval-sla):[0-9a-z]{26}(:[0-9a-z]{26})?$/');
     }
     expect($response->json('meta'))->toBe(['total' => count($ids), 'unread_count' => count($ids), 'dismissed_count' => 0]);
 });

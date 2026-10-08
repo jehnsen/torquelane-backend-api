@@ -65,8 +65,8 @@ it('numbers orders for two accounts from one series, never colliding', function 
     $first = $this->postJson("/api/v1/work-orders/{$northwind}/send")->assertOk()->json('data.reference');
     $second = $this->postJson("/api/v1/work-orders/{$actimed}/send")->assertOk()->json('data.reference');
 
-    expect([$first, $second])->toBe(['WO-2026-1657', 'WO-2026-1658'])
-        ->and(nextWorkOrderNumber())->toBe(1659);
+    expect([$first, $second])->toBe(['WO-2026-1656', 'WO-2026-1657'])
+        ->and(nextWorkOrderNumber())->toBe(1658);
 
     // The index stands behind the series: a duplicate number in one organization cannot be written.
     expect(refusedByDatabase(fn () => WorkOrder::query()->whereKey($actimed)->update(['reference' => $first])))
@@ -107,10 +107,10 @@ it('ignores every cost and total a client sends', function () {
 it('burns no number for a draft', function () {
     $abandoned = draftFor($this->world->id('veh-001'));
     $this->postJson("/api/v1/work-orders/{$abandoned}/cancel", ['reason' => 'Walked out.'])->assertOk()->assertJsonPath('data.reference', '');
-    expect(nextWorkOrderNumber())->toBe(1657);
+    expect(nextWorkOrderNumber())->toBe(1656);
 
     $sent = draftFor($this->world->id('veh-001'));
-    $this->postJson("/api/v1/work-orders/{$sent}/send")->assertOk()->assertJsonPath('data.reference', 'WO-2026-1657');
+    $this->postJson("/api/v1/work-orders/{$sent}/send")->assertOk()->assertJsonPath('data.reference', 'WO-2026-1656');
 });
 
 it('will not let a portal user raise work on a sibling account\'s vehicle, or see its orders', function () {
@@ -161,9 +161,9 @@ it('leaves no partial rows when an action fails midway', function () {
         ->and(asSystem(fn () => WorkOrderEvent::query()->count()))->toBe($events)
         ->and(asSystem(fn () => AuditLog::query()->count()))->toBe($audits)
         // The number the failed send drew went back with the rollback.
-        ->and(nextWorkOrderNumber())->toBe(1657);
+        ->and(nextWorkOrderNumber())->toBe(1656);
 
-    $this->postJson("/api/v1/work-orders/{$id}/send")->assertOk()->assertJsonPath('data.reference', 'WO-2026-1657');
+    $this->postJson("/api/v1/work-orders/{$id}/send")->assertOk()->assertJsonPath('data.reference', 'WO-2026-1656');
 });
 
 it('refuses, in the database, to re-price or delete an approved line', function () {

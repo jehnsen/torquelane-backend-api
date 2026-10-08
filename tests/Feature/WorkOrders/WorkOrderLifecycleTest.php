@@ -18,7 +18,7 @@ use Tests\Support\World;
  *
  * Seed facts: veh-001 is Actimed's, 45,600 km read 2026-10-08; Actimed runs
  * on the organization defaults (auto-approve under ₱5,000, operations up to
- * ₱50,000, 12% VAT on top); the work_order series continues at 1657.
+ * ₱50,000, 12% VAT on top); the work_order series continues at 1656.
  */
 
 beforeEach(function () {
@@ -92,7 +92,7 @@ it('takes an order from draft to collected', function () {
     $this->postJson("/api/v1/work-orders/{$id}/send")
         ->assertOk()
         ->assertJsonPath('data.status', 'pending_approval')
-        ->assertJsonPath('data.reference', 'WO-2026-1657')
+        ->assertJsonPath('data.reference', 'WO-2026-1656')
         ->assertJsonPath('data.approval_log.0.action', 'sent_for_approval')
         ->assertJsonPath('data.approval_log.0.amount_at_time_cents', 538750)
         ->assertJsonPath('data.approval_log.0.note', 'Quotation sent for 2 lines.');
@@ -147,7 +147,7 @@ it('takes an order from draft to collected', function () {
     $state = asSystem(fn () => MaintenanceState::query()->where('vehicle_id', $this->world->id('veh-001'))->where('service_task_id', $this->world->id('task:air-filter'))->firstOrFail());
     expect((string) $state->last_done_value)->toBe('45700.000')
         ->and($state->last_done_on->toDateString())->toBe('2026-10-08')
-        ->and(asSystem(fn () => MeterReading::query()->where('vehicle_id', $this->world->id('veh-001'))->where('source', 'work_order')->value('value')))->toBe('45700.000');
+        ->and((string) asSystem(fn () => MeterReading::query()->where('vehicle_id', $this->world->id('veh-001'))->where('source', 'work_order')->value('value')))->toBe('45700.000');
 
     signIn('advisor@mekanikomore.ph');
     $this->postJson("/api/v1/work-orders/{$id}/collect")
@@ -170,7 +170,7 @@ it('auto-approves inside the band, numbered all the same', function () {
     $this->postJson("/api/v1/work-orders/{$id}/send")
         ->assertOk()
         ->assertJsonPath('data.status', 'approved')
-        ->assertJsonPath('data.reference', 'WO-2026-1657')
+        ->assertJsonPath('data.reference', 'WO-2026-1656')
         ->assertJsonPath('data.lines.0.approved_by_name', 'System (auto-approval)')
         ->assertJsonPath('data.approval_log.0.action', 'auto_approved')
         ->assertJsonPath('data.history.1.actor_name', 'System (auto-approval)');
@@ -195,10 +195,10 @@ it('reopens a declined quote as a draft that keeps its number', function () {
 
     signIn('advisor@mekanikomore.ph');
     $this->patchJson("/api/v1/work-orders/{$id}", ['notes' => 'Re-quoted with OEM pads.'])
-        ->assertOk()->assertJsonPath('data.status', 'draft')->assertJsonPath('data.reference', 'WO-2026-1657');
-    $this->putJson("/api/v1/work-orders/{$id}/lines", ['lines' => [['id' => $lines[0], 'description' => 'OEM brake pads', 'quantity' => 2, 'unit_part_rate_cents' => 210000]]])
+        ->assertOk()->assertJsonPath('data.status', 'draft')->assertJsonPath('data.reference', 'WO-2026-1656');
+    $this->putJson("/api/v1/work-orders/{$id}/lines", ['lines' => [['id' => $lines[0], 'description' => 'OEM brake pads', 'quantity' => 2, 'unit_part_rate_cents' => 210000], ['id' => $lines[1], 'description' => 'Wiper blades', 'unit_part_rate_cents' => 65000]]])
         ->assertOk()->assertJsonPath('data.lines.0.part_cost_cents', 420000)->assertJsonPath('data.lines.0.approval_status', 'pending');
-    $this->postJson("/api/v1/work-orders/{$id}/send")->assertOk()->assertJsonPath('data.reference', 'WO-2026-1657');
+    $this->postJson("/api/v1/work-orders/{$id}/send")->assertOk()->assertJsonPath('data.reference', 'WO-2026-1656');
 });
 
 it('keeps a line with approval history on the order', function () {
