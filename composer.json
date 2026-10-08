@@ -1,0 +1,100 @@
+{
+    "$schema": "https://getcomposer.org/schema.json",
+    "name": "torquelane/api",
+    "type": "project",
+    "description": "TorqueLane API: multi-tenant ERP + CRM for Philippine automotive service businesses.",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.4",
+        "ext-pdo_pgsql": "*",
+        "brick/money": "^0.15.2",
+        "dedoc/scramble": "^0.13.47",
+        "laravel/framework": "^13.17",
+        "laravel/sanctum": "^4.3",
+        "laravel/tinker": "^3.0"
+    },
+    "require-dev": {
+        "deployer/deployer": "^8.0",
+        "fakerphp/faker": "^1.23",
+        "larastan/larastan": "^3.13",
+        "laravel/pail": "^1.2.5",
+        "laravel/pao": "^1.0.6",
+        "laravel/pint": "^1.27",
+        "mockery/mockery": "^1.6",
+        "nunomaduro/collision": "^8.6",
+        "pestphp/pest": "^4.7",
+        "pestphp/pest-plugin-arch": "^4.0",
+        "pestphp/pest-plugin-laravel": "^4.1",
+        "phpunit/phpunit": "^12.5.12"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "app/",
+            "Database\\Factories\\": "database/factories/",
+            "Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "setup": [
+            "Composer\\Config::disableProcessTimeout",
+            "@composer install --no-interaction",
+            "@php scripts/setup-env.php",
+            "docker compose up -d --wait",
+            "@php artisan migrate --force --ansi"
+        ],
+        "dev": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php artisan serve"
+        ],
+        "test": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php artisan config:clear --ansi @no_additional_args",
+            "@php vendor/bin/pest --parallel"
+        ],
+        "analyse": "@php vendor/bin/phpstan analyse --memory-limit=1G --no-progress",
+        "lint": "@php vendor/bin/pint --test",
+        "lint:fix": "@php vendor/bin/pint",
+        "openapi": "@php artisan scramble:export --path=openapi.json",
+        "openapi:check": [
+            "@openapi",
+            "git diff --exit-code -- openapi.json"
+        ],
+        "post-autoload-dump": [
+            "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
+            "@php artisan package:discover --ansi"
+        ],
+        "pre-package-uninstall": [
+            "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
+        ]
+    },
+    "scripts-descriptions": {
+        "setup": "Install dependencies, create .env, start Postgres + Mailpit, migrate.",
+        "test": "Pest, in parallel, against real Postgres.",
+        "analyse": "Larastan (level in phpstan.neon).",
+        "lint": "Pint, check only.",
+        "lint:fix": "Pint, rewrite files.",
+        "openapi": "Regenerate openapi.json with Scramble.",
+        "openapi:check": "Fail if the committed openapi.json is stale."
+    },
+    "extra": {
+        "laravel": {
+            "dont-discover": []
+        }
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "preferred-install": "dist",
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "php-http/discovery": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

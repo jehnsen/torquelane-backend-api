@@ -1,0 +1,9 @@
+{
+    "status": 403,
+    "body": {
+        "error": {
+            "code": "forbidden",
+            "message": "Only a provider admin may do this."
+        }
+    }
+}

@@ -1,0 +1,13 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    # The highest level the codebase passes cleanly (R12 floor is 6).
+    level: max
+    paths:
+        - app
+        - bootstrap/app.php
+        - config
+        - database
+        - routes
+    tmpDir: storage/phpstan

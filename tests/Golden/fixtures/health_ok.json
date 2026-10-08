@@ -1,0 +1,21 @@
+{
+    "status": 200,
+    "body": {
+        "data": {
+            "status": "ok",
+            "checked_at": "<utc-timestamp>",
+            "checks": {
+                "database": {
+                    "status": "ok",
+                    "latency_ms": "<int>"
+                },
+                "queue": {
+                    "status": "ok",
+                    "connection": "sync",
+                    "pending_jobs": 0,
+                    "last_heartbeat_at": "<utc-timestamp>"
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: lint · analyse · test · openapi
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        # Keep in step with POSTGRES_VERSION in docker-compose.yml / the staging server.
+        image: postgres:17
+        env:
+          POSTGRES_USER: torquelane
+          POSTGRES_PASSWORD: torquelane
+          POSTGRES_DB: torquelane_testing
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U torquelane -d torquelane_testing"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+
+    env:
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: torquelane_testing
+      DB_USERNAME: torquelane
+      DB_PASSWORD: torquelane
+      DB_SCHEMA: torquelane
+      PGPASSWORD: torquelane
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_pgsql, pgsql, mbstring, intl, bcmath
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache Composer downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache/files
+          key: composer-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-
+
+      - run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Prepare .env
+        run: |
+          cp .env.example .env
+          php artisan key:generate --ansi
+
+      # The roles Supabase's REST API runs as, so the revoke migration is tested for real.
+      - name: Create Supabase API roles
+        run: psql -h 127.0.0.1 -U torquelane -d torquelane_testing -v ON_ERROR_STOP=1 -f docker/postgres/init/01-supabase-roles.sql
+
+      - name: Lint (Pint)
+        run: composer lint
+
+      - name: Static analysis (Larastan)
+        run: composer analyse
+
+      - name: Tests (Pest, parallel, Postgres)
+        run: composer test
+
+      # `composer migrate` from scratch, the way a deploy runs it, on a database
+      # the tests did not touch.
+      - name: Migrate a fresh database
+        run: |
+          psql -h 127.0.0.1 -U torquelane -d torquelane_testing -c 'create database torquelane_migrate_check'
+          DB_DATABASE=torquelane_migrate_check php artisan migrate --force --ansi
+
+      - name: openapi.json is current
+        run: |
+          composer openapi
+          git diff --exit-code -- openapi.json || (echo "::error::openapi.json is stale. Run 'composer openapi' and commit the result." && exit 1)

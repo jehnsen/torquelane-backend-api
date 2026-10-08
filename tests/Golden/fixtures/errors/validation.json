@@ -1,0 +1,19 @@
+{
+    "status": 422,
+    "body": {
+        "error": {
+            "code": "validation",
+            "message": "The name field is required. (and 1 more error)",
+            "details": {
+                "fields": {
+                    "name": [
+                        "The name field is required."
+                    ],
+                    "quantity": [
+                        "The quantity field must be an integer."
+                    ]
+                }
+            }
+        }
+    }
+}

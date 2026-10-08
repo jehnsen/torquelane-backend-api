@@ -1,0 +1,168 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "TorqueLane API",
+        "version": "0.1.0",
+        "description": "TorqueLane API. Errors always use the envelope { \"error\": { \"code\", \"message\", \"details\"? } }; clients branch on `code`. Records outside the tenant scope of the caller answer 404 not_found, exactly like records that do not exist."
+    },
+    "servers": [
+        {
+            "url": "/api/v1",
+            "description": "Relative to the environment host, e.g. https://api-staging.<domain>"
+        }
+    ],
+    "paths": {
+        "/health": {
+            "get": {
+                "operationId": "health",
+                "description": "Database and queue status, for uptime monitors. `degraded` (queue\nheartbeat missing or older than five minutes) still answers 200; an\nunreachable database answers 503 in the error envelope, with the report\nunder `details.health`.",
+                "summary": "Health",
+                "tags": [
+                    "Health"
+                ],
+                "responses": {
+                    "503": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "object",
+                                            "properties": {
+                                                "code": {
+                                                    "type": "string"
+                                                },
+                                                "message": {
+                                                    "type": "string",
+                                                    "const": "The API cannot reach its database."
+                                                },
+                                                "details": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "health": {
+                                                            "type": "array",
+                                                            "items": {}
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "health"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "code",
+                                                "message",
+                                                "details"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "error"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "200": {
+                        "description": "`HealthResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/HealthResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": []
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "HealthResource": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string"
+                    },
+                    "checked_at": {
+                        "type": "string"
+                    },
+                    "checks": {
+                        "type": "object",
+                        "properties": {
+                            "database": {
+                                "type": "object",
+                                "properties": {
+                                    "status": {
+                                        "type": "string"
+                                    },
+                                    "latency_ms": {
+                                        "type": [
+                                            "integer",
+                                            "null"
+                                        ]
+                                    }
+                                },
+                                "required": [
+                                    "status",
+                                    "latency_ms"
+                                ]
+                            },
+                            "queue": {
+                                "type": "object",
+                                "properties": {
+                                    "status": {
+                                        "type": "string"
+                                    },
+                                    "connection": {
+                                        "type": "string"
+                                    },
+                                    "pending_jobs": {
+                                        "type": [
+                                            "integer",
+                                            "null"
+                                        ]
+                                    },
+                                    "last_heartbeat_at": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    }
+                                },
+                                "required": [
+                                    "status",
+                                    "connection",
+                                    "pending_jobs",
+                                    "last_heartbeat_at"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "database",
+                            "queue"
+                        ]
+                    }
+                },
+                "required": [
+                    "status",
+                    "checked_at",
+                    "checks"
+                ],
+                "title": "HealthResource"
+            }
+        }
+    }
+}

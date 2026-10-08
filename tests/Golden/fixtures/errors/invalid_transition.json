@@ -1,0 +1,13 @@
+{
+    "status": 409,
+    "body": {
+        "error": {
+            "code": "invalid_transition",
+            "message": "Cannot move a closed work order back to draft.",
+            "details": {
+                "from": "closed",
+                "to": "draft"
+            }
+        }
+    }
+}

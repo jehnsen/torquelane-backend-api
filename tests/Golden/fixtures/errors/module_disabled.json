@@ -1,0 +1,9 @@
+{
+    "status": 403,
+    "body": {
+        "error": {
+            "code": "module_disabled",
+            "message": "This module is not enabled for your organization."
+        }
+    }
+}
