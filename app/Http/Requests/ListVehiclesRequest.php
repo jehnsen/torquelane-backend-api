@@ -19,11 +19,18 @@ final class ListVehiclesRequest extends PaginatedRequest
             // Plate or VIN, matched on the normalised form (check-in style).
             'q' => ['sometimes', 'string', 'max:64'],
             'include_archived' => ['sometimes', 'boolean'],
+            // Derived, so evaluated per request: the worst PMS band, or an odometer reading over 14 days old.
+            'pms' => ['sometimes', 'string', 'in:ok,due_soon,overdue,stale'],
+            'department' => ['sometimes', 'string', 'max:100'],
+            // Plate, make, model, driver or location, case-insensitive substring.
+            'search' => ['sometimes', 'string', 'max:100'],
+            // plate (the default) or health (least healthy first).
+            'sort' => ['sometimes', 'string', 'in:plate,health'],
         ]);
     }
 
     /**
-     * @return array{status?: string, customer_account_id?: string, q?: string}
+     * @return array{status?: string, customer_account_id?: string, q?: string, pms?: string, department?: string, search?: string, sort?: string}
      */
     public function filters(): array
     {
@@ -36,6 +43,11 @@ final class ListVehiclesRequest extends PaginatedRequest
         }
         if ($this->filled('q')) {
             $filters['q'] = PlateNumber::normalise($this->string('q')->toString());
+        }
+        foreach (['pms', 'department', 'search', 'sort'] as $key) {
+            if ($this->filled($key)) {
+                $filters[$key] = trim($this->string($key)->toString());
+            }
         }
 
         return $filters;

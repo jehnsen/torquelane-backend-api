@@ -11,10 +11,7 @@ use App\Domain\Analytics\DemandBand;
 use App\Domain\Analytics\MonthlyCostPoint;
 use App\Domain\Analytics\UpcomingBucket;
 use App\Domain\Analytics\UrgentItem;
-use App\Domain\Fleet\PmsItem;
 use App\Domain\Fleet\ServiceTaskFacts;
-use App\Domain\Fleet\VehicleFacts;
-use App\Domain\Fleet\VehicleHealth;
 use App\Domain\Parts\DemandContributor;
 use App\Domain\Parts\FleetPartFacts;
 use App\Domain\Parts\PartDemandRow;
@@ -29,7 +26,6 @@ use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use DateTimeImmutable;
 use LogicException;
-use SplObjectStorage;
 
 /**
  * Calls the Phase 4 ports (App\Domain\Parts\PartsForecast,

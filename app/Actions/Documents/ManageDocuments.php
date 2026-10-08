@@ -12,6 +12,7 @@ use App\Models\CustomerAccount;
 use App\Models\Document;
 use App\Models\User;
 use App\Models\Vehicle;
+use App\Models\WorkOrder;
 use App\Tenancy\TenantManager;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -42,7 +43,7 @@ final class ManageDocuments
     /**
      * @param  array{name?: string|null, expires_on?: string|null, reference_number?: string|null, issued_on?: string|null, issuing_body?: string|null, notes?: string|null}  $meta
      */
-    public function upload(CustomerAccount $account, ?Vehicle $vehicle, DocumentKind $kind, UploadedFile $file, array $meta): Document
+    public function upload(CustomerAccount $account, ?Vehicle $vehicle, DocumentKind $kind, UploadedFile $file, array $meta, ?WorkOrder $order = null): Document
     {
         $context = $this->tenancy->require();
         if (($meta['expires_on'] ?? null) !== null && ! $kind->expires()) {
@@ -55,6 +56,7 @@ final class ManageDocuments
             'organization_id' => $context->organizationId(),
             'customer_account_id' => $account->id,
             'vehicle_id' => $vehicle?->id,
+            'work_order_id' => $order?->id,
             'kind' => $kind,
             'name' => $meta['name'] ?? $file->getClientOriginalName(),
             'mime_type' => $file->getMimeType(),

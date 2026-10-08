@@ -45,6 +45,19 @@ final class CustomerAccountPolicy extends TenantPolicy
         );
     }
 
+    /**
+     * The account's own approval bands (../web: a client's Fleet Manager
+     * sets them from Settings; the provider's staff may too): scope, then
+     * `settings:manage`. A portal user reaches only their own account.
+     */
+    public function manageApprovalSettings(User $user, CustomerAccount $account): Response
+    {
+        return $this->first(
+            $this->visible($this->context()->canReachAccount($account->id)),
+            $this->capability(Capability::SettingsManage),
+        );
+    }
+
     /** Suspend or reactivate: a credit decision, staff with settings:manage. */
     public function setStatus(User $user, CustomerAccount $account): Response
     {

@@ -68,6 +68,13 @@ final class TenantIsolationSuite
         'work_order_parts' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'work_order' => 'work_order_id'],
         'work_order_events' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'work_order' => 'work_order_id'],
         'approval_log' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'work_order' => 'work_order_id'],
+        // Phase 4
+        'vendors' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
+        'fleet_parts' => ['org' => 'organization_id', 'account' => 'customer_account_id', 'branch' => null],
+        'fleet_part_usages' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'fleet_part' => 'fleet_part_id'],
+        'purchase_orders' => ['org' => 'organization_id', 'account' => 'customer_account_id', 'branch' => null],
+        'purchase_order_lines' => ['org' => 'organization_id', 'account' => 'customer_account_id', 'branch' => null],
+        'purchase_order_events' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'purchase_order' => 'purchase_order_id'],
     ];
 
     /**
@@ -75,17 +82,23 @@ final class TenantIsolationSuite
      * see their own account's rows only. A vehicle's readings and maintenance
      * state belong to the vehicle's CURRENT owner (service history stays with
      * the vehicle); documents to the account they were filed under; a work
-     * order (and everything on it) to the account it was raised for.
+     * order (and everything on it) to the account it was raised for; a spare
+     * part, a purchase order and their children to the account that owns
+     * them. Vendors are the provider's own list: staff-only.
      */
     private const array ACCOUNT_OWNED = [
         'customer_accounts', 'contacts', 'consents', 'users', 'invitations', 'vehicles', 'meter_readings', 'maintenance_states', 'documents',
         'work_orders', 'work_order_lines', 'work_order_tasks', 'work_order_parts', 'work_order_events', 'approval_log',
+        'fleet_parts', 'fleet_part_usages', 'purchase_orders', 'purchase_order_lines', 'purchase_order_events',
     ];
 
     /** Organization-wide records a portal user may see (the catalogue they are measured against). */
     private const array ORGANIZATION_WIDE = ['organizations', 'service_tasks'];
 
-    /** @var array<string, array{org: string, account: string|null, branch: string|null, table: string, vehicle: string|null, work_order: string|null}> */
+    /** Child tables whose owner is their parent row's (column alias → parent). */
+    private const array PARENTS = ['vehicle', 'work_order', 'fleet_part', 'purchase_order'];
+
+    /** @var array<string, array{org: string, account: string|null, branch: string|null, table: string, parents: array<string, string>}> */
     private array $rows = [];
 
     public function __construct(public readonly World $world)
@@ -97,32 +110,35 @@ final class TenantIsolationSuite
                 $columns['account'] === null ? null : $columns['account'].' as account',
                 $columns['branch'] === null ? null : $columns['branch'].' as branch',
             ]));
-            foreach (['vehicle', 'work_order'] as $parent) {
+            foreach (self::PARENTS as $parent) {
                 if (isset($columns[$parent])) {
                     $select[] = $columns[$parent].' as '.$parent;
                 }
             }
             foreach (DB::table($table)->select($select)->get() as $row) {
+                $parents = [];
+                foreach (self::PARENTS as $parent) {
+                    if (isset($row->{$parent})) {
+                        $parents[$parent] = (string) $row->{$parent};
+                    }
+                }
                 $this->rows[(string) $row->id] = [
                     'org' => (string) $row->org,
                     'account' => isset($row->account) ? (string) $row->account : null,
                     'branch' => isset($row->branch) ? (string) $row->branch : null,
                     'table' => $table,
-                    'vehicle' => isset($row->vehicle) ? (string) $row->vehicle : null,
-                    'work_order' => isset($row->work_order) ? (string) $row->work_order : null,
+                    'parents' => $parents,
                 ];
             }
         }
 
         // Vehicle-owned rows belong to the vehicle's current owner; a work
-        // order's children to the order's account and branch.
+        // order's children to the order's account and branch; a part's or a
+        // purchase order's children to its account.
         foreach ($this->rows as $id => $row) {
-            if ($row['vehicle'] !== null) {
-                $this->rows[$id]['account'] = $this->rows[$row['vehicle']]['account'] ?? null;
-            }
-            if ($row['work_order'] !== null) {
-                $this->rows[$id]['account'] = $this->rows[$row['work_order']]['account'] ?? null;
-                $this->rows[$id]['branch'] = $this->rows[$row['work_order']]['branch'] ?? null;
+            foreach ($row['parents'] as $parentId) {
+                $this->rows[$id]['account'] = $this->rows[$parentId]['account'] ?? null;
+                $this->rows[$id]['branch'] = $this->rows[$parentId]['branch'] ?? $row['branch'];
             }
         }
     }

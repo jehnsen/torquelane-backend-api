@@ -34,7 +34,10 @@ use Laravel\Sanctum\HasApiTokens;
  * @property string|null $customer_account_id
  * @property Role $role
  * @property string|null $title
- * @property string $name
+ * @property string $name derived: "first last"
+ * @property string $first_name
+ * @property string $last_name
+ * @property string|null $username a display handle, unique per organization (case-insensitive)
  * @property string $email
  * @property string $status
  * @property CarbonImmutable|null $email_verified_at

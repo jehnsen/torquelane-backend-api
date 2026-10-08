@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $organization_id
  * @property string $customer_account_id
  * @property string|null $vehicle_id
+ * @property string|null $work_order_id the order it is attached to (same account)
  * @property DocumentKind $kind
  * @property string $name
  * @property string|null $mime_type

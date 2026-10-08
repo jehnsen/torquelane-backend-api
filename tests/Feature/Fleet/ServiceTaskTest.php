@@ -44,3 +44,23 @@ it('refuses to delete a task with history, and keeps writes to staff with settin
     Sanctum::actingAs($this->world->user('donmiguel@mekanikomor.ph'));
     $this->patchJson("/api/v1/service-tasks/{$this->oil}", ['interval_km' => 1])->assertForbidden();
 });
+
+it('refuses to delete a task a work order names, rather than failing in the database', function () {
+    Sanctum::actingAs($this->world->user('owner@mekanikomore.ph'));
+    $task = $this->postJson('/api/v1/service-tasks', ['code' => 'wiper-check', 'name' => 'Wiper check', 'category' => 'body', 'interval_km' => 10000, 'interval_months' => 6])->assertCreated()->json('data.id');
+
+    Sanctum::actingAs($this->world->user('advisor@mekanikomore.ph'));
+    $this->postJson('/api/v1/work-orders', [
+        'vehicle_id' => $this->world->id('veh-001'),
+        'title' => 'Wipers',
+        'type' => 'corrective',
+        'priority' => 'low',
+        'lines' => [['description' => 'Wiper blades', 'service_task_id' => $task, 'quantity' => 1, 'unit_part_rate_cents' => 65000, 'labour_hours' => 0.25, 'urgency' => 'optional']],
+    ])->assertCreated();
+
+    Sanctum::actingAs($this->world->user('owner@mekanikomore.ph'));
+    $this->deleteJson("/api/v1/service-tasks/{$task}")
+        ->assertStatus(409)
+        ->assertJsonPath('error.message', 'Work orders or purchase orders name this task. Deactivate it (is_active: false) instead.');
+    $this->patchJson("/api/v1/service-tasks/{$task}", ['is_active' => false])->assertOk();
+});

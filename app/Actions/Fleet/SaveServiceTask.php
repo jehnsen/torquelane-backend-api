@@ -8,6 +8,8 @@ use App\Actions\Audit\AuditTrail;
 use App\Exceptions\ConflictException;
 use App\Models\MaintenanceState;
 use App\Models\ServiceTask;
+use App\Models\WorkOrderLine;
+use App\Models\WorkOrderTask;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -62,6 +64,13 @@ final class SaveServiceTask
             $locked = ServiceTask::query()->lockForUpdate()->findOrFail($task->id);
             if (MaintenanceState::query()->where('service_task_id', $locked->id)->exists()) {
                 throw new ConflictException('Vehicles have service history for this task. Deactivate it (is_active: false) instead.');
+            }
+            // Work orders and purchase orders keep the task they named (R7):
+            // the foreign keys restrict, so refuse here rather than fail there.
+            if (WorkOrderLine::query()->where('service_task_id', $locked->id)->exists()
+                || WorkOrderTask::query()->where('service_task_id', $locked->id)->exists()
+                || DB::table('purchase_order_line_tasks')->where('service_task_id', $locked->id)->exists()) {
+                throw new ConflictException('Work orders or purchase orders name this task. Deactivate it (is_active: false) instead.');
             }
 
             $before = AuditTrail::snapshot($locked);

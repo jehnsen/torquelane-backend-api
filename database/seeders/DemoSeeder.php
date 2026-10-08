@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Domain\Access\PersonName;
 use App\Domain\Access\Role;
 use App\Domain\Crm\ConsentChannel;
 use App\Domain\Crm\ConsentPurpose;
@@ -161,7 +162,11 @@ final class DemoSeeder extends Seeder
         $this->floor($organization, $detailing, self::DETAILING_BAYS, self::DETAILING_TECHNICIANS, 'detailer');
 
         $password = Hash::make(self::PASSWORD);
+        $usernames = [];
         foreach (self::DEMO_USERS as [$email, $name, $title, $role, $clientId, $pins]) {
+            [$first, $last] = PersonName::split($name);
+            $username = PersonName::freeUsername(PersonName::usernameBase($email), $usernames);
+            $usernames[$username] = true;
             $user = new User;
             $user->forceFill([
                 'organization_id' => $organization->id,
@@ -169,6 +174,9 @@ final class DemoSeeder extends Seeder
                 'role' => $role,
                 'customer_account_id' => $clientId === null ? null : $this->ids[$clientId],
                 'name' => $name,
+                'first_name' => $first,
+                'last_name' => $last,
+                'username' => $username,
                 'title' => $title,
                 'email' => $email,
                 'password' => $password,
@@ -184,6 +192,7 @@ final class DemoSeeder extends Seeder
 
         FleetSeed::run($organization->id, $data, $this->ids);
         WorkOrderSeed::run($organization->id, $repair->id, $data, $this->ids);
+        FleetSeed::linkDocuments($data, $this->ids);
         PartsSeed::run($organization->id, $data, $this->ids);
     }
 

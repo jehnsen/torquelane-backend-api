@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Domain\Modules\Module;
 use App\Exceptions\ModuleDisabledException;
+use App\Models\WorkOrder;
 use App\Tenancy\ModuleGate;
 use App\Tenancy\TenantContextResolver;
 use App\Tenancy\TenantManager;
@@ -152,6 +153,19 @@ it('manages bays and technicians inside allowed branches', function () {
     $this->postJson('/api/v1/bays', ['branch_id' => $this->world->id('mekanikomor-binan'), 'name' => 'Not Mine'])->assertNotFound();
     $this->postJson('/api/v1/technicians', ['branch_id' => $detailing, 'name' => 'Cross Wired', 'home_bay_id' => $this->world->id('bay:bay-1')])
         ->assertStatus(422)->assertJsonPath('error.details.fields.home_bay_id.0', "The home bay must be in the technician's own branch.");
+    $this->deleteJson("/api/v1/bays/{$bay}")->assertStatus(409);
+});
+
+it('keeps a technician or bay that work orders name, rather than failing in the database', function () {
+    Sanctum::actingAs($this->world->user('owner@mekanikomore.ph'));
+    [$technician, $bay] = asSystem(fn (): array => [
+        WorkOrder::query()->whereNotNull('technician_id')->value('technician_id'),
+        WorkOrder::query()->whereNotNull('bay_id')->value('bay_id'),
+    ]);
+
+    $this->deleteJson("/api/v1/technicians/{$technician}")
+        ->assertStatus(409)
+        ->assertJsonPath('error.message', 'This technician is on work orders. Mark them inactive instead.');
     $this->deleteJson("/api/v1/bays/{$bay}")->assertStatus(409);
 });
 

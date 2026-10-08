@@ -20,16 +20,22 @@ use App\Models\Consent;
 use App\Models\Contact;
 use App\Models\CustomerAccount;
 use App\Models\Document;
+use App\Models\FleetPart;
+use App\Models\FleetPartUsage;
 use App\Models\Invitation;
 use App\Models\MaintenanceState;
 use App\Models\MeterReading;
 use App\Models\Organization;
 use App\Models\OrganizationModule;
+use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderEvent;
+use App\Models\PurchaseOrderLine;
 use App\Models\ServiceTask;
 use App\Models\Technician;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\VehicleOwnership;
+use App\Models\Vendor;
 use App\Models\WorkOrder;
 use App\Models\WorkOrderEvent;
 use App\Models\WorkOrderLine;
@@ -104,6 +110,62 @@ final class World
         $owner = $this->id('owner@mekanikomore.ph');
         $this->ids['invite:portal'] = $this->invitation($organizationId, 'new.dispatcher@northwind.ph', Role::Operations, $this->id('fc-northwind'), $owner)->id;
         $this->ids['invite:staff'] = $this->invitation($organizationId, 'new.advisor@mekanikomore.ph', Role::ServiceAdvisor, null, $owner)->id;
+
+        // A sibling account's own spare part and purchase order (the seed's are all Actimed's).
+        $this->purchasing($organizationId, $this->id('fc-northwind'), 'northwind', $this->id('task:oil-filter'), $owner, 'PO-2026-0901');
+    }
+
+    /** A spare part with a usage, and a purchase order for it with a line and its first event. */
+    private function purchasing(string $organizationId, string $accountId, string $key, string $taskId, string $actorId, string $reference): void
+    {
+        $part = new FleetPart;
+        $part->forceFill([
+            'organization_id' => $organizationId,
+            'customer_account_id' => $accountId,
+            'sku' => strtoupper($key).'-OIL',
+            'name' => 'Oil filter ('.$key.')',
+            'category' => 'engine',
+            'unit_cost_cents' => 40000,
+            'current_stock' => 1,
+            'reorder_point' => 2,
+            'preferred_vendor' => 'Parts Co',
+        ])->save();
+        $this->ids["{$key}:part"] = $part->id;
+
+        $usage = new FleetPartUsage;
+        $usage->forceFill(['organization_id' => $organizationId, 'fleet_part_id' => $part->id, 'service_task_id' => $taskId, 'quantity_per_service' => 1])->save();
+        $this->ids["{$key}:part-usage"] = $usage->id;
+
+        $order = new PurchaseOrder;
+        $order->forceFill([
+            'organization_id' => $organizationId,
+            'customer_account_id' => $accountId,
+            'reference' => $reference,
+            'vendor' => 'Parts Co',
+            'status' => 'draft',
+            'created_on' => '2026-10-01',
+            'created_by' => $actorId,
+            'created_by_name' => 'Someone',
+            'total_cents' => 80000,
+        ])->save();
+        $this->ids["{$key}:po"] = $order->id;
+
+        $line = new PurchaseOrderLine;
+        $line->forceFill([
+            'organization_id' => $organizationId,
+            'purchase_order_id' => $order->id,
+            'customer_account_id' => $accountId,
+            'fleet_part_id' => $part->id,
+            'description' => $part->name,
+            'quantity' => 2,
+            'unit_cost_cents' => 40000,
+            'line_total_cents' => 80000,
+        ])->save();
+        $this->ids["{$key}:po-line"] = $line->id;
+
+        $event = new PurchaseOrderEvent;
+        $event->forceFill(['organization_id' => $organizationId, 'purchase_order_id' => $order->id, 'status' => 'draft', 'at' => '2026-10-01T02:00:00Z', 'actor_name' => 'Someone'])->save();
+        $this->ids["{$key}:po-event"] = $event->id;
     }
 
     private function rival(): void
@@ -218,6 +280,11 @@ final class World
         $this->ids['rival:document'] = $document->id;
 
         $this->rivalWorkOrder($organizationId, $accountId, $vehicle->id, $task->id);
+
+        $vendor = new Vendor;
+        $vendor->forceFill(['organization_id' => $organizationId, 'name' => 'Rival Parts Co'])->save();
+        $this->ids['rival:vendor'] = $vendor->id;
+        $this->purchasing($organizationId, $accountId, 'rival', $task->id, $this->id('rival:admin'), 'PO-2026-0001');
     }
 
     /** A rival work order with one of everything hanging off it, for the cross-organization probes. */

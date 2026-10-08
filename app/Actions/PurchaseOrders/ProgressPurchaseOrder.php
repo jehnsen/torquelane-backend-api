@@ -118,5 +118,4 @@ final class ProgressPurchaseOrder
         return $order->status === PurchaseOrderStatus::Draft
             && PurchaseOrders::canIssue($context->role, $order->total_cents, $this->settings->forAccount($order->customerAccount()->firstOrFail(), null));
     }
-
 }

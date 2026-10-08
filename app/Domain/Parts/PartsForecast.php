@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Domain\Parts;
 
 use App\Domain\Fleet\VehicleHealth;
-use App\Domain\PurchaseOrders\PurchaseOrderStatus;
 use App\Domain\Shared\Calendar;
 use App\Domain\WorkOrders\WorkOrderStatus;
 use DateTimeImmutable;
@@ -27,7 +26,7 @@ final class PartsForecast
      * @param  list<PurchaseCoverage>  $purchaseOrders
      * @param  list<FleetPartFacts>  $parts  the account's own parts
      * @param  list<PartUsage>  $usages  which parts each task consumes
-     * @return list<PartDemandRow>  largest shortfall first, then largest quantity
+     * @return list<PartDemandRow> largest shortfall first, then largest quantity
      */
     public static function demand(array $health, array $workOrders, array $purchaseOrders, array $parts, array $usages, int $horizonWeeks, DateTimeImmutable $today): array
     {

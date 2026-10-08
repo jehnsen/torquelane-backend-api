@@ -25,8 +25,10 @@ final class UploadDocumentRequest extends ApiRequest
         return [
             'file' => ['required', 'file', 'max:'.intdiv(DocumentStorage::MAX_BYTES, 1024), 'mimetypes:'.implode(',', DocumentStorage::MIME_TYPES)],
             'kind' => ['required', 'string', Rule::enum(DocumentKind::class)],
-            'vehicle_id' => ['required_without:customer_account_id', 'nullable', 'string', 'ulid'],
-            'customer_account_id' => ['required_without:vehicle_id', 'nullable', 'string', 'ulid'],
+            'vehicle_id' => ['required_without_all:customer_account_id,work_order_id', 'nullable', 'string', 'ulid'],
+            'customer_account_id' => ['required_without_all:vehicle_id,work_order_id', 'nullable', 'string', 'ulid'],
+            // Attach to a work order: filed under the order's account, on its vehicle.
+            'work_order_id' => ['sometimes', 'nullable', 'string', 'ulid'],
             'name' => ['sometimes', 'nullable', 'string', 'max:255'],
             'expires_on' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
             'reference_number' => ['sometimes', 'nullable', 'string', 'max:255'],

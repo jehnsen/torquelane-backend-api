@@ -317,7 +317,7 @@ final class FleetQueries
     }
 
     /**
-     * @param  array{status?: string, customer_account_id?: string, q?: string}  $filters
+     * @param  array{status?: string, customer_account_id?: string, q?: string, pms?: string, department?: string, search?: string, sort?: string}  $filters
      * @return LengthAwarePaginator<int, VehicleView>
      */
     public function vehiclePage(array $filters, bool $includeArchived, int $perPage): LengthAwarePaginator
@@ -326,15 +326,44 @@ final class FleetQueries
         if (isset($filters['status'])) {
             $query->where('status', $filters['status']);
         }
-        if (isset($filters['customer_account_id'])) {
-            $query->where('customer_account_id', $filters['customer_account_id']);
+        foreach (['customer_account_id', 'department'] as $column) {
+            if (isset($filters[$column])) {
+                $query->where($column, $filters[$column]);
+            }
         }
         if (isset($filters['q']) && $filters['q'] !== '') {
             $q = $filters['q'];
             $query->where(fn (Builder $w) => $w->where('plate_normalized', $q)->orWhere('vin_normalized', $q)->orWhere('plate_normalized', 'like', addcslashes($q, '%_\\').'%'));
         }
+        if (($filters['search'] ?? '') !== '') {
+            $like = '%'.addcslashes(mb_strtolower($filters['search']), '%_\\').'%';
+            $query->where(function (Builder $w) use ($like): void {
+                foreach (['plate_number', 'make', 'model', 'assigned_to', 'location'] as $column) {
+                    $w->orWhereRaw("lower(coalesce({$column}, '')) like ?", [$like]);
+                }
+            });
+        }
+        $query->orderBy('plate_normalized')->orderBy('id');
 
-        $page = $query->orderBy('plate_normalized')->orderBy('id')->paginate($perPage);
+        // PMS band, staleness and health are derived: evaluate the matching
+        // set, then filter, order and page it here.
+        if (isset($filters['pms']) || ($filters['sort'] ?? 'plate') === 'health') {
+            /** @var list<Vehicle> $all */
+            $all = array_values($query->get()->all());
+            $views = $this->views($all);
+            $pms = $filters['pms'] ?? null;
+            if ($pms !== null) {
+                $views = array_values(array_filter($views, fn (VehicleView $v): bool => $pms === 'stale' ? $v->odometerStale : $v->health?->status === $pms));
+            }
+            if (($filters['sort'] ?? 'plate') === 'health') {
+                usort($views, fn (VehicleView $a, VehicleView $b): int => ($a->health->healthScore ?? 101) <=> ($b->health->healthScore ?? 101));
+            }
+            $page = Paginator::resolveCurrentPage();
+
+            return new Paginator(array_slice($views, ($page - 1) * $perPage, $perPage), count($views), $perPage, $page);
+        }
+
+        $page = $query->paginate($perPage);
         /** @var list<Vehicle> $vehicles */
         $vehicles = array_values($page->items());
 
@@ -398,13 +427,29 @@ final class FleetQueries
     }
 
     /**
-     * @param  array{vehicle_id?: string, customer_account_id?: string, kind?: string, expiring_within?: int}  $filters
+     * @param  array{vehicle_id?: string, work_order_id?: string, customer_account_id?: string, kind?: string, expiring_within?: int, status?: string, q?: string, sort?: string}  $filters
      * @return LengthAwarePaginator<int, Document>
      */
     public function documentPage(array $filters, int $perPage): LengthAwarePaginator
     {
+        $query = $this->filteredDocuments($filters);
+        if (($filters['sort'] ?? 'uploaded') === 'expiry') {
+            $query->orderByRaw('expires_on asc nulls last')->orderByDesc('uploaded_on')->orderByDesc('id');
+        } else {
+            $query->orderByDesc('uploaded_on')->orderByDesc('id');
+        }
+
+        return $query->paginate($perPage);
+    }
+
+    /**
+     * @param  array{vehicle_id?: string, work_order_id?: string, customer_account_id?: string, kind?: string, expiring_within?: int, status?: string, q?: string, sort?: string}  $filters
+     * @return Builder<Document>
+     */
+    public function filteredDocuments(array $filters): Builder
+    {
         $query = $this->documents();
-        foreach (['vehicle_id', 'customer_account_id', 'kind'] as $column) {
+        foreach (['vehicle_id', 'work_order_id', 'customer_account_id', 'kind'] as $column) {
             if (isset($filters[$column])) {
                 $query->where($column, $filters[$column]);
             }
@@ -413,7 +458,51 @@ final class FleetQueries
             $query->whereNotNull('expires_on')->where('expires_on', '<=', Calendar::toDate(Calendar::addDays($this->today(), $filters['expiring_within'])));
         }
 
-        return $query->orderByDesc('uploaded_on')->orderByDesc('id')->paginate($perPage);
+        // Compliance::documentStatus as a range on expires_on.
+        $today = Calendar::toDate($this->today());
+        $warning = Calendar::toDate(Calendar::addDays($this->today(), FleetThresholds::BADGE_WARNING_DAYS));
+        match ($filters['status'] ?? null) {
+            'expired' => $query->where('expires_on', '<', $today),
+            'expiring' => $query->where('expires_on', '>=', $today)->where('expires_on', '<=', $warning),
+            'ok' => $query->where(fn (Builder $w) => $w->whereNull('expires_on')->orWhere('expires_on', '>', $warning)),
+            default => null,
+        };
+
+        if (($filters['q'] ?? '') !== '') {
+            $like = '%'.addcslashes(mb_strtolower((string) $filters['q']), '%_\\').'%';
+            $plates = $this->vehicles(true)->select('id')->whereRaw('lower(plate_number) like ?', [$like]);
+            $query->where(fn (Builder $w) => $w
+                ->whereRaw('lower(name) like ?', [$like])
+                ->orWhereRaw("lower(coalesce(notes, '')) like ?", [$like])
+                ->orWhereRaw("lower(coalesce(uploaded_by_name, '')) like ?", [$like])
+                ->orWhereIn('vehicle_id', $plates));
+        }
+
+        return $query;
+    }
+
+    /**
+     * The documents screen's tiles over the filtered set: how many, their
+     * total size, and how many expire within the 45-day warning window
+     * (already expired included).
+     *
+     * @param  array{vehicle_id?: string, work_order_id?: string, customer_account_id?: string, kind?: string, expiring_within?: int, status?: string, q?: string, sort?: string}  $filters
+     * @return array{count: int, total_bytes: int, expiring_soon: int, expiring_window_days: int}
+     */
+    public function documentSummary(array $filters): array
+    {
+        $row = $this->filteredDocuments($filters)->toBase()
+            ->selectRaw('count(*) as n, coalesce(sum(size_bytes), 0) as bytes, count(*) filter (where expires_on is not null and expires_on <= ?) as soon', [
+                Calendar::toDate(Calendar::addDays($this->today(), FleetThresholds::DOCUMENT_EXPIRY_WARNING_DAYS)),
+            ])->first();
+        $value = fn (string $key): int => is_object($row) && isset($row->{$key}) && is_numeric($row->{$key}) ? (int) $row->{$key} : 0;
+
+        return [
+            'count' => $value('n'),
+            'total_bytes' => $value('bytes'),
+            'expiring_soon' => $value('soon'),
+            'expiring_window_days' => FleetThresholds::DOCUMENT_EXPIRY_WARNING_DAYS,
+        ];
     }
 
     /**

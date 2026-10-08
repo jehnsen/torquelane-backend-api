@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Invitations;
 
 use App\Actions\Audit\AuditTrail;
+use App\Domain\Access\PersonName;
 use App\Domain\Tenancy\ScopeDenial;
 use App\Exceptions\AccountSuspendedException;
 use App\Exceptions\ConflictException;
@@ -61,6 +62,8 @@ final class AcceptInvitation
                 'role' => $invitation->role,
                 'customer_account_id' => $invitation->customer_account_id,
                 'name' => $invitation->name,
+                'first_name' => PersonName::split($invitation->name)[0],
+                'last_name' => PersonName::split($invitation->name)[1],
                 'title' => $invitation->title,
                 'email' => $invitation->email,
                 'password' => $password,

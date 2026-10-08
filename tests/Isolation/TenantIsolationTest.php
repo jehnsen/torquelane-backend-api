@@ -71,5 +71,10 @@ it('probes each parameterised route with records from another organization and a
         ->toContain($this->world->id('rival:bay'))
         ->toContain($this->world->id('rival:technician'))
         ->toContain($this->world->id('fc-northwind'))
-        ->toContain($this->world->id('walk-in'));
+        ->toContain($this->world->id('walk-in'))
+        ->toContain($this->world->id('rival:vendor'))
+        ->toContain($this->world->id('rival:part'))
+        ->toContain($this->world->id('rival:po'))
+        ->toContain($this->world->id('northwind:part'))
+        ->toContain($this->world->id('northwind:po'));
 });

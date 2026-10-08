@@ -42,14 +42,12 @@ final class SpreadsheetWriter
 
     public static function xlsx(ExportTable $table): string
     {
-        $path = tempnam(sys_get_temp_dir(), 'xlsx');
-        if ($path === false) {
-            throw new RuntimeException('Cannot create a temporary file.');
-        }
+        // ZipArchive writes only to a path; a random name, created exclusively.
+        $path = sys_get_temp_dir().DIRECTORY_SEPARATOR.'xlsx-'.bin2hex(random_bytes(12)).'.xlsx';
 
         try {
             $zip = new ZipArchive;
-            if ($zip->open($path, ZipArchive::OVERWRITE) !== true) {
+            if ($zip->open($path, ZipArchive::CREATE | ZipArchive::EXCL) !== true) {
                 throw new RuntimeException('Cannot write the workbook.');
             }
             $zip->addFromString('[Content_Types].xml', self::CONTENT_TYPES);

@@ -194,6 +194,24 @@ final class FleetSeed
         }
     }
 
+    /**
+     * Attaches the seeded documents to their work orders, once the orders
+     * exist (WorkOrderSeed runs after this seed).
+     *
+     * @param  array<string, mixed>  $data  demo-seed.json
+     * @param  array<string, string>  $ids
+     */
+    public static function linkDocuments(array $data, array $ids): void
+    {
+        $state = self::map($data['state'] ?? null);
+        foreach (self::list($state['documents'] ?? null) as $document) {
+            $d = self::map($document);
+            if (is_string($d['workOrderId'] ?? null)) {
+                DB::table('documents')->where('id', $ids[self::str($d['id'] ?? null)])->update(['work_order_id' => $ids[$d['workOrderId']]]);
+            }
+        }
+    }
+
     private static function int(mixed $value): int
     {
         return is_int($value) ? $value : throw new RuntimeException('Expected a whole number in the demo seed.');

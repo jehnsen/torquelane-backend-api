@@ -122,7 +122,7 @@ return new class extends Migration
 
         // R7: an issued purchase order is immutable but for its status moving on.
         DB::unprepared(<<<'SQL'
-            create function purchase_orders_keep_issued() returns trigger language plpgsql as $$
+            create or replace function purchase_orders_keep_issued() returns trigger language plpgsql as $$
             begin
                 if old.status <> 'draft' and (
                     new.customer_account_id is distinct from old.customer_account_id
@@ -143,7 +143,7 @@ return new class extends Migration
             create trigger purchase_orders_keep_issued before update or delete on purchase_orders
                 for each row execute function purchase_orders_keep_issued();
 
-            create function purchase_order_lines_keep_issued() returns trigger language plpgsql as $$
+            create or replace function purchase_order_lines_keep_issued() returns trigger language plpgsql as $$
             declare
                 order_status text;
             begin

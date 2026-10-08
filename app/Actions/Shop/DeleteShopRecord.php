@@ -8,6 +8,7 @@ use App\Actions\Audit\AuditTrail;
 use App\Exceptions\ConflictException;
 use App\Models\Bay;
 use App\Models\Technician;
+use App\Models\WorkOrder;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -26,6 +27,10 @@ final class DeleteShopRecord
             if (Technician::query()->where('home_bay_id', $locked->id)->exists()) {
                 throw new ConflictException('This bay is a technician\'s home bay. Reassign them or mark the bay inactive.');
             }
+            // Work orders keep the bay they were booked into (the key restricts).
+            if (WorkOrder::query()->where('bay_id', $locked->id)->exists()) {
+                throw new ConflictException('Work orders were booked into this bay. Mark it inactive instead.');
+            }
 
             $before = AuditTrail::snapshot($locked);
             $locked->delete();
@@ -37,6 +42,10 @@ final class DeleteShopRecord
     {
         DB::transaction(function () use ($technician): void {
             $locked = Technician::query()->lockForUpdate()->findOrFail($technician->id);
+            // Work orders keep the technician who did them (the key restricts).
+            if (WorkOrder::query()->where('technician_id', $locked->id)->exists()) {
+                throw new ConflictException('This technician is on work orders. Mark them inactive instead.');
+            }
 
             $before = AuditTrail::snapshot($locked);
             $locked->delete();

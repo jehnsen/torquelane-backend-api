@@ -84,3 +84,35 @@ it('keeps settings to staff', function () {
 
     $this->getJson('/api/v1/approval-settings')->assertForbidden();
 });
+
+it('lets an account\'s own Fleet Manager set its bands, as ../web\'s Settings did', function () {
+    $uri = '/api/v1/customer-accounts/'.$this->world->id('fc-actimed').'/approval-settings';
+
+    Sanctum::actingAs($this->world->user('donmiguel@mekanikomor.ph'));
+    $this->getJson($uri)->assertOk()
+        ->assertJsonPath('data.overrides', [])
+        ->assertJsonPath('data.effective.auto_approve_under_cents', 500000);
+
+    $this->patchJson($uri, ['auto_approve_under_cents' => 250000, 'monthly_budget_cents' => 20000000])
+        ->assertOk()
+        ->assertJsonPath('data.overrides', ['auto_approve_under_cents' => 250000, 'monthly_budget_cents' => 20000000])
+        ->assertJsonPath('data.effective.auto_approve_under_cents', 250000)
+        ->assertJsonPath('data.effective.ops_approval_under_cents', 5000000);
+
+    // null goes back to inheriting; an absent key is unchanged.
+    $this->patchJson($uri, ['auto_approve_under_cents' => null])
+        ->assertOk()
+        ->assertJsonPath('data.overrides', ['monthly_budget_cents' => 20000000])
+        ->assertJsonPath('data.effective.auto_approve_under_cents', 500000);
+    $this->getJson('/api/v1/requests')->assertJsonPath('data.monthly_budget_cents', 20000000);
+
+    // Only their own account, and only with settings:manage.
+    $this->patchJson('/api/v1/customer-accounts/'.$this->world->id('fc-northwind').'/approval-settings', ['sla_hours' => 1])->assertNotFound();
+    Sanctum::actingAs($this->world->user('ops@mekanikomore.ph'));
+    $this->getJson($uri)->assertOk();
+    $this->patchJson($uri, ['sla_hours' => 1])->assertForbidden();
+
+    // Staff with settings:manage may set them too.
+    Sanctum::actingAs($this->world->user('owner@mekanikomore.ph'));
+    $this->patchJson($uri, ['sla_hours' => 8])->assertOk()->assertJsonPath('data.overrides.sla_hours', 8);
+});

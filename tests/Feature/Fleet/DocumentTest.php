@@ -87,3 +87,25 @@ it('deletes the row and then the file', function () {
     Storage::disk('documents')->assertMissing($path);
     $this->getJson("/api/v1/documents/{$id}")->assertNotFound();
 });
+
+it('attaches a document to a work order, filed under the order\'s account and vehicle', function () {
+    Sanctum::actingAs($this->world->user('advisor@mekanikomore.ph'));
+    $order = $this->world->id('wo-0079');
+
+    $attached = $this->getJson("/api/v1/documents?work_order_id={$order}&per_page=100")->assertOk()->json('data');
+    expect($attached)->not->toBeEmpty()
+        ->and(array_unique(array_column($attached, 'work_order_id')))->toBe([$order]);
+
+    upload(['work_order_id' => $order, 'kind' => 'invoice'])
+        ->assertCreated()
+        ->assertJsonPath('data.work_order_id', $order)
+        ->assertJsonPath('data.vehicle_id', $this->world->id('veh-007'))
+        ->assertJsonPath('data.customer_account_id', $this->world->id('fc-actimed'));
+    upload(['work_order_id' => $order, 'vehicle_id' => $this->world->id('veh-001'), 'kind' => 'invoice'])->assertUnprocessable();
+    upload(['work_order_id' => $this->world->id('rival:work-order'), 'kind' => 'invoice'])->assertNotFound();
+
+    // Another account's portal user cannot attach to it, nor see it.
+    Sanctum::actingAs($this->world->user('fleet@northwind.ph'));
+    upload(['work_order_id' => $order, 'kind' => 'invoice'])->assertNotFound();
+    $this->getJson("/api/v1/documents?work_order_id={$order}")->assertOk()->assertJsonPath('meta.total', 0);
+});

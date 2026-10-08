@@ -45,10 +45,10 @@ final class SaveFleetPartRequest extends ApiRequest
      */
     public function partAttributes(): array
     {
-        $attributes = $this->safe()->except(['customer_account_id', 'usages']);
-        foreach (['sku', 'name', 'unit', 'preferred_vendor'] as $text) {
-            if (is_string($attributes[$text] ?? null)) {
-                $attributes[$text] = trim($attributes[$text]);
+        $attributes = [];
+        foreach ($this->safe()->except(['customer_account_id', 'usages']) as $key => $value) {
+            if (is_string($key)) {
+                $attributes[$key] = in_array($key, ['sku', 'name', 'unit', 'preferred_vendor'], true) && is_string($value) ? trim($value) : $value;
             }
         }
 
@@ -56,7 +56,7 @@ final class SaveFleetPartRequest extends ApiRequest
     }
 
     /**
-     * @return list<array{service_task_id: string, quantity_per_service: int}>|null  null: not given
+     * @return list<array{service_task_id: string, quantity_per_service: int}>|null null: not given
      */
     public function usages(): ?array
     {

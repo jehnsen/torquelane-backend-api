@@ -17,6 +17,20 @@ final class FinishWorkOrder
 {
     public function __construct(private readonly WorkOrderJournal $journal) {}
 
+    /**
+     * A vehicle's finished jobs released together (../web collectWorkOrders,
+     * the check-out panel): all or none, locked in id order.
+     *
+     * @param  list<WorkOrder>  $orders
+     * @return list<WorkOrder>
+     */
+    public function markAllCollected(array $orders): array
+    {
+        usort($orders, fn (WorkOrder $a, WorkOrder $b): int => strcmp($a->id, $b->id));
+
+        return DB::transaction(fn (): array => array_map($this->markCollected(...), $orders));
+    }
+
     public function markCollected(WorkOrder $order): WorkOrder
     {
         return DB::transaction(function () use ($order): WorkOrder {

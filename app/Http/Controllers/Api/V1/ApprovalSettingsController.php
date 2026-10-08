@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Actions\Accounts\SetApprovalOverrides;
 use App\Actions\WorkOrders\ApprovalSettingsResolver;
 use App\Actions\WorkOrders\SaveApprovalSettings;
 use App\Actions\WorkOrders\WorkOrderQueries;
@@ -11,11 +12,14 @@ use App\Domain\Access\AccessMatrix;
 use App\Domain\Access\Capability;
 use App\Domain\Approvals\ApprovalSettings;
 use App\Domain\Tenancy\TenantContext;
+use App\Http\Requests\SaveAccountApprovalSettingsRequest;
 use App\Http\Requests\SaveApprovalSettingsRequest;
 use App\Models\Branch;
+use App\Models\CustomerAccount;
 use App\Tenancy\TenantManager;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * Approval bands and billing settings, folded organization → branch →
@@ -46,6 +50,45 @@ final class ApprovalSettingsController
             'branch_id' => $branchId,
             'branch_override' => $branchId === null ? null : (object) $this->queries->branchOverride($branchId),
             'effective' => $this->resolver->forBranch($branchId)->toArray(),
+        ]]);
+    }
+
+    /**
+     * Show an account's approval settings
+     *
+     * The account's sparse overrides and the settings they resolve to (for
+     * staff, in the selected branch). Anyone who can see the account; a
+     * portal user's own.
+     */
+    public function showAccount(CustomerAccount $customerAccount): JsonResponse
+    {
+        Gate::authorize('view', $customerAccount);
+
+        return $this->account($customerAccount);
+    }
+
+    /**
+     * Update an account's approval settings
+     *
+     * `settings:manage`: the account's own Fleet Manager (portal), or staff.
+     * Each key sets that band for the account; null goes back to inheriting;
+     * an absent key is unchanged. Money in centavos.
+     */
+    public function updateAccount(SaveAccountApprovalSettingsRequest $request, CustomerAccount $customerAccount, SetApprovalOverrides $set): JsonResponse
+    {
+        Gate::authorize('manageApprovalSettings', $customerAccount);
+
+        return $this->account($set->handle($customerAccount, $request->changes()));
+    }
+
+    private function account(CustomerAccount $account): JsonResponse
+    {
+        $branchId = $this->tenancy->require()->isStaff() ? $this->tenancy->require()->selectedBranchId : null;
+
+        return new JsonResponse(['data' => [
+            'customer_account_id' => $account->id,
+            'overrides' => (object) ($account->approval_threshold_overrides ?? []),
+            'effective' => $this->resolver->forAccount($account, $branchId)->toArray(),
         ]]);
     }
 

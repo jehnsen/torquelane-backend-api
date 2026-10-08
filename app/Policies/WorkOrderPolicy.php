@@ -67,6 +67,12 @@ final class WorkOrderPolicy extends TenantPolicy
         return $this->act($order, Capability::WorkOrderUpdate, staffOnly: true);
     }
 
+    /** Raising the overdue queue as drafts; each account is then checked on its own. */
+    public function autoSchedule(User $user): Response
+    {
+        return $this->first($this->capability(Capability::WorkOrderCreate), $this->module(Module::RepairPms));
+    }
+
     public function viewShop(User $user): Response
     {
         return $this->first($this->staffOnly(), $this->module(Module::RepairPms));

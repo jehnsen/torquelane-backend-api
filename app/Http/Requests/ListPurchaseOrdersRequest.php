@@ -38,7 +38,7 @@ final class ListPurchaseOrdersRequest extends PaginatedRequest
     }
 
     /** Export format; xlsx by default, as ../web exported. */
-    public function format(): string
+    public function exportFormat(): string
     {
         return $this->string('format', 'xlsx')->toString();
     }

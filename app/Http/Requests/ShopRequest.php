@@ -24,6 +24,7 @@ final class ShopRequest extends ApiRequest
             'to' => ['sometimes', 'date_format:Y-m-d', 'after:from'],
             'days' => ['sometimes', 'integer', 'min:1', 'max:90'],
             'branch_id' => ['sometimes', 'string', 'ulid'],
+            'months' => ['sometimes', 'integer', 'in:3,6,12'],
         ];
     }
 

@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\V1\AlertController;
+use App\Http\Controllers\Api\V1\AnalyticsController;
+use App\Http\Controllers\Api\V1\ApprovalRequestsController;
 use App\Http\Controllers\Api\V1\ApprovalSettingsController;
 use App\Http\Controllers\Api\V1\Auth\InvitationAcceptanceController;
 use App\Http\Controllers\Api\V1\Auth\PasswordController;
@@ -13,19 +15,24 @@ use App\Http\Controllers\Api\V1\CheckInController;
 use App\Http\Controllers\Api\V1\ConsentController;
 use App\Http\Controllers\Api\V1\ContactController;
 use App\Http\Controllers\Api\V1\CustomerAccountController;
+use App\Http\Controllers\Api\V1\DemandForecastController;
 use App\Http\Controllers\Api\V1\DocumentController;
 use App\Http\Controllers\Api\V1\DocumentFileController;
+use App\Http\Controllers\Api\V1\FleetPartController;
 use App\Http\Controllers\Api\V1\FleetSummaryController;
 use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\InvitationController;
 use App\Http\Controllers\Api\V1\MeterReadingController;
 use App\Http\Controllers\Api\V1\ModuleController;
 use App\Http\Controllers\Api\V1\OrganizationController;
+use App\Http\Controllers\Api\V1\ProfileController;
+use App\Http\Controllers\Api\V1\PurchaseOrderController;
 use App\Http\Controllers\Api\V1\ServiceTaskController;
 use App\Http\Controllers\Api\V1\ShopController;
 use App\Http\Controllers\Api\V1\TechnicianController;
 use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\VehicleController;
+use App\Http\Controllers\Api\V1\VendorController;
 use App\Http\Controllers\Api\V1\WorkOrderController;
 use Illuminate\Support\Facades\Route;
 
@@ -54,6 +61,8 @@ Route::prefix('auth')->group(function (): void {
 // --------------------------------------------------------- tenant data
 Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::get('me', [SessionController::class, 'me'])->name('me');
+    Route::patch('me', [ProfileController::class, 'update'])->name('me.update');
+    Route::put('me/password', [ProfileController::class, 'password'])->middleware('throttle:password-reset')->name('me.password');
 
     Route::get('organization', [OrganizationController::class, 'show'])->name('organization.show');
     Route::patch('organization', [OrganizationController::class, 'update'])->name('organization.update');
@@ -96,6 +105,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::get('fleet/summary', FleetSummaryController::class)->name('fleet.summary');
     Route::apiResource('service-tasks', ServiceTaskController::class);
 
+    Route::get('documents/summary', [DocumentController::class, 'summary'])->name('documents.summary');
     Route::apiResource('documents', DocumentController::class)->except(['store', 'update']);
     Route::post('documents', [DocumentController::class, 'store'])->middleware('idempotent')->name('documents.store');
     Route::get('documents/{document}/download', [DocumentController::class, 'download'])->name('documents.download');
@@ -109,9 +119,14 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::get('approval-settings', [ApprovalSettingsController::class, 'show'])->name('approval-settings.show');
     Route::put('approval-settings', [ApprovalSettingsController::class, 'updateOrganization'])->name('approval-settings.update');
     Route::put('branches/{branch}/approval-settings', [ApprovalSettingsController::class, 'updateBranch'])->name('branches.approval-settings.update');
+    Route::get('customer-accounts/{customer_account}/approval-settings', [ApprovalSettingsController::class, 'showAccount'])->name('customer-accounts.approval-settings.show');
+    Route::patch('customer-accounts/{customer_account}/approval-settings', [ApprovalSettingsController::class, 'updateAccount'])->name('customer-accounts.approval-settings.update');
 
     Route::get('work-orders', [WorkOrderController::class, 'index'])->name('work-orders.index');
+    Route::get('work-orders/summary', [WorkOrderController::class, 'summary'])->name('work-orders.summary');
     Route::post('work-orders', [WorkOrderController::class, 'store'])->middleware('idempotent')->name('work-orders.store');
+    Route::post('work-orders/collect', [WorkOrderController::class, 'collectMany'])->name('work-orders.collect-many');
+    Route::post('work-orders/auto-schedule', [WorkOrderController::class, 'autoSchedule'])->name('work-orders.auto-schedule');
     Route::get('work-orders/{work_order}', [WorkOrderController::class, 'show'])->name('work-orders.show');
     Route::patch('work-orders/{work_order}', [WorkOrderController::class, 'update'])->name('work-orders.update');
     Route::put('work-orders/{work_order}/lines', [WorkOrderController::class, 'lines'])->name('work-orders.lines');
@@ -135,7 +150,35 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
         Route::get('floor', [ShopController::class, 'floor'])->name('floor');
         Route::get('technicians', [ShopController::class, 'technicians'])->name('technicians');
         Route::get('revenue', [ShopController::class, 'revenue'])->name('revenue');
+        Route::get('home', [ShopController::class, 'home'])->name('home');
+        Route::get('reports', [ShopController::class, 'reports'])->name('reports');
+        Route::get('clients', [ShopController::class, 'clients'])->name('clients');
+        Route::get('clients/{customer_account}', [ShopController::class, 'client'])->name('clients.show');
     });
+
+    // Purpose-built reads for the fleet screens (Phase 4).
+    Route::prefix('analytics')->name('analytics.')->group(function (): void {
+        Route::get('dashboard', [AnalyticsController::class, 'dashboard'])->name('dashboard');
+        Route::get('schedule', [AnalyticsController::class, 'schedule'])->name('schedule');
+        Route::get('reports', [AnalyticsController::class, 'reports'])->name('reports');
+        Route::get('auto-schedule', [AnalyticsController::class, 'autoSchedule'])->name('auto-schedule');
+    });
+    Route::get('requests', ApprovalRequestsController::class)->name('requests');
+
+    // Parts and purchasing (Phase 4): the provider's vendors, each customer
+    // account's own spare parts, the demand forecast, purchase orders.
+    Route::apiResource('vendors', VendorController::class);
+    Route::apiResource('fleet-parts', FleetPartController::class);
+    Route::get('demand-forecast', DemandForecastController::class)->name('demand-forecast');
+
+    Route::get('purchase-orders', [PurchaseOrderController::class, 'index'])->name('purchase-orders.index');
+    Route::post('purchase-orders', [PurchaseOrderController::class, 'store'])->middleware('idempotent')->name('purchase-orders.store');
+    Route::get('purchase-orders/export', [PurchaseOrderController::class, 'export'])->name('purchase-orders.export');
+    Route::get('purchase-orders/{purchase_order}', [PurchaseOrderController::class, 'show'])->name('purchase-orders.show');
+    Route::get('purchase-orders/{purchase_order}/export', [PurchaseOrderController::class, 'exportOne'])->name('purchase-orders.export-one');
+    Route::post('purchase-orders/{purchase_order}/send', [PurchaseOrderController::class, 'send'])->name('purchase-orders.send');
+    Route::post('purchase-orders/{purchase_order}/receive', [PurchaseOrderController::class, 'receive'])->name('purchase-orders.receive');
+    Route::post('purchase-orders/{purchase_order}/cancel', [PurchaseOrderController::class, 'cancel'])->name('purchase-orders.cancel');
 });
 
 // A signed, 60-second URL from GET documents/{id}/download: the signature is

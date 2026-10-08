@@ -16,6 +16,7 @@ use App\Models\Bay;
 use App\Models\CustomerAccount;
 use App\Models\ServiceTask;
 use App\Models\Technician;
+use App\Models\Vehicle;
 use App\Models\WorkOrder;
 use App\Models\WorkOrderEvent;
 use App\Models\WorkOrderLine;
@@ -27,6 +28,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator as Paginator;
 
 /**
+ * @phpstan-type WorkOrderFilters array{status?: list<string>, customer_account_id?: string, vehicle_id?: string, branch_id?: string, scheduled_for?: string, technician_id?: string, bay_id?: string, stage?: string, type?: string, q?: string, sort?: string}
+ *
  * The read side of work orders: what the caller may see, as models or as the
  * domain snapshot (WorkOrderFacts) the approval and shop rules read.
  */
@@ -48,24 +51,94 @@ final class WorkOrderQueries
     }
 
     /**
-     * @param  array{status?: list<string>, customer_account_id?: string, vehicle_id?: string, branch_id?: string, scheduled_for?: string}  $filters
+     * @param  WorkOrderFilters  $filters
      * @return LengthAwarePaginator<int, WorkOrderView>
      */
     public function page(array $filters, int $perPage): LengthAwarePaginator
     {
-        $query = $this->orders()->with(self::RELATIONS);
+        $query = $this->filtered($filters)->with(self::RELATIONS);
+        match ($filters['sort'] ?? 'opened') {
+            'scheduled' => $query->orderByRaw('scheduled_for asc nulls first')->orderBy('id'),
+            'completed' => $query->orderByRaw('completed_on desc nulls last')->orderByDesc('id'),
+            'queue' => $query->orderByRaw("status <> 'in_progress'")->orderByRaw('scheduled_for asc nulls first')->orderBy('id'),
+            default => $query->orderByDesc('opened_on')->orderByDesc('id'),
+        };
+
+        $page = $query->paginate($perPage);
+
+        return new Paginator($this->views(array_values($page->items())), $page->total(), $page->perPage(), $page->currentPage());
+    }
+
+    /**
+     * The visible orders matching the list filters (no ordering).
+     *
+     * @param  WorkOrderFilters  $filters
+     * @return Builder<WorkOrder>
+     */
+    public function filtered(array $filters): Builder
+    {
+        $query = $this->orders();
         if (isset($filters['status'])) {
             $query->whereIn('status', $filters['status']);
         }
-        foreach (['customer_account_id', 'vehicle_id', 'branch_id', 'scheduled_for'] as $column) {
+        foreach (['customer_account_id', 'vehicle_id', 'branch_id', 'scheduled_for', 'technician_id', 'bay_id', 'type'] as $column) {
             if (isset($filters[$column])) {
                 $query->where($column, $filters[$column]);
             }
         }
+        match ($filters['stage'] ?? null) {
+            'active' => $query->whereNotIn('status', [WorkOrderStatus::Closed->value, WorkOrderStatus::Cancelled->value]),
+            'completed' => $query->where('status', WorkOrderStatus::Closed->value),
+            'cancelled' => $query->where('status', WorkOrderStatus::Cancelled->value),
+            default => null,
+        };
+        if (($filters['q'] ?? '') !== '') {
+            $like = '%'.addcslashes(mb_strtolower((string) $filters['q']), '%_\\').'%';
+            $plates = Vehicle::query()->visibleTo($this->tenancy->require())->select('id')->whereRaw('lower(plate_number) like ?', [$like]);
+            $customers = CustomerAccount::query()->visibleTo($this->tenancy->require())->select('id')->whereRaw('lower(display_name) like ?', [$like]);
+            $query->where(fn (Builder $w) => $w
+                ->whereRaw('lower(reference) like ?', [$like])
+                ->orWhereRaw('lower(title) like ?', [$like])
+                ->orWhereRaw("lower(coalesce(technician_name, '')) like ?", [$like])
+                ->orWhereRaw('lower(vendor) like ?', [$like])
+                ->orWhereIn('vehicle_id', $plates)
+                ->orWhereIn('customer_account_id', $customers));
+        }
 
-        $page = $query->orderByDesc('opened_on')->orderByDesc('id')->paginate($perPage);
+        return $query;
+    }
 
-        return new Paginator($this->views(array_values($page->items())), $page->total(), $page->perPage(), $page->currentPage());
+    /**
+     * What the list screens total: orders per bucket under the scope filters
+     * (account, vehicle, branch), and the count and value (workOrderCost:
+     * labour plus resolved parts, centavos) of the fully filtered set.
+     *
+     * @param  WorkOrderFilters  $filters
+     * @return array{buckets: array{active: int, completed: int, cancelled: int, all: int}, filtered: array{count: int, value_cents: int}}
+     */
+    public function summary(array $filters): array
+    {
+        $scope = array_intersect_key($filters, array_flip(['customer_account_id', 'vehicle_id', 'branch_id']));
+        $counts = $this->filtered($scope)->selectRaw('status, count(*) as n')->groupBy('status')->pluck('n', 'status');
+        $buckets = ['active' => 0, 'completed' => 0, 'cancelled' => 0, 'all' => 0];
+        foreach ($counts as $status => $n) {
+            $n = is_numeric($n) ? (int) $n : 0;
+            $buckets['all'] += $n;
+            $buckets[match ((string) $status) {
+                WorkOrderStatus::Closed->value => 'completed',
+                WorkOrderStatus::Cancelled->value => 'cancelled',
+                default => 'active',
+            }] += $n;
+        }
+
+        $value = 0;
+        $count = 0;
+        foreach ($this->filtered($filters)->with(self::RELATIONS)->lazyById(200) as $order) {
+            $count++;
+            $value += $this->fact($order)->costCents();
+        }
+
+        return ['buckets' => $buckets, 'filtered' => ['count' => $count, 'value_cents' => $value]];
     }
 
     public function view(WorkOrder $order): WorkOrderView

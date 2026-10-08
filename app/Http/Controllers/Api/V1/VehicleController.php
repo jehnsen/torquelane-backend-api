@@ -32,7 +32,11 @@ final class VehicleController
      * List vehicles
      *
      * `q` matches a plate or VIN on its normalised form ("abc-1234" finds
-     * "ABC 1234"), exactly or as a plate prefix.
+     * "ABC 1234"), exactly or as a plate prefix; `search` is a substring of
+     * plate, make, model, driver or location. Filter by `status`,
+     * `customer_account_id`, `department`, and `pms` (ok, due_soon, overdue:
+     * the worst band; stale: odometer over 14 days old). `sort=health` lists
+     * the least healthy first (else by plate).
      */
     public function index(ListVehiclesRequest $request, FleetQueries $fleet): VehicleCollection
     {

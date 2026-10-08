@@ -15,8 +15,8 @@ Larastan 3 at level **max** · Pint · Deployer 8.
 ## Where the frontend is
 
 The phase briefs refer to the frontend as `../web`. On this machine it lives at
-**`../pms-monitoring-frontend`** (the sibling directory). It is read-only from
-here. Its `CLAUDE.md`, `types/index.ts`, `lib/tenancy.ts` and `lib/rbac.ts`
+**`~/Projects/NextJS/pms-monitoring-frontend`** (not a sibling of this
+repository). It is read-only from here. Its `CLAUDE.md`, `types/index.ts`, `lib/tenancy.ts` and `lib/rbac.ts`
 hold the rules being ported (R11): health-score weights, reference issued at
 draft → pending_approval, stored approved line costs, fail-closed tenancy,
 sibling-account isolation, deterministic alert ids.
@@ -54,6 +54,7 @@ app/Models/                      thin Eloquent models; every one HasUlids and (u
 app/Tenancy/                     TenantManager, the BelongsToOrganization trait + OrganizationScope,
                                  TenantContextResolver, ModuleGate, TenantAwareUserProvider.
 app/Documents/                   DocumentStorage: the private `documents` disk and signed downloads.
+app/Exports/                     SpreadsheetWriter: an ExportTable as CSV or a minimal XLSX (no dependency).
 app/Casts/                       MoneyCast (*_cents ↔ Money), DecimalCast (numeric ↔ BigDecimal),
                                  JsonObject (nullable jsonb object; {} stays {}).
 app/Database/                    migration helpers: AppendOnly, SchemaMacros, EnsureSchemaExists.
@@ -64,6 +65,7 @@ tests/Arch/                      architecture rules + the model classification (
 tests/Feature/Api/               HTTP behaviour against real Postgres.
 tests/Feature/Database/          database conventions (triggers, revokes, casts, schema).
 tests/Feature/{Auth,Tenancy,Numbering}/  login, invites, /me, branch header, suspension, guards, series.
+tests/Feature/Parity/            ParitySmokeTest: every endpoint in docs/frontend-parity.md, as admin and fleet manager.
 tests/Isolation/                 tenant isolation; coverage.php lists every GET route (R5);
                                  TenantIsolationSuite probes them all for every demo user.
 tests/Golden/                    byte-exact response fixtures; a diff is an API change.
@@ -577,6 +579,99 @@ WO-2026-1656, seeded here unnumbered). Approvers and event actors keep
 their recorded names (no user ids); collections are credited to the demo user
 of that name.
 
+## Parts, purchasing and API parity (Phase 4)
+
+### Tables (Phase 4)
+
+| Table | Notes |
+|---|---|
+| `vendors` | The provider's service vendors (../web `pms_vendors`), name unique per organization. Staff-only. |
+| `fleet_parts` | A customer account's OWN spare parts (not shop inventory, which is Phase 6): SKU unique per account, unit cost, `current_stock` (CHECK ≥ 0), reorder point, preferred vendor (a parts supplier), lead time, `position`. |
+| `fleet_part_usages` | Which service tasks consume a part, and how many per service: the forecast's input. `position` keeps the order ties are broken in. |
+| `purchase_orders` | Per account: `reference` (`PO-YYYY-NNNN`, issued at CREATION from the organization's `purchase_order` series), vendor, status `draft`/`sent`/`received`/`cancelled` (CHECK ties each to its timestamp), `total_cents`, who/when per move, `cancellation_reason`. Trigger: once issued, only the status moves; never deleted. |
+| `purchase_order_lines` | Part (same account, composite FK; nullable for an off-catalogue item), quantity, unit cost, `line_total_cents` (CHECK = qty × unit). Trigger: an issued order's lines never change. |
+| `purchase_order_line_tasks`, `purchase_order_line_vehicles` | The due items a line covers (task × vehicle), so the forecast stops counting them. |
+| `purchase_order_events` | **Append-only** status history. |
+| `users` (altered) | `first_name`, `last_name` (`name` stays the derived "first last"), `username`: a handle, never a credential, unique per ORGANIZATION case-insensitively (../web: global), nullable until chosen. |
+| `documents` (altered) | `work_order_id`: the order a document is attached to. Composite FK to `work_orders (id, customer_account_id)`, so it can only be the account's own order. |
+| `work_orders` (altered) | Unique `(id, customer_account_id)` (the documents FK target); a cancelled draft may lack a reference (it never drew a number). |
+
+### Parts and purchasing
+
+- **Stock is per customer account**, never pooled: the brief's "customer's own
+  spare parts". The forecast (`App\Domain\Parts\PartsForecast`, ../web
+  `computePartsDemand` + `summariseDemand`) is always for ONE account: its
+  vehicles' PMS items due within the horizon, less what its live work orders
+  and open purchase orders cover, against its own stock. Staff name the
+  account; portal users get their own.
+- **Raising purchase requests** (`RaisePurchaseOrders`): the client names the
+  PARTS; the server recomputes the forecast on the locked account and orders
+  each part's shortfall at its unit cost, one draft per preferred vendor,
+  numbered in the transaction. Quantities and prices sent are never read. It
+  is new work: `createWorkFor` (a suspended account takes none).
+- **Moves** (`ProgressPurchaseOrder`, `PurchaseOrderMachine`): draft → sent
+  (issuing IS the approval: the order's total must be within the issuer's
+  band, `Approvals::canApprove` under the account's settings; `can_send` on
+  the resource), sent → received (restocks the account's parts, rows
+  locked), draft | sent → cancelled (with a reason). `po:issue` for all.
+- **Export** (`PurchaseOrderExport`, ../web `lib/po-export.ts`): the same
+  rows and columns, as XLSX (a minimal Office Open XML workbook written with
+  ZipArchive, no dependency) or CSV; money from centavos as exact pesos.
+
+### Purpose-built reads
+
+The frontend computed these from the whole store; now one call each, over
+the caller's scope (staff may narrow with `customer_account_id`):
+
+- `GET /analytics/dashboard`, `/analytics/schedule`, `/analytics/reports`,
+  `/analytics/auto-schedule`: every `lib/analytics.ts` series
+  (`App\Domain\Analytics\Analytics`) through `AnalyticsQueries`. Orders count
+  for the account stamped on them; reports narrow to orders closed in the
+  window (as ../web's page did).
+- `GET /requests`: the approvals queue (`App\Domain\Approvals\ApprovalRequests`),
+  each order judged against its OWN effective settings (../web read one set).
+- `GET /shop/home`, `/shop/reports`, `/shop/clients`, `/shop/clients/{id}`.
+- List totals and derived filters: `GET /work-orders/summary` and
+  `stage`/`type`/`q`/`technician_id`/`bay_id`/`sort` on the list;
+  `GET /documents/summary` and `status`/`q`/`sort`/`work_order_id`;
+  vehicles `pms` (band or `stale`), `department`, `search`, `sort=health`
+  (derived, so evaluated in memory, then paged).
+- Writes the store did that had no endpoint: `PATCH /me`, `PUT /me/password`,
+  `POST /work-orders/collect` (a vehicle's jobs, all or none),
+  `POST /work-orders/auto-schedule` (`App\Domain\Analytics\AutoSchedule`,
+  ../web's dialog: overdue items no live order covers, worst first, three a
+  day from tomorrow; suspended accounts left out), and
+  `GET|PATCH /customer-accounts/{id}/approval-settings` (a client's Fleet
+  Manager sets its own bands, as in ../web; staff too).
+
+**docs/frontend-parity.md** maps every ../web screen and store mutation to
+its endpoints; Phase 5 switches over against it.
+
+### Golden replay (Phase 4)
+
+`tests/Golden/PartsAnalyticsGoldenTest.php` replays parts-forecast.json and
+analytics.json against the pure ports: every case matches exactly.
+`PartsAnalyticsDbGoldenTest` replays them end to end through the seed and
+the API: the dashboard series per scope (monthly costs, load, demand bands,
+rolling spend, urgent items), the rankings over every order in scope
+(through `AnalyticsQueries` into the domain), the 6-month trend and the
+year's fleet distance, the seeded catalogue against parts.json, and
+Actimed's 6-week forecast (rows and summary) as portal user and as staff.
+**18 forecast sweeps are pinned** by name: ../web kept one fleet-wide parts
+list, so its whole-fleet and other-client sweeps price every client's items
+against the same shelf; here stock is per account and only Actimed's is
+seeded. A sweep neither replayed nor pinned fails the test.
+
+### Demo data (Phase 4)
+
+`Database\Seeders\Demo\PartsSeed`: ../web's six `pms_vendors`; Actimed's 25
+parts with their usages (`data/parts-catalogue.json`, from parts.json's
+constants) and stock from the seed state; the two demo purchase orders (the
+`purchase_order` series continues at PO-2026-0003). `FleetSeed::linkDocuments`
+attaches 131 documents to their work orders once the orders exist. Demo
+users get first/last names split from `name` and usernames from their email
+(`PersonName`, ../web's backfill rule).
+
 ## Rules that bite
 
 - **Tests use `RefreshApiDatabase`, never `DatabaseTruncation`.** The
@@ -682,6 +777,37 @@ of that name.
   settings, staff the selected branch's (`FleetQueries::alerts`).
 - **Seed and test ULIDs are monotonic**, so ordering by id reproduces ../web's
   array order (alerts, technician "current job", shop queues).
+- **Stock moves only by receiving a purchase order.** `current_stock` is an
+  opening count on create; an edit refuses it (and the account). Every
+  forecast, raise and receive is per account; never read another account's
+  shelf.
+- **A purchase order's quantities and prices come from the server's own
+  forecast**, never the request. It is numbered at CREATION (unlike a work
+  order) and, once sent, only its status moves (trigger); orders are never
+  deleted, only cancelled.
+- **Raising purchase orders, and auto-scheduling, are new work**:
+  authorize `createWorkFor` on every account involved.
+- **A trigger function in a migration is `create or replace`.**
+  `migrate:fresh` drops tables, not functions; a plain `create function`
+  fails the second time.
+- **Module checks in policies are deferred** (`TenantPolicy::module()`
+  returns a Closure that `first()` runs in order): evaluated eagerly they
+  would answer 403 module_disabled for a record the scope check was about to
+  hide as 404.
+- **A catalogue task, technician or bay that work orders (or purchase
+  orders) name is never deleted**: the keys restrict, so the action answers
+  409 first. Deactivate instead.
+- **docs/frontend-parity.md is a test input.** `ParitySmokeTest` reads its
+  tables: every `` `METHOD /path` `` must be a route; each GET must answer
+  2xx to a caller on its row's side (`staff`/`portal`/`both`) and 403/404 to
+  the other; every status must be `done`. A new screen or endpoint gets a
+  row; a new placeholder gets a seeded id in the test.
+- **Derived list filters are evaluated in memory** (vehicle PMS band,
+  staleness, health order): the matching rows are loaded and evaluated, then
+  paged. Keep them off unbounded tables.
+- **Never name a FormRequest method after a `Request` method** (`format()`
+  broke every request class's autoload). And the arch security preset bans
+  `tempnam`: temporary paths use `random_bytes`.
 
 ## Running it
 
@@ -764,7 +890,7 @@ audit rows). Fill in the rest from the phase plan.
 - [x] **1**: Identity & tenancy (organizations, branches, customer accounts, contacts, consents, users/invites, bays, technicians, modules, document series, audit log; Sanctum SPA auth; /me)
 - [x] **2**: Fleet & maintenance (vehicles, ownership, meter readings, PMS catalogue, generic maintenance engine, documents in private storage, derived alerts)
 - [x] **3**: Repair core (work orders, per-line approvals, billing in centavos, check-in, shop floor)
-- [ ] **4**: *(title not provided)*
+- [x] **4**: Parts, purchasing, analytics and API parity (vendors, fleet parts, purchase orders, forecast, analytics, purpose-built reads, docs/frontend-parity.md)
 - [ ] **5**: *(title not provided)*
 - [ ] **6**: *(title not provided)*
 - [ ] **7**: *(title not provided)*
@@ -803,3 +929,15 @@ organization-wide work-order series; branch managers approve without
 limit; scheduling and collection are staff-only; re-approving a variance
 needs authority over the actual amount; portal requests wait unassigned
 to a branch until staff take them in.
+
+Phase 4 status: done locally (gates green; every parts-forecast and
+analytics case matches the pure ports; the DB replay matches every
+dashboard, ranking and Actimed forecast sweep, 18 forecast sweeps pinned
+with their reason). docs/frontend-parity.md: every row `done`, none
+dropped. Decisions taken here, for review: stock and forecasts per customer
+account; purchase orders numbered at creation, issuing held to the
+issuer's approval band on the order total; vendors staff-only; usernames
+unique per organization (../web: global); bulk collection all or none
+(../web skipped ineligible orders silently); auto-schedule leaves out
+suspended accounts; a client's Fleet Manager edits its own approval bands
+(new endpoint; the account-update endpoint keeps them staff-only).

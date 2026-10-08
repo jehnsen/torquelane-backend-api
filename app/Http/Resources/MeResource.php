@@ -37,6 +37,9 @@ final class MeResource extends JsonResource
             'user' => [
                 'id' => $me->user->id,
                 'name' => $me->user->name,
+                'first_name' => $me->user->first_name,
+                'last_name' => $me->user->last_name,
+                'username' => $me->user->username,
                 'email' => $me->user->email,
                 'title' => $me->user->title,
                 'role' => $context->role->value,

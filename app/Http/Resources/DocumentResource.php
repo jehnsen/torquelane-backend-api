@@ -37,6 +37,7 @@ final class DocumentResource extends JsonResource
             'id' => $document->id,
             'customer_account_id' => $document->customer_account_id,
             'vehicle_id' => $document->vehicle_id,
+            'work_order_id' => $document->work_order_id,
             'kind' => $document->kind->value,
             'kind_label' => $document->kind->label(),
             'name' => $document->name,

@@ -101,7 +101,12 @@ final class PartsQueries
      */
     public function plates(CustomerAccount $account): array
     {
-        return Vehicle::query()->where('customer_account_id', $account->id)->pluck('plate_number', 'id')->map(fn (mixed $plate): string => is_string($plate) ? $plate : '')->all();
+        $plates = [];
+        foreach (Vehicle::query()->where('customer_account_id', $account->id)->get(['id', 'plate_number']) as $vehicle) {
+            $plates[$vehicle->id] = $vehicle->plate_number;
+        }
+
+        return $plates;
     }
 
     /**
@@ -114,7 +119,7 @@ final class PartsQueries
     }
 
     /**
-     * @return list<PartUsage>  in position order (the forecast's tie order)
+     * @return list<PartUsage> in position order (the forecast's tie order)
      */
     public function usages(string $accountId): array
     {
