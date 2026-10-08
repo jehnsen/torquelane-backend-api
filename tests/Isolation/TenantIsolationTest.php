@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Branch;
 use App\Tenancy\TenantManager;
+use Illuminate\Routing\Middleware\ThrottleRequests;
 use Laravel\Sanctum\Sanctum;
 use Tests\Isolation\TenantIsolationSuite;
 use Tests\Support\World;
@@ -29,6 +30,8 @@ it('never shows a caller another tenant\'s records', function (string $who) {
         return $user->customer_account_id === null && $pins !== [] ? array_values($pins) : null;
     });
 
+    // The probe count per user exceeds the api rate limit; throttling is not what this suite tests.
+    $this->withoutMiddleware(ThrottleRequests::class);
     Sanctum::actingAs($user);
 
     $probes = $this->suite->probes();

@@ -14,6 +14,7 @@ use App\Tenancy\BelongsToOrganization;
  *    explicit allowlist ArchTest's trait rule refers to (GLOBAL_MODELS).
  */
 const MODEL_TENANCY = [
+    'App\Models\AlertInteraction' => ['tenant', ''],
     'App\Models\AuditLog' => ['tenant', ''],
     'App\Models\Bay' => ['tenant', ''],
     'App\Models\Branch' => ['tenant', ''],
@@ -21,13 +22,19 @@ const MODEL_TENANCY = [
     'App\Models\Consent' => ['tenant', ''],
     'App\Models\Contact' => ['tenant', ''],
     'App\Models\CustomerAccount' => ['tenant', ''],
+    'App\Models\Document' => ['tenant', ''],
     'App\Models\DocumentSeries' => ['tenant', ''],
     'App\Models\IdempotencyKey' => ['global', 'Infrastructure keyed per user, pruned after 24h; holds no business data.'],
     'App\Models\Invitation' => ['tenant', ''],
+    'App\Models\MaintenanceState' => ['tenant', ''],
+    'App\Models\MeterReading' => ['tenant', ''],
     'App\Models\Organization' => ['global', 'The tenant root itself: always loaded by the session\'s own organization_id, never listed.'],
     'App\Models\OrganizationModule' => ['tenant', ''],
+    'App\Models\ServiceTask' => ['tenant', ''],
     'App\Models\Technician' => ['tenant', ''],
     'App\Models\User' => ['tenant', ''],
+    'App\Models\Vehicle' => ['tenant', ''],
+    'App\Models\VehicleOwnership' => ['tenant', ''],
 ];
 
 it('classifies every model in app/Models', function () {

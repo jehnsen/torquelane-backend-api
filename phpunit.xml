@@ -27,6 +27,9 @@
         </include>
     </source>
     <php>
+        <!-- The arch tests parse every class in app/ (and each worker loads the
+             golden fixtures): more than PHP's 128 MB default. -->
+        <ini name="memory_limit" value="1G"/>
         <env name="APP_ENV" value="testing" force="true"/>
         <env name="APP_DEBUG" value="false" force="true"/>
         <!-- A throwaway key for tests only (cookie sessions encrypt). Never used outside phpunit. -->

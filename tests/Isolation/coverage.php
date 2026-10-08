@@ -20,6 +20,7 @@ $isolated = ['isolation' => TenantIsolationSuite::class];
 return [
     'api/v1/health' => ['public' => 'Database and queue status for uptime monitors; no tenant data.'],
     'api/v1/sanctum/csrf-cookie' => ['public' => 'Sets the XSRF-TOKEN cookie for SPA login; no body, no tenant data.'],
+    'api/v1/document-files/{document}' => ['public' => 'Signed 60-second URL issued after the document policy check; the signature is the credential (tested in DocumentTest).'],
 
     'api/v1/me' => $isolated,
     'api/v1/organization' => $isolated,
@@ -39,4 +40,16 @@ return [
     'api/v1/bays/{bay}' => $isolated,
     'api/v1/technicians' => $isolated,
     'api/v1/technicians/{technician}' => $isolated,
+    'api/v1/vehicles' => $isolated,
+    'api/v1/vehicles/{vehicle}' => $isolated,
+    'api/v1/vehicles/{vehicle}/ownerships' => $isolated,
+    'api/v1/vehicles/{vehicle}/health' => $isolated,
+    'api/v1/vehicles/{vehicle}/readings' => $isolated,
+    'api/v1/fleet/summary' => $isolated,
+    'api/v1/service-tasks' => $isolated,
+    'api/v1/service-tasks/{service_task}' => $isolated,
+    'api/v1/documents' => $isolated,
+    'api/v1/documents/{document}' => $isolated,
+    'api/v1/documents/{document}/download' => $isolated,
+    'api/v1/alerts' => $isolated,
 ];

@@ -53,6 +53,7 @@ app/Models/                      thin Eloquent models; every one HasUlids and (u
                                  BelongsToOrganization.
 app/Tenancy/                     TenantManager, the BelongsToOrganization trait + OrganizationScope,
                                  TenantContextResolver, ModuleGate, TenantAwareUserProvider.
+app/Documents/                   DocumentStorage: the private `documents` disk and signed downloads.
 app/Casts/                       MoneyCast (*_cents ↔ Money), DecimalCast (numeric ↔ BigDecimal),
                                  JsonObject (nullable jsonb object; {} stays {}).
 app/Database/                    migration helpers: AppendOnly, SchemaMacros, EnsureSchemaExists.
@@ -367,6 +368,111 @@ Samahuzai-Biñan) and `cashier@mekanikomore.ph` (cashier, pinned to
 MekanikoMoR-Biñan). Password `demo1234`; refuses to run in production.
 Override keys are converted from pesos/camelCase to centavos/snake_case.
 
+## Fleet and maintenance (Phase 2)
+
+### Tables (Phase 2)
+
+| Table | Notes |
+|---|---|
+| `vehicles` | Owner `customer_account_id` (the CURRENT owner; composite FK), `plate_number` + `plate_normalized` (upper case, no spaces/dashes; unique per organization among unarchived vehicles), `vin` + `vin_normalized` (likewise), class, fuel, `size_class` (`small`/`medium`/`large`/`xl`, for detailing pricing), status `active`/`in_service`/`down`, assignment, acquisition and expiry dates, `archived_at`. Never deleted: DELETE archives and frees the plate. **No odometer column.** |
+| `vehicle_ownerships` | History: vehicle, account, `from_date`, `to_date` (null = current; one current per vehicle, partial unique index). |
+| `meter_readings` | **Append-only.** Polymorphic asset (`asset_type` = `vehicle` now, equipment in Phase 10) plus a typed FK per asset kind (`vehicle_id`, CHECKed equal to `asset_id`) so the database still guarantees the asset. `meter_kind` `km`/`hours`/`cycles`/`cups`, `value` numeric(14,3), `read_on`, `source`, `recorded_by`. Corrections are VOID rows (`voids_reading_id`, no value, unique per voided reading). |
+| `service_tasks` | Organization-wide PMS catalogue: `code` (slug, unique per organization), name, category, `interval_km`, `interval_months`, `estimated_cost_cents`, `estimated_hours`, `critical`, `is_active`, `position` (catalogue order). |
+| `maintenance_states` | Per asset × task: `meter_kind`, `last_done_value`, `last_done_on` (replaces ../web's `task_state` jsonb). Same polymorphic + typed-FK shape. |
+| `documents` | `customer_account_id` = the account the document was FILED UNDER (for a vehicle: its owner at upload), optional `vehicle_id`, `kind` (CHECK), name, mime, size, `storage_path` (null for imported paper records), `expires_on` (CHECK: renewal kinds only), reference/issued/issuer/notes, `uploaded_by` + `uploaded_by_name`, `uploaded_on`. |
+| `alert_interactions` | Per user × scope key × alert id: `read_at`, `dismissed_at`. Alerts themselves are never stored. |
+
+### The maintenance engine
+
+- **`App\Domain\Maintenance` is generic** (Phase 10 reuses it for equipment):
+  an asset has meters (`MeterState`: kind, value, read on, daily rate); a
+  `PlanItem` has per-meter intervals and/or a calendar interval; a
+  `LastService` anchors them. `IntervalEngine::evaluate` projects each meter
+  limit onto the calendar from the SAME anchor (last service), so the
+  earliest limit governs before and after a breach (ties: meters in order,
+  then time). Output: band (`on_schedule`/`due_soon`/`overdue`), remaining
+  amounts, projected due date, `governedBy`, progress. A meter with rate 0
+  falls back to calendar × 100 (the frontend's rule); with no calendar it
+  never falls due.
+- **`App\Domain\Fleet` is the vehicle adapter** and reproduces ../web exactly:
+  `IntervalStatus` (computeIntervalStatus), `Pms` (evaluateTask,
+  evaluateVehicle with the STEEP health weights −25/−15/−8/−4, evaluateFleet,
+  compareUrgency, odometerAgeDays, isOdometerStale, applyCompletion),
+  `FleetSummary` (summariseFleet), `OdometerValidation`, `Compliance`,
+  `PlateNumber`. `App\Domain\Alerts\Alerts` ports buildAlerts/viewAlerts
+  (including the work-order and approval-SLA rules, ready for work orders);
+  `App\Domain\WorkOrders\WorkOrderCosting` ports resolvePartsCost /
+  workOrderCost in exact decimals.
+- **`FleetThresholds` is the one place** for DUE_SOON_KM (750),
+  DUE_SOON_DAYS (21), ODOMETER_STALE_DAYS (14), the odometer rate multipliers,
+  and the 60/30/45-day document windows. GET /fleet/summary returns them.
+- **JavaScript fidelity** lives in `App\Domain\Shared`: `JsMath::round`
+  (halves towards +∞, unlike PHP's `round`), `Calendar` (date-fns addMonths
+  clamping, addDays, differenceInCalendarDays, all in Manila),
+  `BusinessHours` (Mon–Fri 08:00–18:00), `WebFormat` (`23,000 km`,
+  `08 Oct 2026`, `5 days overdue`). Every ported rule rounds and counts days
+  through these, or its outputs drift.
+- **Odometer and daily rate are DERIVED** (`MeterRate`) from the effective
+  readings (not voided, not void rows): current = latest by date then id;
+  rate = (current − baseline) / days, baseline = earliest reading in the 90
+  days before the current one, else the most recent before that window;
+  fewer than two dated readings → 0 (calendar governs). The demo seed's
+  stored rates are reproduced exactly with a second reading 30 days earlier.
+- **Readings are gated** by the ported validation: below current → 422 (the
+  frontend's message); over 3× / under 0.1× the average → 422 warning until
+  re-sent with `confirm_warning`; plus not in the future and not before the
+  current reading's date. The vehicle row is locked while validating.
+
+### Golden replay (Phase 2)
+
+`tests/Golden/FleetGoldenTest.php` replays pms.json (2,002 cases),
+interval-status.json (28), odometer-validation.json (236), compliance.json
+(288) and alerts.json (17): **every case matches exactly**, compared
+strictly (keys sorted, integral floats as ints, `===`). Money cases assert
+in integer centavos, as the fixtures README intends. A deliberate one-point
+change to a health weight fails 11 cases (checked). `FleetDbGoldenTest`
+replays end to end through the seeded database and the API with the clock
+frozen: GET /vehicles/{id}/health for all 32 seed vehicles = the fixture's
+`$health`; GET /fleet/summary per scope = summariseFleet sweeps; GET /alerts
+per scope = buildAlerts sweeps minus work-order alerts (no work orders yet).
+
+### Ownership, visibility, documents
+
+- **Service history stays with the VEHICLE** (readings, maintenance state):
+  the new owner sees it. **Documents stay with the account they were filed
+  under**: the new owner never sees the previous owner's documents (or their
+  alerts), and the previous owner keeps their own. The previous owner loses
+  the vehicle itself. Work orders and invoices must follow the same rule
+  (stamp the owning account at creation). Transfer: staff with
+  `vehicle:manage`, receiving account must be active (`createWorkFor`).
+  Ownership history is staff-only (it names other accounts).
+- **Vehicles, readings, documents are core**; the PMS views (vehicle health,
+  fleet summary, service tasks) need `repair_pms` (403 module_disabled), and
+  GET /alerts includes PMS alerts only where it is active. A vehicle response
+  carries `pms: null` there.
+- **Files** live on the private `documents` disk (`DOCUMENTS_DISK=local` or
+  `s3` for any S3-compatible store). GET /documents/{id}/download checks the
+  policy, then returns a 60-second URL: the provider's temporary URL on S3,
+  otherwise a signed `/api/v1/document-files/{id}` (the signature is the only
+  credential; named system context "signed document download"). Upload:
+  file first, row in a transaction, file deleted if the transaction fails.
+  Delete: row first, file after commit. 10 MB, PDF/JPEG/PNG/WebP/HEIC.
+  Expiry only on the six renewal kinds (registration, CTPL, comprehensive
+  insurance, emission test, LTFRB franchise, warranty: ../web's
+  EXPIRING_KINDS); compliance counts the five roadworthiness kinds.
+- **Alerts** are derived on read (`FleetQueries::alerts`, vehicles in
+  creation order so ties match ../web). Read/dismiss/restore write the
+  caller's row in their scope bucket (`TenantScope::key()`); dismissing does
+  not mark read.
+
+### Demo data (Phase 2)
+
+`Database\Seeders\Demo\FleetSeed` (called by DemoSeeder): the 12-task
+catalogue in seed order, 32 vehicles with ownerships, two readings each
+(see MeterRate above), 384 maintenance states, 195 documents as metadata
+(no files; their work-order links wait for work orders). Bulk inserts with
+explicit ids, no audit rows.
+
 ## Rules that bite
 
 - **Tests use `RefreshApiDatabase`, never `DatabaseTruncation`.** The
@@ -426,9 +532,27 @@ Override keys are converted from pesos/camelCase to centavos/snake_case.
   `composer dev`; `php artisan key:generate` fixes it.
 - **Phase 1 migrations refuse a `users` table with rows** (Phase 0A users had
   no organization). Locally: `php artisan migrate:fresh --seed`.
-- **Running only part of the suite in one process**: the arch tests need
-  more than PHP's default 128 MB (`php -d memory_limit=1G vendor/bin/pest …`);
-  `composer test` (parallel) is fine.
+- **The test suite needs more than 128 MB** (the arch tests parse every
+  class; workers load the golden fixtures): `phpunit.xml` sets
+  `memory_limit=1G` for every worker.
+- **Never round or count days with PHP built-ins in a ported rule.**
+  `round(-2.5)` is −3, `Math.round(-2.5)` is −2; `DateTime::modify('+1
+  month')` overflows 31 Jan into March, date-fns clamps to 28/29 Feb. Use
+  `JsMath`, `Calendar`, `WebFormat`.
+- **Never store an odometer or a daily rate.** Both are derived from
+  readings; a correction is a void row (`RecordReading::void`), never an
+  update (the table is append-only).
+- **Readings are polymorphic with a typed FK.** A new asset kind (equipment)
+  adds its own nullable FK column and extends the CHECKs on `meter_readings`
+  and `maintenance_states`, in a new migration.
+- **A vehicle's documents are filed under its owner at upload**
+  (`ManageDocuments::upload`). Never derive a document's account from the
+  vehicle's current owner at read time: that is the previous-owner leak.
+- **Alert ids are identity.** `pms:<vehicle>:<task>`, `doc:<document>`,
+  `licence:<vehicle>`, `wo:<order>`, `approval-sla:<order>`; read/dismiss
+  state is keyed on them.
+- **The isolation probes run without throttling.** Their count per user
+  exceeds the `api` limiter; the throttle is tested elsewhere.
 
 ## Running it
 
@@ -509,7 +633,7 @@ audit rows). Fill in the rest from the phase plan.
 
 - [x] **0A**: Foundation (scaffold, API conventions, database conventions, quality gates, staging deploy)
 - [x] **1**: Identity & tenancy (organizations, branches, customer accounts, contacts, consents, users/invites, bays, technicians, modules, document series, audit log; Sanctum SPA auth; /me)
-- [ ] **2**: *(title not provided)*
+- [x] **2**: Fleet & maintenance (vehicles, ownership, meter readings, PMS catalogue, generic maintenance engine, documents in private storage, derived alerts)
 - [ ] **3**: *(title not provided)*
 - [ ] **4**: *(title not provided)*
 - [ ] **5**: *(title not provided)*
@@ -534,3 +658,9 @@ The golden fixtures were copied from pms-monitoring-frontend@d45871e
 the `../web` the ported rules come from (`lib/rbac.ts`, `lib/tenancy.ts`,
 `app/api/admin/users/route.ts`). `branch_manager` / `cashier` grants are
 proposals pending review.
+
+Phase 2 status: done locally (gates green; every golden case of pms,
+interval-status, odometer-validation, compliance and alerts matches
+exactly). Fixtures verified byte-identical to pms-monitoring-frontend@d45871e.
+Decisions taken with the user: documents on a configurable private disk
+(local by default); expiry on the frontend's six renewal kinds.

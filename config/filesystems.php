@@ -55,6 +55,30 @@ return [
             'report' => false,
         ],
 
+        // Document files (App\Documents\DocumentStorage). Private, always:
+        // downloads are short-lived URLs issued after a policy check.
+        // DOCUMENTS_DISK=local (default) or s3 for any S3-compatible store
+        // (AWS S3, Cloudflare R2, Supabase Storage, DigitalOcean Spaces).
+        'documents' => env('DOCUMENTS_DISK', 'local') === 's3' ? [
+            'driver' => 's3',
+            'key' => env('DOCUMENTS_S3_KEY'),
+            'secret' => env('DOCUMENTS_S3_SECRET'),
+            'region' => env('DOCUMENTS_S3_REGION', 'auto'),
+            'bucket' => env('DOCUMENTS_S3_BUCKET'),
+            'endpoint' => env('DOCUMENTS_S3_ENDPOINT'),
+            'use_path_style_endpoint' => env('DOCUMENTS_S3_PATH_STYLE', true),
+            'visibility' => 'private',
+            'throw' => true,
+            'report' => false,
+        ] : [
+            'driver' => 'local',
+            'root' => storage_path('app/private/documents'),
+            'serve' => false,
+            'visibility' => 'private',
+            'throw' => true,
+            'report' => false,
+        ],
+
     ],
 
     /*

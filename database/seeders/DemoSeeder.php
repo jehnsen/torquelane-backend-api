@@ -21,6 +21,7 @@ use App\Models\User;
 use App\Tenancy\TenantManager;
 use Brick\Money\Money;
 use Carbon\CarbonImmutable;
+use Database\Seeders\Demo\FleetSeed;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -174,6 +175,8 @@ final class DemoSeeder extends Seeder
             ));
             $this->ids[$email] = $user->id;
         }
+
+        FleetSeed::run($organization->id, $data, $this->ids);
     }
 
     /**

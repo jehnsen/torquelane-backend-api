@@ -7,6 +7,8 @@ namespace Tests\Support;
 use App\Domain\Access\Role;
 use App\Domain\Crm\ConsentChannel;
 use App\Domain\Crm\ConsentPurpose;
+use App\Domain\Documents\DocumentKind;
+use App\Domain\Maintenance\MeterKind;
 use App\Domain\Modules\Module;
 use App\Models\Bay;
 use App\Models\Branch;
@@ -14,11 +16,17 @@ use App\Models\BranchModule;
 use App\Models\Consent;
 use App\Models\Contact;
 use App\Models\CustomerAccount;
+use App\Models\Document;
 use App\Models\Invitation;
+use App\Models\MaintenanceState;
+use App\Models\MeterReading;
 use App\Models\Organization;
 use App\Models\OrganizationModule;
+use App\Models\ServiceTask;
 use App\Models\Technician;
 use App\Models\User;
+use App\Models\Vehicle;
+use App\Models\VehicleOwnership;
 use App\Tenancy\TenantManager;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DemoSeeder;
@@ -132,6 +140,73 @@ final class World
         $this->ids['rival:portal'] = $this->makeUser($organization->id, 'fleet@rivalfleet.example', Role::FleetManager, $fleet->id)->id;
 
         $this->ids['rival:invite'] = $this->invitation($organization->id, 'someone@rivalfleet.example', Role::Viewer, $fleet->id, $admin->id)->id;
+
+        $this->rivalFleet($organization->id, $fleet->id);
+    }
+
+    private function rivalFleet(string $organizationId, string $accountId): void
+    {
+        $task = new ServiceTask;
+        $task->forceFill([
+            'organization_id' => $organizationId,
+            'code' => 'oil-filter',
+            'name' => 'Rival oil change',
+            'category' => 'engine',
+            'interval_km' => 5000,
+            'interval_months' => 6,
+            'critical' => true,
+        ])->save();
+        $this->ids['rival:task'] = $task->id;
+
+        $vehicle = new Vehicle;
+        $vehicle->forceFill([
+            'organization_id' => $organizationId,
+            'customer_account_id' => $accountId,
+            'plate_number' => 'NBA 4821',
+            'plate_normalized' => 'NBA4821',
+            'status' => 'active',
+            'driver_licence_expiry' => '2026-10-20',
+        ])->save();
+        $this->ids['rival:vehicle'] = $vehicle->id;
+
+        (new VehicleOwnership)->forceFill(['organization_id' => $organizationId, 'vehicle_id' => $vehicle->id, 'customer_account_id' => $accountId, 'from_date' => '2025-01-01'])->save();
+
+        foreach ([['2026-09-08', '10000'], ['2026-10-08', '11500']] as [$on, $value]) {
+            (new MeterReading)->forceFill([
+                'organization_id' => $organizationId,
+                'asset_type' => 'vehicle',
+                'asset_id' => $vehicle->id,
+                'vehicle_id' => $vehicle->id,
+                'meter_kind' => MeterKind::Km,
+                'value' => $value,
+                'read_on' => $on,
+                'source' => 'import',
+            ])->save();
+        }
+
+        (new MaintenanceState)->forceFill([
+            'organization_id' => $organizationId,
+            'asset_type' => 'vehicle',
+            'asset_id' => $vehicle->id,
+            'vehicle_id' => $vehicle->id,
+            'service_task_id' => $task->id,
+            'meter_kind' => MeterKind::Km,
+            'last_done_value' => '5000',
+            'last_done_on' => '2026-01-01',
+        ])->save();
+
+        $document = new Document;
+        $document->forceFill([
+            'organization_id' => $organizationId,
+            'customer_account_id' => $accountId,
+            'vehicle_id' => $vehicle->id,
+            'kind' => DocumentKind::Ctpl,
+            'name' => 'Rival CTPL',
+            'expires_on' => '2026-10-15',
+            'uploaded_by_name' => 'Rival Admin',
+            'uploaded_on' => '2026-01-01',
+        ])->save();
+        $this->ids['rival:document'] = $document->id;
     }
 
     private function account(string $organizationId, string $name, string $type): CustomerAccount

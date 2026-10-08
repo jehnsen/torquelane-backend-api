@@ -52,12 +52,28 @@ final class TenantIsolationSuite
         'branch_modules' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id'],
         'document_series' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id'],
         'audit_logs' => ['org' => 'organization_id', 'account' => 'customer_account_id', 'branch' => 'branch_id'],
+        // Phase 2: the fleet.
+        'vehicles' => ['org' => 'organization_id', 'account' => 'customer_account_id', 'branch' => null],
+        'vehicle_ownerships' => ['org' => 'organization_id', 'account' => 'customer_account_id', 'branch' => null],
+        'meter_readings' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'vehicle' => 'vehicle_id'],
+        'maintenance_states' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'vehicle' => 'vehicle_id'],
+        'service_tasks' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
+        'documents' => ['org' => 'organization_id', 'account' => 'customer_account_id', 'branch' => null],
+        'alert_interactions' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
     ];
 
-    /** Tables that are organization-wide but account-scoped: a portal user may see their own account's rows only. */
-    private const array ACCOUNT_OWNED = ['customer_accounts', 'contacts', 'consents', 'users', 'invitations'];
+    /**
+     * Tables that are organization-wide but account-scoped: a portal user may
+     * see their own account's rows only. A vehicle's readings and maintenance
+     * state belong to the vehicle's CURRENT owner (service history stays with
+     * the vehicle); documents to the account they were filed under.
+     */
+    private const array ACCOUNT_OWNED = ['customer_accounts', 'contacts', 'consents', 'users', 'invitations', 'vehicles', 'meter_readings', 'maintenance_states', 'documents'];
 
-    /** @var array<string, array{org: string, account: string|null, branch: string|null, table: string}> */
+    /** Organization-wide records a portal user may see (the catalogue they are measured against). */
+    private const array ORGANIZATION_WIDE = ['organizations', 'service_tasks'];
+
+    /** @var array<string, array{org: string, account: string|null, branch: string|null, table: string, vehicle: string|null}> */
     private array $rows = [];
 
     public function __construct(public readonly World $world)
@@ -69,13 +85,24 @@ final class TenantIsolationSuite
                 $columns['account'] === null ? null : $columns['account'].' as account',
                 $columns['branch'] === null ? null : $columns['branch'].' as branch',
             ]));
+            if (isset($columns['vehicle'])) {
+                $select[] = $columns['vehicle'].' as vehicle';
+            }
             foreach (DB::table($table)->select($select)->get() as $row) {
                 $this->rows[(string) $row->id] = [
                     'org' => (string) $row->org,
                     'account' => isset($row->account) ? (string) $row->account : null,
                     'branch' => isset($row->branch) ? (string) $row->branch : null,
                     'table' => $table,
+                    'vehicle' => isset($row->vehicle) ? (string) $row->vehicle : null,
                 ];
+            }
+        }
+
+        // Vehicle-owned rows belong to the vehicle's current owner.
+        foreach ($this->rows as $id => $row) {
+            if ($row['vehicle'] !== null) {
+                $this->rows[$id]['account'] = $this->rows[$row['vehicle']]['account'] ?? null;
             }
         }
     }
@@ -176,7 +203,7 @@ final class TenantIsolationSuite
             if (in_array($row['table'], self::ACCOUNT_OWNED, true)) {
                 return $row['account'] === $user->customer_account_id ? 'visible' : 'hidden';
             }
-            if ($row['table'] === 'organizations') {
+            if (in_array($row['table'], self::ORGANIZATION_WIDE, true)) {
                 return 'visible';
             }
 

@@ -12,6 +12,159 @@
         }
     ],
     "paths": {
+        "/alerts": {
+            "get": {
+                "operationId": "alerts.index",
+                "description": "Most severe first, then most urgent. PMS alerts only where repair_pms\nis active. Ids are deterministic (`pms:<vehicle>:<task>`,\n`doc:<document>`, `licence:<vehicle>`, \u2026). `?include_dismissed=1` adds\ndismissed ones (flagged).",
+                "summary": "List alerts",
+                "tags": [
+                    "Alert"
+                ],
+                "parameters": [
+                    {
+                        "name": "include_dismissed",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`AlertsResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AlertsResource"
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "total": {
+                                                    "type": "integer"
+                                                },
+                                                "unread_count": {
+                                                    "type": "integer"
+                                                },
+                                                "dismissed_count": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "total",
+                                                "unread_count",
+                                                "dismissed_count"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            }
+        },
+        "/alerts/read": {
+            "post": {
+                "operationId": "alerts.read",
+                "summary": "Mark alerts read",
+                "tags": [
+                    "Alert"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AlertInteractionRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/alerts/dismiss": {
+            "post": {
+                "operationId": "alerts.dismiss",
+                "summary": "Dismiss alerts",
+                "tags": [
+                    "Alert"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AlertInteractionRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/alerts/restore": {
+            "post": {
+                "operationId": "alerts.restore",
+                "summary": "Restore dismissed alerts",
+                "tags": [
+                    "Alert"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AlertInteractionRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
         "/bays": {
             "get": {
                 "operationId": "bays.index",
@@ -1389,6 +1542,365 @@
                 }
             }
         },
+        "/documents": {
+            "get": {
+                "operationId": "documents.index",
+                "summary": "List documents",
+                "tags": [
+                    "Document"
+                ],
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    },
+                    {
+                        "name": "vehicle_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "customer_account_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "kind",
+                        "in": "query",
+                        "schema": {
+                            "$ref": "#/components/schemas/DocumentKind"
+                        }
+                    },
+                    {
+                        "name": "expiring_within",
+                        "in": "query",
+                        "description": "Expiring within N days (already-expired included).",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 3650
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `DocumentResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/DocumentCollection"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "documents.store",
+                "description": "`document:upload`, multipart. With `vehicle_id` the document is filed\nunder the vehicle's current owner; otherwise under `customer_account_id`.\nOnly renewal kinds (registration, CTPL, comprehensive insurance,\nemission test, LTFRB franchise, warranty) take `expires_on`. Up to\n10 MB of PDF, JPEG, PNG, WebP or HEIC.",
+                "summary": "Upload a document",
+                "tags": [
+                    "Document"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UploadDocumentRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "`DocumentResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/DocumentResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/documents/{document}": {
+            "get": {
+                "operationId": "documents.show",
+                "summary": "Show a document",
+                "tags": [
+                    "Document"
+                ],
+                "parameters": [
+                    {
+                        "name": "document",
+                        "in": "path",
+                        "required": true,
+                        "description": "The document ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`DocumentResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/DocumentResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "documents.destroy",
+                "description": "`document:delete`. The file is removed after the row's deletion commits.",
+                "summary": "Delete a document",
+                "tags": [
+                    "Document"
+                ],
+                "parameters": [
+                    {
+                        "name": "document",
+                        "in": "path",
+                        "required": true,
+                        "description": "The document ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            }
+        },
+        "/documents/{document}/download": {
+            "get": {
+                "operationId": "documents.download",
+                "description": "A short-lived (60 s) URL to the file, issued after the policy check.\n409 for a record with no file (imported paper records).",
+                "summary": "Download link",
+                "tags": [
+                    "Document"
+                ],
+                "parameters": [
+                    {
+                        "name": "document",
+                        "in": "path",
+                        "required": true,
+                        "description": "The document ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "url": {
+                                                    "type": "string"
+                                                },
+                                                "expires_at": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "url",
+                                                "expires_at"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/Error.conflict"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            }
+        },
+        "/document-files/{document}": {
+            "get": {
+                "operationId": "document-files.show",
+                "description": "Streams a document's file. Reachable only through the signed, 60-second\nURL from GET /documents/{id}/download: the signature (bound to the\ndocument id and expiry, checked by the `signed` middleware) is the\ncredential, so there is no session and the lookup runs in the named\nsystem context \"signed document download\".",
+                "summary": "Document file (signed)",
+                "tags": [
+                    "DocumentFile"
+                ],
+                "parameters": [
+                    {
+                        "name": "document",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": []
+            }
+        },
+        "/fleet/summary": {
+            "get": {
+                "operationId": "fleet.summary",
+                "description": "The dashboard KPIs over the caller's vehicles (staff may narrow to one\n`customer_account_id`), the expiring-documents tile and the thresholds\nbehind them. Needs repair_pms.",
+                "summary": "Fleet summary",
+                "tags": [
+                    "FleetSummary"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`FleetSummaryResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/FleetSummaryResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            }
+        },
         "/health": {
             "get": {
                 "operationId": "health",
@@ -1668,6 +2180,217 @@
                     }
                 },
                 "security": []
+            }
+        },
+        "/vehicles/{vehicle}/readings": {
+            "get": {
+                "operationId": "vehicles.readings.index",
+                "description": "Every row, newest first, void rows included.",
+                "summary": "Reading history",
+                "tags": [
+                    "MeterReading"
+                ],
+                "parameters": [
+                    {
+                        "name": "vehicle",
+                        "in": "path",
+                        "required": true,
+                        "description": "The vehicle ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `MeterReadingResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/MeterReadingCollection"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "vehicles.readings.store",
+                "description": "`vehicle:update`. Refused below the current reading (422, the\nfrontend's message). A reading implying over 3\u00d7 or under 0.1\u00d7 the\nvehicle's average daily distance is a 422 warning on `value` until\nre-sent with `confirm_warning: true`. Not in the future, not dated\nbefore the current reading.",
+                "summary": "Record a reading",
+                "tags": [
+                    "MeterReading"
+                ],
+                "parameters": [
+                    {
+                        "name": "vehicle",
+                        "in": "path",
+                        "required": true,
+                        "description": "The vehicle ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RecordReadingRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "`MeterReadingResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/MeterReadingResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/vehicles/{vehicle}/readings/{reading}/void": {
+            "post": {
+                "operationId": "vehicles.readings.void",
+                "description": "`vehicle:manage`. Appends a correction row; nothing is edited or\ndeleted. A vehicle keeps at least one effective reading.",
+                "summary": "Void a reading",
+                "tags": [
+                    "MeterReading"
+                ],
+                "parameters": [
+                    {
+                        "name": "vehicle",
+                        "in": "path",
+                        "required": true,
+                        "description": "The vehicle ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "reading",
+                        "in": "path",
+                        "required": true,
+                        "description": "The reading ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/VoidReadingRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "`MeterReadingResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/MeterReadingResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
             }
         },
         "/modules": {
@@ -2059,6 +2782,262 @@
                     }
                 },
                 "security": []
+            }
+        },
+        "/service-tasks": {
+            "get": {
+                "operationId": "service-tasks.index",
+                "description": "In catalogue order (ties in urgency keep it), inactive ones included.",
+                "summary": "List service tasks",
+                "tags": [
+                    "ServiceTask"
+                ],
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `ServiceTaskResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ServiceTaskCollection"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "service-tasks.store",
+                "description": "Staff with `settings:manage`.",
+                "summary": "Add a service task",
+                "tags": [
+                    "ServiceTask"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SaveServiceTaskRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "`ServiceTaskResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ServiceTaskResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/service-tasks/{serviceTask}": {
+            "get": {
+                "operationId": "service-tasks.show",
+                "summary": "Show a service task",
+                "tags": [
+                    "ServiceTask"
+                ],
+                "parameters": [
+                    {
+                        "name": "serviceTask",
+                        "in": "path",
+                        "required": true,
+                        "description": "The service task ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`ServiceTaskResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ServiceTaskResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            },
+            "put": {
+                "operationId": "service-tasks.update",
+                "description": "Editing an interval never changes any vehicle's recorded service\nhistory; due dates move because they are derived.",
+                "summary": "Update a service task",
+                "tags": [
+                    "ServiceTask"
+                ],
+                "parameters": [
+                    {
+                        "name": "serviceTask",
+                        "in": "path",
+                        "required": true,
+                        "description": "The service task ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SaveServiceTaskRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`ServiceTaskResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ServiceTaskResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "service-tasks.destroy",
+                "description": "Only one no vehicle has history for (409 otherwise; deactivate it).",
+                "summary": "Delete a service task",
+                "tags": [
+                    "ServiceTask"
+                ],
+                "parameters": [
+                    {
+                        "name": "serviceTask",
+                        "in": "path",
+                        "required": true,
+                        "description": "The service task ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
             }
         },
         "/auth/login": {
@@ -2588,6 +3567,501 @@
                     }
                 }
             }
+        },
+        "/vehicles": {
+            "get": {
+                "operationId": "vehicles.index",
+                "description": "`q` matches a plate or VIN on its normalised form (\"abc-1234\" finds\n\"ABC 1234\"), exactly or as a plate prefix.",
+                "summary": "List vehicles",
+                "tags": [
+                    "Vehicle"
+                ],
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "active",
+                                "in_service",
+                                "down"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "customer_account_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "description": "Plate or VIN, matched on the normalised form (check-in style).",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 64
+                        }
+                    },
+                    {
+                        "name": "include_archived",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `VehicleResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/VehicleCollection"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "vehicles.store",
+                "description": "`vehicle:manage`. Staff name the `customer_account_id`; a portal user\nregisters to their own account. Takes the first odometer reading and\nany known service history. A suspended account takes no new vehicles\n(403 account_suspended).",
+                "summary": "Register a vehicle",
+                "tags": [
+                    "Vehicle"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SaveVehicleRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "`VehicleResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/VehicleResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/vehicles/{vehicle}": {
+            "get": {
+                "operationId": "vehicles.show",
+                "summary": "Show a vehicle",
+                "tags": [
+                    "Vehicle"
+                ],
+                "parameters": [
+                    {
+                        "name": "vehicle",
+                        "in": "path",
+                        "required": true,
+                        "description": "The vehicle ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`VehicleResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/VehicleResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            },
+            "put": {
+                "operationId": "vehicles.update",
+                "description": "`vehicle:manage`. Never the odometer (POST \u2026/readings) or the owner\n(POST \u2026/transfer).",
+                "summary": "Update a vehicle",
+                "tags": [
+                    "Vehicle"
+                ],
+                "parameters": [
+                    {
+                        "name": "vehicle",
+                        "in": "path",
+                        "required": true,
+                        "description": "The vehicle ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SaveVehicleRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`VehicleResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/VehicleResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "vehicles.destroy",
+                "description": "`vehicle:manage`. Vehicles are never deleted: history stays and the\nplate becomes free for another vehicle.",
+                "summary": "Archive a vehicle",
+                "tags": [
+                    "Vehicle"
+                ],
+                "parameters": [
+                    {
+                        "name": "vehicle",
+                        "in": "path",
+                        "required": true,
+                        "description": "The vehicle ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`VehicleResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/VehicleResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            }
+        },
+        "/vehicles/{vehicle}/transfer": {
+            "post": {
+                "operationId": "vehicles.transfer",
+                "description": "Staff with `vehicle:manage`. Service history (readings, maintenance\nstate) stays with the vehicle; documents stay with the account they\nwere filed under, so the new owner never sees the previous owner's.\nThe receiving account must be active.",
+                "summary": "Transfer ownership",
+                "tags": [
+                    "Vehicle"
+                ],
+                "parameters": [
+                    {
+                        "name": "vehicle",
+                        "in": "path",
+                        "required": true,
+                        "description": "The vehicle ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TransferVehicleRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`VehicleResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/VehicleResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/vehicles/{vehicle}/ownerships": {
+            "get": {
+                "operationId": "vehicles.ownerships",
+                "description": "Staff only (it names other customer accounts).",
+                "summary": "Ownership history",
+                "tags": [
+                    "Vehicle"
+                ],
+                "parameters": [
+                    {
+                        "name": "vehicle",
+                        "in": "path",
+                        "required": true,
+                        "description": "The vehicle ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `VehicleOwnershipResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/VehicleOwnershipCollection"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/vehicles/{vehicle}/health": {
+            "get": {
+                "operationId": "vehicles.health",
+                "description": "Every catalogue task evaluated against the vehicle, most urgent first,\nwith the health score (steep: overdue critical \u221225, overdue \u221215,\ndue-soon critical \u22128, due-soon \u22124). Needs repair_pms.",
+                "summary": "Vehicle PMS health",
+                "tags": [
+                    "Vehicle"
+                ],
+                "parameters": [
+                    {
+                        "name": "vehicle",
+                        "in": "path",
+                        "required": true,
+                        "description": "The vehicle ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`VehicleHealthResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/VehicleHealthResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            }
         }
     },
     "components": {
@@ -2617,6 +4091,30 @@
                     "password_confirmation"
                 ],
                 "title": "AcceptInvitationRequest"
+            },
+            "AlertInteractionRequest": {
+                "type": "object",
+                "properties": {
+                    "alert_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "pattern": "^(pms|wo|approval-sla|doc|licence):[0-9a-z]{26}(:[0-9a-z]{26})?$",
+                            "maxLength": 200
+                        },
+                        "minItems": 1,
+                        "maxItems": 500
+                    }
+                },
+                "required": [
+                    "alert_ids"
+                ],
+                "title": "AlertInteractionRequest"
+            },
+            "AlertsResource": {
+                "type": "array",
+                "items": {},
+                "title": "AlertsResource"
             },
             "BayCollection": {
                 "type": "array",
@@ -3219,6 +4717,298 @@
                 "additionalProperties": {},
                 "title": "CustomerAccountResource"
             },
+            "DocumentCollection": {
+                "type": "array",
+                "items": {
+                    "$ref": "#/components/schemas/DocumentResource"
+                },
+                "title": "DocumentCollection"
+            },
+            "DocumentKind": {
+                "type": "string",
+                "description": "Port of ../web's `DocumentKind` and lib/documents.ts / lib/compliance.ts kind sets. Labels are verbatim: alert bodies and the expiring-documents tile print them.\n",
+                "enum": [
+                    "invoice",
+                    "service_report",
+                    "inspection",
+                    "lto_registration",
+                    "ctpl",
+                    "comprehensive_insurance",
+                    "emission_test",
+                    "ltfrb_franchise",
+                    "warranty",
+                    "photo",
+                    "other"
+                ],
+                "title": "DocumentKind"
+            },
+            "DocumentResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "customer_account_id": {
+                        "type": "string"
+                    },
+                    "vehicle_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "kind": {
+                        "type": "string"
+                    },
+                    "kind_label": {
+                        "type": "string",
+                        "enum": [
+                            "Invoice",
+                            "Service report",
+                            "Inspection",
+                            "LTO registration",
+                            "CTPL insurance",
+                            "Comprehensive insurance",
+                            "Emission test",
+                            "LTFRB franchise",
+                            "Warranty",
+                            "Photo",
+                            "Other"
+                        ]
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "mime_type": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "size_bytes": {
+                        "type": "integer"
+                    },
+                    "has_file": {
+                        "type": "boolean"
+                    },
+                    "expires_on": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "expiry_status": {
+                        "type": "string",
+                        "description": "expired | expiring | ok",
+                        "enum": [
+                            "ok",
+                            "expiring",
+                            "expired"
+                        ]
+                    },
+                    "reference_number": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "issued_on": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "issuing_body": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "notes": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "uploaded_by": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "uploaded_by_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "uploaded_on": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "customer_account_id",
+                    "vehicle_id",
+                    "kind",
+                    "kind_label",
+                    "name",
+                    "mime_type",
+                    "size_bytes",
+                    "has_file",
+                    "expires_on",
+                    "expiry_status",
+                    "reference_number",
+                    "issued_on",
+                    "issuing_body",
+                    "notes",
+                    "uploaded_by",
+                    "uploaded_by_name",
+                    "uploaded_on",
+                    "created_at"
+                ],
+                "title": "DocumentResource"
+            },
+            "FleetSummaryResource": {
+                "type": "object",
+                "properties": {
+                    "evaluated_on": {
+                        "type": "string"
+                    },
+                    "total": {
+                        "type": "integer"
+                    },
+                    "compliant": {
+                        "type": "integer"
+                    },
+                    "due_soon": {
+                        "type": "integer"
+                    },
+                    "overdue": {
+                        "type": "integer"
+                    },
+                    "in_service": {
+                        "type": "integer"
+                    },
+                    "down": {
+                        "type": "integer"
+                    },
+                    "compliance_rate": {
+                        "type": "integer"
+                    },
+                    "avg_health_score": {
+                        "type": "integer"
+                    },
+                    "total_odometer": {
+                        "type": "number"
+                    },
+                    "documents": {
+                        "type": "object",
+                        "properties": {
+                            "expired": {
+                                "type": "integer"
+                            },
+                            "expiring": {
+                                "type": "integer"
+                            },
+                            "ok": {
+                                "type": "integer"
+                            }
+                        },
+                        "required": [
+                            "expired",
+                            "expiring",
+                            "ok"
+                        ]
+                    },
+                    "expiring_documents": {
+                        "type": "object",
+                        "properties": {
+                            "window_days": {
+                                "type": "integer",
+                                "const": 60
+                            },
+                            "total": {
+                                "type": "number"
+                            },
+                            "by_kind": {
+                                "type": "array",
+                                "items": {}
+                            }
+                        },
+                        "required": [
+                            "window_days",
+                            "total",
+                            "by_kind"
+                        ]
+                    },
+                    "thresholds": {
+                        "type": "object",
+                        "properties": {
+                            "due_soon_km": {
+                                "type": "integer",
+                                "const": 750
+                            },
+                            "due_soon_days": {
+                                "type": "integer",
+                                "const": 21
+                            },
+                            "odometer_stale_days": {
+                                "type": "integer",
+                                "const": 14
+                            },
+                            "odometer_rate_high_multiplier": {
+                                "type": "integer",
+                                "const": 3
+                            },
+                            "odometer_rate_low_multiplier": {
+                                "type": "number"
+                            },
+                            "dashboard_expiry_window_days": {
+                                "type": "integer",
+                                "const": 60
+                            },
+                            "badge_warning_days": {
+                                "type": "integer",
+                                "const": 30
+                            },
+                            "document_expiry_warning_days": {
+                                "type": "integer",
+                                "const": 45
+                            }
+                        },
+                        "required": [
+                            "due_soon_km",
+                            "due_soon_days",
+                            "odometer_stale_days",
+                            "odometer_rate_high_multiplier",
+                            "odometer_rate_low_multiplier",
+                            "dashboard_expiry_window_days",
+                            "badge_warning_days",
+                            "document_expiry_warning_days"
+                        ]
+                    }
+                },
+                "required": [
+                    "evaluated_on",
+                    "total",
+                    "compliant",
+                    "due_soon",
+                    "overdue",
+                    "in_service",
+                    "down",
+                    "compliance_rate",
+                    "avg_health_score",
+                    "total_odometer",
+                    "documents",
+                    "expiring_documents",
+                    "thresholds"
+                ],
+                "title": "FleetSummaryResource"
+            },
             "ForgotPasswordRequest": {
                 "type": "object",
                 "properties": {
@@ -3630,6 +5420,77 @@
                 ],
                 "title": "MeResource"
             },
+            "MeterReadingCollection": {
+                "type": "array",
+                "items": {
+                    "$ref": "#/components/schemas/MeterReadingResource"
+                },
+                "title": "MeterReadingCollection"
+            },
+            "MeterReadingResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "vehicle_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "meter_kind": {
+                        "type": "string"
+                    },
+                    "value": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "read_on": {
+                        "type": "string"
+                    },
+                    "source": {
+                        "type": "string"
+                    },
+                    "recorded_by": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Which staff member recorded it is the shop's business."
+                    },
+                    "voids_reading_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "void_reason": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "created_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "vehicle_id",
+                    "meter_kind",
+                    "value",
+                    "read_on",
+                    "source",
+                    "recorded_by",
+                    "voids_reading_id",
+                    "void_reason",
+                    "created_at"
+                ],
+                "title": "MeterReadingResource"
+            },
             "Module": {
                 "type": "string",
                 "enum": [
@@ -3777,6 +5638,37 @@
                     "channel"
                 ],
                 "title": "RecordConsentRequest"
+            },
+            "RecordReadingRequest": {
+                "type": "object",
+                "properties": {
+                    "value": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 99999999
+                    },
+                    "read_on": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date"
+                    },
+                    "confirm_warning": {
+                        "type": "boolean",
+                        "description": "Required to save a reading the validation flags as unusual."
+                    },
+                    "source": {
+                        "type": "string",
+                        "enum": [
+                            "manual"
+                        ]
+                    }
+                },
+                "required": [
+                    "value"
+                ],
+                "title": "RecordReadingRequest"
             },
             "ResetPasswordRequest": {
                 "type": "object",
@@ -4198,6 +6090,69 @@
                 },
                 "title": "SaveCustomerAccountRequest"
             },
+            "SaveServiceTaskRequest": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                        "maxLength": 64
+                    },
+                    "name": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "category": {
+                        "type": "string",
+                        "enum": [
+                            "engine",
+                            "drivetrain",
+                            "brakes",
+                            "tires",
+                            "electrical",
+                            "safety",
+                            "body"
+                        ]
+                    },
+                    "interval_km": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000000
+                    },
+                    "interval_months": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 240
+                    },
+                    "estimated_cost_cents": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "estimated_hours": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 999
+                    },
+                    "critical": {
+                        "type": "boolean"
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "position": {
+                        "type": "integer",
+                        "minimum": 0
+                    }
+                },
+                "required": [
+                    "code",
+                    "name",
+                    "category",
+                    "interval_km",
+                    "interval_months"
+                ],
+                "title": "SaveServiceTaskRequest"
+            },
             "SaveTechnicianRequest": {
                 "type": "object",
                 "properties": {
@@ -4250,6 +6205,222 @@
                     "name"
                 ],
                 "title": "SaveTechnicianRequest"
+            },
+            "SaveVehicleRequest": {
+                "type": "object",
+                "description": "POST registers a vehicle with its first odometer reading (and any known\nservice history); PATCH edits details. The odometer never changes here\n(POST \u2026/readings), nor the owner (POST \u2026/transfer).",
+                "properties": {
+                    "customer_account_id": {
+                        "type": "string"
+                    },
+                    "plate_number": {
+                        "type": "string",
+                        "maxLength": 32
+                    },
+                    "make": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 64
+                    },
+                    "model": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 128
+                    },
+                    "year": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 1950,
+                        "maximum": 2027
+                    },
+                    "vin": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 32
+                    },
+                    "vehicle_class": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "enum": [
+                            "sedan",
+                            "suv",
+                            "pickup",
+                            "van",
+                            "truck",
+                            null
+                        ]
+                    },
+                    "fuel_type": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "enum": [
+                            "gasoline",
+                            "diesel",
+                            "hybrid",
+                            "electric",
+                            null
+                        ]
+                    },
+                    "size_class": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "enum": [
+                            "small",
+                            "medium",
+                            "large",
+                            "xl",
+                            null
+                        ]
+                    },
+                    "color": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 64
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "active",
+                            "in_service",
+                            "down"
+                        ]
+                    },
+                    "assigned_to": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    },
+                    "department": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    },
+                    "location": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    },
+                    "acquired_on": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date"
+                    },
+                    "registration_expiry": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date"
+                    },
+                    "insurance_expiry": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date"
+                    },
+                    "driver_licence_expiry": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date"
+                    },
+                    "odometer": {
+                        "type": "string"
+                    },
+                    "service_history": {
+                        "type": "string"
+                    }
+                },
+                "title": "SaveVehicleRequest"
+            },
+            "ServiceTaskCollection": {
+                "type": "array",
+                "items": {
+                    "$ref": "#/components/schemas/ServiceTaskResource"
+                },
+                "title": "ServiceTaskCollection"
+            },
+            "ServiceTaskResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "code": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "category": {
+                        "type": "string"
+                    },
+                    "interval_km": {
+                        "type": "integer"
+                    },
+                    "interval_months": {
+                        "type": "integer"
+                    },
+                    "estimated_cost_cents": {
+                        "type": "integer"
+                    },
+                    "estimated_hours": {
+                        "type": "string"
+                    },
+                    "critical": {
+                        "type": "boolean"
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "position": {
+                        "type": "integer"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "code",
+                    "name",
+                    "category",
+                    "interval_km",
+                    "interval_months",
+                    "estimated_cost_cents",
+                    "estimated_hours",
+                    "critical",
+                    "is_active",
+                    "position",
+                    "updated_at"
+                ],
+                "title": "ServiceTaskResource"
             },
             "SetModuleRequest": {
                 "type": "object",
@@ -4374,6 +6545,25 @@
                 ],
                 "title": "TechnicianResource"
             },
+            "TransferVehicleRequest": {
+                "type": "object",
+                "properties": {
+                    "customer_account_id": {
+                        "type": "string"
+                    },
+                    "effective_on": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date"
+                    }
+                },
+                "required": [
+                    "customer_account_id"
+                ],
+                "title": "TransferVehicleRequest"
+            },
             "UpdateOrganizationRequest": {
                 "type": "object",
                 "properties": {
@@ -4489,6 +6679,80 @@
                 },
                 "title": "UpdateUserRequest"
             },
+            "UploadDocumentRequest": {
+                "type": "object",
+                "description": "multipart/form-data: `file` plus metadata. Name a `vehicle_id` (the\ndocument is filed under the vehicle's current owner) or a\n`customer_account_id` (an account-level document).",
+                "properties": {
+                    "file": {
+                        "type": "string",
+                        "format": "binary",
+                        "contentMediaType": "application/octet-stream",
+                        "description": "Maximum file size: 10240 kilobytes."
+                    },
+                    "kind": {
+                        "$ref": "#/components/schemas/DocumentKind"
+                    },
+                    "vehicle_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "customer_account_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    },
+                    "expires_on": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date"
+                    },
+                    "reference_number": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    },
+                    "issued_on": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date"
+                    },
+                    "issuing_body": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    },
+                    "notes": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 2000
+                    }
+                },
+                "required": [
+                    "file",
+                    "kind"
+                ],
+                "title": "UploadDocumentRequest"
+            },
             "UserCollection": {
                 "type": "array",
                 "items": {
@@ -4575,6 +6839,413 @@
                     "created_at"
                 ],
                 "title": "UserResource"
+            },
+            "VehicleCollection": {
+                "type": "array",
+                "items": {
+                    "$ref": "#/components/schemas/VehicleResource"
+                },
+                "title": "VehicleCollection"
+            },
+            "VehicleHealthResource": {
+                "type": "object",
+                "properties": {
+                    "vehicle_id": {
+                        "type": "string"
+                    },
+                    "evaluated_on": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "ok | due_soon | overdue (the worst item)"
+                    },
+                    "health_score": {
+                        "type": "integer"
+                    },
+                    "overdue_count": {
+                        "type": "integer"
+                    },
+                    "due_soon_count": {
+                        "type": "integer"
+                    },
+                    "next_item": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {}
+                    },
+                    "items": {
+                        "type": "array",
+                        "description": "Most urgent first.",
+                        "items": {}
+                    },
+                    "odometer": {
+                        "type": "object",
+                        "properties": {
+                            "value": {
+                                "type": "number"
+                            },
+                            "read_on": {
+                                "type": "string"
+                            },
+                            "avg_daily_km": {
+                                "type": "number"
+                            }
+                        },
+                        "required": [
+                            "value",
+                            "read_on",
+                            "avg_daily_km"
+                        ]
+                    },
+                    "thresholds": {
+                        "type": "object",
+                        "properties": {
+                            "due_soon_km": {
+                                "type": "integer",
+                                "const": 750
+                            },
+                            "due_soon_days": {
+                                "type": "integer",
+                                "const": 21
+                            }
+                        },
+                        "required": [
+                            "due_soon_km",
+                            "due_soon_days"
+                        ]
+                    }
+                },
+                "required": [
+                    "vehicle_id",
+                    "evaluated_on",
+                    "status",
+                    "health_score",
+                    "overdue_count",
+                    "due_soon_count",
+                    "next_item",
+                    "items",
+                    "odometer",
+                    "thresholds"
+                ],
+                "title": "VehicleHealthResource"
+            },
+            "VehicleOwnershipCollection": {
+                "type": "array",
+                "items": {
+                    "$ref": "#/components/schemas/VehicleOwnershipResource"
+                },
+                "title": "VehicleOwnershipCollection"
+            },
+            "VehicleOwnershipResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "vehicle_id": {
+                        "type": "string"
+                    },
+                    "customer_account_id": {
+                        "type": "string"
+                    },
+                    "from_date": {
+                        "type": "string"
+                    },
+                    "to_date": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "current": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "id",
+                    "vehicle_id",
+                    "customer_account_id",
+                    "from_date",
+                    "to_date",
+                    "current"
+                ],
+                "title": "VehicleOwnershipResource"
+            },
+            "VehicleResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "customer_account_id": {
+                        "type": "string"
+                    },
+                    "plate_number": {
+                        "type": "string"
+                    },
+                    "plate_normalized": {
+                        "type": "string"
+                    },
+                    "make": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "model": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "year": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "vin": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "vehicle_class": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "fuel_type": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "size_class": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "color": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "assigned_to": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "department": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "location": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "acquired_on": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "registration_expiry": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "insurance_expiry": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "driver_licence_expiry": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "lto_renewal_month": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "odometer": {
+                        "type": "object",
+                        "properties": {
+                            "value": {
+                                "type": "number"
+                            },
+                            "label": {
+                                "type": "string"
+                            },
+                            "read_on": {
+                                "type": "string"
+                            },
+                            "age_days": {
+                                "type": "integer"
+                            },
+                            "stale": {
+                                "type": "boolean",
+                                "description": "Older than the stale threshold: re-read the dash, don't trust it."
+                            },
+                            "avg_daily_km": {
+                                "type": "number"
+                            }
+                        },
+                        "required": [
+                            "value",
+                            "label",
+                            "read_on",
+                            "age_days",
+                            "stale",
+                            "avg_daily_km"
+                        ]
+                    },
+                    "pms": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "properties": {
+                            "status": {
+                                "type": "string"
+                            },
+                            "health_score": {
+                                "type": "integer"
+                            },
+                            "overdue_count": {
+                                "type": "integer"
+                            },
+                            "due_soon_count": {
+                                "type": "integer"
+                            },
+                            "next_item": {
+                                "type": [
+                                    "object",
+                                    "null"
+                                ],
+                                "properties": {
+                                    "service_task_id": {
+                                        "type": "string"
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "status": {
+                                        "type": "string"
+                                    },
+                                    "due_date": {
+                                        "type": "string"
+                                    },
+                                    "days_remaining": {
+                                        "type": "integer"
+                                    },
+                                    "due_label": {
+                                        "type": "string"
+                                    },
+                                    "governed_by": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "service_task_id",
+                                    "name",
+                                    "status",
+                                    "due_date",
+                                    "days_remaining",
+                                    "due_label",
+                                    "governed_by"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "status",
+                            "health_score",
+                            "overdue_count",
+                            "due_soon_count",
+                            "next_item"
+                        ]
+                    },
+                    "compliance_status": {
+                        "type": "string",
+                        "description": "expired | expiring | ok"
+                    },
+                    "archived_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "customer_account_id",
+                    "plate_number",
+                    "plate_normalized",
+                    "make",
+                    "model",
+                    "year",
+                    "vin",
+                    "vehicle_class",
+                    "fuel_type",
+                    "size_class",
+                    "color",
+                    "status",
+                    "assigned_to",
+                    "department",
+                    "location",
+                    "acquired_on",
+                    "registration_expiry",
+                    "insurance_expiry",
+                    "driver_licence_expiry",
+                    "lto_renewal_month",
+                    "odometer",
+                    "pms",
+                    "compliance_status",
+                    "archived_at",
+                    "created_at",
+                    "updated_at"
+                ],
+                "title": "VehicleResource"
+            },
+            "VoidReadingRequest": {
+                "type": "object",
+                "properties": {
+                    "reason": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 500
+                    }
+                },
+                "required": [
+                    "reason"
+                ],
+                "title": "VoidReadingRequest"
             }
         },
         "responses": {
@@ -4721,6 +7392,44 @@
                                             "type": "string",
                                             "enum": [
                                                 "not_found"
+                                            ]
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Human-readable; never branch on it."
+                                        },
+                                        "details": {
+                                            "type": "object",
+                                            "description": "Optional machine-readable context."
+                                        }
+                                    },
+                                    "required": [
+                                        "code",
+                                        "message"
+                                    ]
+                                }
+                            },
+                            "required": [
+                                "error"
+                            ]
+                        }
+                    }
+                }
+            },
+            "Error.conflict": {
+                "description": "The request conflicts with the current state.",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "object",
+                                    "properties": {
+                                        "code": {
+                                            "type": "string",
+                                            "enum": [
+                                                "conflict"
                                             ]
                                         },
                                         "message": {

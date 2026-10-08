@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Api\V1\AlertController;
 use App\Http\Controllers\Api\V1\Auth\InvitationAcceptanceController;
 use App\Http\Controllers\Api\V1\Auth\PasswordController;
 use App\Http\Controllers\Api\V1\Auth\SessionController;
@@ -10,12 +11,18 @@ use App\Http\Controllers\Api\V1\BranchController;
 use App\Http\Controllers\Api\V1\ConsentController;
 use App\Http\Controllers\Api\V1\ContactController;
 use App\Http\Controllers\Api\V1\CustomerAccountController;
+use App\Http\Controllers\Api\V1\DocumentController;
+use App\Http\Controllers\Api\V1\DocumentFileController;
+use App\Http\Controllers\Api\V1\FleetSummaryController;
 use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\InvitationController;
+use App\Http\Controllers\Api\V1\MeterReadingController;
 use App\Http\Controllers\Api\V1\ModuleController;
 use App\Http\Controllers\Api\V1\OrganizationController;
+use App\Http\Controllers\Api\V1\ServiceTaskController;
 use App\Http\Controllers\Api\V1\TechnicianController;
 use App\Http\Controllers\Api\V1\UserController;
+use App\Http\Controllers\Api\V1\VehicleController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -71,4 +78,30 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
 
     Route::apiResource('bays', BayController::class);
     Route::apiResource('technicians', TechnicianController::class);
+
+    // ------------------------------------------------------------ fleet
+    Route::apiResource('vehicles', VehicleController::class)->except(['store']);
+    Route::post('vehicles', [VehicleController::class, 'store'])->middleware('idempotent')->name('vehicles.store');
+    Route::post('vehicles/{vehicle}/transfer', [VehicleController::class, 'transfer'])->name('vehicles.transfer');
+    Route::get('vehicles/{vehicle}/ownerships', [VehicleController::class, 'ownerships'])->name('vehicles.ownerships');
+    Route::get('vehicles/{vehicle}/health', [VehicleController::class, 'health'])->name('vehicles.health');
+    Route::get('vehicles/{vehicle}/readings', [MeterReadingController::class, 'index'])->name('vehicles.readings.index');
+    Route::post('vehicles/{vehicle}/readings', [MeterReadingController::class, 'store'])->middleware('idempotent')->name('vehicles.readings.store');
+    Route::post('vehicles/{vehicle}/readings/{reading}/void', [MeterReadingController::class, 'void'])->scopeBindings()->name('vehicles.readings.void');
+
+    Route::get('fleet/summary', FleetSummaryController::class)->name('fleet.summary');
+    Route::apiResource('service-tasks', ServiceTaskController::class);
+
+    Route::apiResource('documents', DocumentController::class)->except(['store', 'update']);
+    Route::post('documents', [DocumentController::class, 'store'])->middleware('idempotent')->name('documents.store');
+    Route::get('documents/{document}/download', [DocumentController::class, 'download'])->name('documents.download');
+
+    Route::get('alerts', [AlertController::class, 'index'])->name('alerts.index');
+    Route::post('alerts/read', [AlertController::class, 'read'])->name('alerts.read');
+    Route::post('alerts/dismiss', [AlertController::class, 'dismiss'])->name('alerts.dismiss');
+    Route::post('alerts/restore', [AlertController::class, 'restore'])->name('alerts.restore');
 });
+
+// A signed, 60-second URL from GET documents/{id}/download: the signature is
+// the credential, so no session (and no tenant middleware).
+Route::get('document-files/{document}', DocumentFileController::class)->middleware('signed')->name('document-files.show');

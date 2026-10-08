@@ -6,7 +6,9 @@ namespace App\Policies;
 
 use App\Domain\Access\AccessMatrix;
 use App\Domain\Access\Capability;
+use App\Domain\Modules\Module;
 use App\Domain\Tenancy\TenantContext;
+use App\Tenancy\ModuleGate;
 use App\Tenancy\TenantManager;
 use Illuminate\Auth\Access\Response;
 
@@ -55,6 +57,17 @@ abstract class TenantPolicy
         }
 
         return Response::allow();
+    }
+
+    /**
+     * Module entitlement: throws 403 module_disabled (not a plain forbidden)
+     * when the module is not active where the session works.
+     */
+    protected function module(Module $module): ?Response
+    {
+        app(ModuleGate::class)->ensure($module);
+
+        return null;
     }
 
     /** 404 unless $visible. */
