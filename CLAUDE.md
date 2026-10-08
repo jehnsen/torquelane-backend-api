@@ -400,7 +400,7 @@ Override keys are converted from pesos/camelCase to centavos/snake_case.
   compareUrgency, odometerAgeDays, isOdometerStale, applyCompletion),
   `FleetSummary` (summariseFleet), `OdometerValidation`, `Compliance`,
   `PlateNumber`. `App\Domain\Alerts\Alerts` ports buildAlerts/viewAlerts
-  (including the work-order and approval-SLA rules, ready for work orders);
+  (including the work-order and approval-SLA rules, fed since Phase 3);
   `App\Domain\WorkOrders\WorkOrderCosting` ports resolvePartsCost /
   workOrderCost in exact decimals.
 - **`FleetThresholds` is the one place** for DUE_SOON_KM (750),
@@ -434,7 +434,7 @@ change to a health weight fails 11 cases (checked). `FleetDbGoldenTest`
 replays end to end through the seeded database and the API with the clock
 frozen: GET /vehicles/{id}/health for all 32 seed vehicles = the fixture's
 `$health`; GET /fleet/summary per scope = summariseFleet sweeps; GET /alerts
-per scope = buildAlerts sweeps minus work-order alerts (no work orders yet).
+per scope = buildAlerts sweeps (work-order alerts included since Phase 3).
 
 ### Ownership, visibility, documents
 
@@ -472,6 +472,109 @@ catalogue in seed order, 32 vehicles with ownerships, two readings each
 (see MeterRate above), 384 maintenance states, 195 documents as metadata
 (no files; their work-order links wait for work orders). Bulk inserts with
 explicit ids, no audit rows.
+
+## Repair core (Phase 3)
+
+### Tables (Phase 3)
+
+| Table | Notes |
+|---|---|
+| `approval_settings` | `branch_id` null = the organization's defaults (every field set, CHECKed); set = a branch's SPARSE override (null inherits). Fields: `auto_approve_under_cents`, `ops_approval_under_cents`, `sla_hours`, `variance_threshold_pct`, `default_parts_source`, `monthly_budget_cents`, `vat_rate_pct` (0 is real), `misc_fee_flat_cents`, `default_labour_rate_cents`. One row per (organization, branch), `nulls not distinct`. The account level stays on `customer_accounts.approval_threshold_overrides`. |
+| `work_orders` | `branch_id` (took it in; null = a portal request not yet taken into a branch), `assigned_branch_id` (stamped on approval/booking; replaces ../web's assignedProviderId — never `vendor`), `customer_account_id` (STAMPED at creation, kept if the vehicle changes hands), `vehicle_id`, `reference` ('' until draft → pending_approval; unique per organization where ≠ ''; CHECK: only a draft may lack one), title, type, the nine statuses, priority, `opened_on`, `scheduled_for` + `scheduled_time` ('HH:mm', CHECKed), `bay_id` (composite FK: a bay of the order's own branch), `technician_id` + `technician_name`, `vendor` (third party only; '' in-house), `odometer_at_intake` / `odometer_at_service`, `labor_cost_cents` / `parts_cost_cents` (the estimate's aggregates), findings, notes, `cancellation_reason`, `pending_approval_entered_at`, `approval_wait_hours`, `completed_on`, `collected_at` + `collected_by` (both or neither; only on closed), `created_by`. |
+| `work_order_lines` | description, `service_task_id` (nullable; the description survives as the label), category, `quantity` + `unit_part_rate_cents` → `part_cost_cents`, `labour_hours` + `labour_rate_cents` → `labour_cost_cents` (STORED; CHECK = round(qty × rate)), urgency, `parts_source`, `approval_status` (pending/approved/declined/deferred), `approved_by` + `approved_by_name`, `approved_at`, `decline_reason`, `photos` (jsonb array). Trigger: an APPROVED line is never re-priced or deleted. |
+| `work_order_tasks` | The catalogue tasks an order discharges (closing resets them). |
+| `work_order_parts` | Parts fitted, recorded at close-out: part number, name, quantity, `unit_cost_cents`. |
+| `work_order_events` | **Append-only** status history: status, `at`, `actor_id` (null for the system) + `actor_name`. |
+| `approval_log` | **Append-only**: `line_id` (null = order-level), action (sent_for_approval, auto_approved, approved, declined, deferred, escalated, variance_approved), actor, `at`, note, `amount_at_time_cents`. |
+
+### The workflow
+
+- **`App\Domain\WorkOrders\WorkOrderMachine` is the only gate** (../web
+  work-order-machine.ts): `checkTransition` → legal + the capability needed,
+  or the reason. Every action locks the order row, asks it, then writes the
+  status event, approval-log entries and audit row in the SAME transaction
+  (`WorkOrderJournal`). `lifecycleStage` projects the nine statuses onto
+  draft / pending approval / approved / in progress / ready for billing /
+  completed (+ declined, cancelled): `closed` splits on `collected_at`.
+- **Actions** (`App\Actions\WorkOrders`): `CreateWorkOrder` (createDraft:
+  unnumbered draft, lines priced), `EditWorkOrder` (updateDraft — a declined
+  quote reopens as a draft and keeps its number; recordLines — the full list,
+  draft only), `SendForApproval` (issues the number from the organization's
+  `work_order` series; inside the auto band the system approves every line
+  and the order opens `approved`, as ../web's creation did), `DecideLines`
+  (approve/decline/defer per line, only while pending; decline of a
+  safety-critical line needs a note; status derived, wait stamped in business
+  hours, approved work assigned to the order's branch), `ScheduleWorkOrder`
+  (schedule — staff, date + time + bay, re-bookable; start), `CompleteWorkOrder`
+  (complete — findings, odometer, parts, tasks while in progress; close —
+  variance check, then `Pms::applyCompletion`: maintenance states reset, a
+  higher odometer recorded as a `work_order` reading, vehicle back to active),
+  `FinishWorkOrder` (markCollected — staff; cancel — with a reason).
+- **Who may do what**: `WorkOrderPolicy` = scope (404) → side → capability →
+  `repair_pms` on the order's branch. Authority beyond the capability is the
+  action's: `Approvals::canApprove` (fleet manager, provider admin and —
+  API addition — branch manager without limit; operations and purchasing up
+  to the ops ceiling). Re-approving a variance at close needs
+  `workorder:approve` AND authority over the actual amount.
+- **Branches**: staff raise work in a branch (`branch_id`, else X-Branch-Id,
+  else their only branch); `repair_pms` must be on there. A portal request
+  has no branch until staff take it in (send, start) or book it (the bay's
+  branch). Staff see orders in their branches plus unassigned requests.
+- **Settings fold** organization → branch → account
+  (`ApprovalSettingsResolver`, `ApprovalSettings::effective`): an unset field
+  inherits and is never zero; a branch that is not VAT-registered bills 0%.
+  Bands run on the pre-tax amount. VAT is exclusive (on top) for now;
+  `branches.prices_include_vat` takes effect with invoicing (the demo
+  branches are false).
+- **Money**: `App\Domain\Billing\Billing` in integer centavos — a line's part
+  and labour amounts each rounded once, half-up (and stored); each total
+  rounded once; VAT = round((subtotal + misc) × rate / 100). Approval values
+  read the STORED line costs.
+- **Check-in** (`CheckInLookup`, GET /check-in/lookup): exact match on the
+  normalised plate, then VIN, over the caller's SCOPED vehicles. Endpoint rule
+  (deliberate, stricter than ../web's form hydration, which is ported
+  bit-exact as `CheckIn::hydrate`): a stale odometer is NEVER pre-filled —
+  `form.odometer` null, `odometer_needs_confirmation` true, the last reading in
+  `last_odometer`. POST /check-in opens customer (with service-records
+  consent) + vehicle + first reading in one transaction.
+- **Shop floor** (`App\Domain\Shop\Shop`, staff only): arriving, in progress
+  (elapsed), ready for collection, approval bottleneck (longest business-hours
+  wait first, against each order's SLA), bay load and floor utilisation (bays
+  and estimates from the branch's own records), technician load (duration =
+  start event → closed event), revenue recognised on COLLECTION, by customer
+  and by service item.
+
+### Golden replay (Phase 3)
+
+`tests/Golden/RepairGoldenTest.php` replays work-order-machine.json (1,006
+cases, including all 648 `$authorizeTransition` role × transition cases
+through `AccessMatrix`), approvals.json (1,698), billing.json (1,717),
+checkin.json (533) and shop.json (2,590). Every case matches exactly except
+**80 billing cases, pinned by name with their reason** in the test:
+
+- 4 float half-centavo artefacts (`roundMoney` of 1.005, 1.015, 1.255,
+  −1.005: the float lands below the half; exact half-up rounds up — and −1.005
+  also differs because half-up rounds away from zero where Math.round rounds
+  toward +∞);
+- 76 cases whose INPUT is not a whole number of centavos (3-decimal rates like
+  ₱0.335, a ₱99.995 misc fee, ₱0.004 subtotals): rates and fees are stored in
+  centavos, so such an input cannot reach the API.
+
+A pin that starts matching fails the test too. `ShopDbGoldenTest` replays the
+shop sweeps end to end through the seeded database (arrivals and floor load
+for 11 days, in progress, approval queue, revenue and technician load for the
+whole-day periods), and `FleetDbGoldenTest`'s alerts now include the
+work-order and approval-SLA alerts, per scope with each scope's own SLA.
+
+### Demo data (Phase 3)
+
+`Database\Seeders\Demo\WorkOrderSeed`: the organization's approval settings
+(../web's), and the 484 work orders with lines, tasks, parts, history and
+approval log, all in the repair branch. **Drafts are seeded unnumbered** (the
+frontend's seed numbers them); the `work_order` series continues after the
+highest seeded number (1656 → next 1657). Approvers and event actors keep
+their recorded names (no user ids); collections are credited to the demo user
+of that name.
 
 ## Rules that bite
 
@@ -553,6 +656,31 @@ explicit ids, no audit rows.
   state is keyed on them.
 - **The isolation probes run without throttling.** Their count per user
   exceeds the `api` limiter; the throttle is tested elsewhere.
+- **A work order's lines are priced only by `Billing::recalc`** (via
+  `LineWriter`). Requests carry quantities and rates; any cost or total a
+  client sends is never read. The database CHECKs cost = round(qty × rate),
+  and a trigger refuses to re-price or delete an APPROVED line.
+- **Number at draft → pending_approval, never at creation**, from
+  `DocumentNumbers::issue` in the action's transaction (a rollback returns the
+  number). The `work_order` series is organization-wide (`branch_id` null), so
+  two accounts — or two branches — can never collide; the partial unique
+  index on (organization, reference) is the backstop.
+- **Never set a work order's status directly.** Ask `WorkOrderMachine` (the
+  `WorkOrderJournal::guard`); approval statuses are DERIVED from the lines
+  (`Approvals::deriveOrderStatus`).
+- **A line with approval history stays on its order** (`approval_log.line_id`
+  restricts the delete): re-price it on a reopened draft instead.
+- **Staff ids never reach a portal response.** `WorkOrderResource` blanks
+  branch, bay and technician ids for portal sessions and shows actors by
+  name; the isolation suite treats those rows as staff-only and would flag
+  them as leaks.
+- **A work order belongs to the account stamped at creation**, not the
+  vehicle's current owner (like documents). Its vehicle id stays on it after a
+  transfer.
+- **Work-order alerts read the scope's own SLA**: a portal user's account
+  settings, staff the selected branch's (`FleetQueries::alerts`).
+- **Seed and test ULIDs are monotonic**, so ordering by id reproduces ../web's
+  array order (alerts, technician "current job", shop queues).
 
 ## Running it
 
@@ -634,7 +762,7 @@ audit rows). Fill in the rest from the phase plan.
 - [x] **0A**: Foundation (scaffold, API conventions, database conventions, quality gates, staging deploy)
 - [x] **1**: Identity & tenancy (organizations, branches, customer accounts, contacts, consents, users/invites, bays, technicians, modules, document series, audit log; Sanctum SPA auth; /me)
 - [x] **2**: Fleet & maintenance (vehicles, ownership, meter readings, PMS catalogue, generic maintenance engine, documents in private storage, derived alerts)
-- [ ] **3**: *(title not provided)*
+- [x] **3**: Repair core (work orders, per-line approvals, billing in centavos, check-in, shop floor)
 - [ ] **4**: *(title not provided)*
 - [ ] **5**: *(title not provided)*
 - [ ] **6**: *(title not provided)*
@@ -664,3 +792,13 @@ interval-status, odometer-validation, compliance and alerts matches
 exactly). Fixtures verified byte-identical to pms-monitoring-frontend@d45871e.
 Decisions taken with the user: documents on a configurable private disk
 (local by default); expiry on the frontend's six renewal kinds.
+
+Phase 3 status: see the Phase 3 section. Decisions taken with the user:
+the check-in endpoint never pre-fills a stale odometer (the ported
+hydration stays bit-exact); money in exact centavos with float artefacts
+pinned by name; VAT exclusive until invoicing (demo branches
+`prices_include_vat` false). Decisions taken here, for review: the
+organization-wide work-order series; branch managers approve without
+limit; scheduling and collection are staff-only; re-approving a variance
+needs authority over the actual amount; portal requests wait unassigned
+to a branch until staff take them in.

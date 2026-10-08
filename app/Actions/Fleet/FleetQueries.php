@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Actions\Fleet;
 
+use App\Actions\WorkOrders\ApprovalSettingsResolver;
 use App\Domain\Alerts\Alerts;
 use App\Domain\Alerts\AlertView;
+use App\Domain\Alerts\WorkOrderAlertFacts;
 use App\Domain\Documents\DocumentFacts;
 use App\Domain\Fleet\Compliance;
 use App\Domain\Fleet\FleetSummary;
@@ -21,6 +23,7 @@ use App\Domain\Maintenance\MeterReading as Reading;
 use App\Domain\Modules\Module;
 use App\Domain\Shared\Calendar;
 use App\Domain\Shared\Num;
+use App\Domain\WorkOrders\WorkOrderStatus;
 use App\Models\AlertInteraction;
 use App\Models\CustomerAccount;
 use App\Models\Document;
@@ -29,6 +32,7 @@ use App\Models\MeterReading;
 use App\Models\ServiceTask;
 use App\Models\Vehicle;
 use App\Models\VehicleOwnership;
+use App\Models\WorkOrder;
 use App\Tenancy\ModuleGate;
 use App\Tenancy\TenantManager;
 use Carbon\CarbonImmutable;
@@ -49,7 +53,43 @@ final class FleetQueries
     public function __construct(
         private readonly TenantManager $tenancy,
         private readonly ModuleGate $modules,
+        private readonly ApprovalSettingsResolver $settings,
     ) {}
+
+    /**
+     * What the work-order alert rules read: booked or running work (a slot
+     * that can slip) and quotations waiting on approval, in creation order.
+     *
+     * @return list<WorkOrderAlertFacts>
+     */
+    private function workOrderAlertFacts(): array
+    {
+        $orders = WorkOrder::query()->visibleTo($this->tenancy->require())
+            ->whereIn('status', ['scheduled', 'in_progress', 'pending_approval'])
+            ->withCount(['lines as pending_line_count' => fn (Builder $q) => $q->where('approval_status', 'pending')])
+            ->orderBy('id')
+            ->get();
+
+        $facts = [];
+        foreach ($orders as $order) {
+            $pending = $order->status === WorkOrderStatus::PendingApproval;
+            if (! $pending && $order->scheduled_for === null) {
+                continue;
+            }
+            $facts[] = new WorkOrderAlertFacts(
+                $order->id,
+                $order->reference,
+                $order->title,
+                $order->status->value,
+                $order->scheduled_for?->toDateString() ?? '',
+                $order->vehicle_id,
+                $order->pending_approval_entered_at === null ? null : Calendar::local($order->pending_approval_entered_at)->format('Y-m-d\TH:i:s.vP'),
+                is_int($count = $order->getAttribute('pending_line_count')) ? $count : 0,
+            );
+        }
+
+        return $facts;
+    }
 
     public function today(): CarbonImmutable
     {
@@ -208,20 +248,27 @@ final class FleetQueries
 
     /**
      * Alerts derived for the caller's scope, with their own read/dismiss state.
-     * PMS alerts only where repair_pms is active; document and licence alerts
-     * always. Work-order alerts arrive with work orders (the rules exist).
+     * PMS and work-order alerts only where repair_pms is active; document and
+     * licence alerts always. The approval SLA is the scope's own: a portal
+     * user's account settings, staff the selected branch's.
      */
     public function alerts(): AlertView
     {
         $context = $this->tenancy->require();
         $vehicles = array_values($this->vehicles()->orderBy('id')->get()->all());
+        $repair = $this->pmsActive();
 
         $health = $this->fleetHealth($vehicles);
-        if (! $this->pmsActive()) {
+        if (! $repair) {
             $health = array_map(fn (VehicleHealth $h): VehicleHealth => new VehicleHealth($h->vehicle, [], 'ok', 0, 0, null, 100), $health);
         }
 
-        $alerts = Alerts::build($health, [], $this->documentFacts(), 0, $this->today());
+        $accountId = $context->customerAccountId();
+        $settings = $accountId !== null
+            ? $this->settings->forAccount(CustomerAccount::query()->findOrFail($accountId), null)
+            : $this->settings->forBranch($context->selectedBranchId);
+
+        $alerts = Alerts::build($health, $repair ? $this->workOrderAlertFacts() : [], $this->documentFacts(), $settings->slaHours, $this->today());
 
         $read = [];
         $dismissed = [];

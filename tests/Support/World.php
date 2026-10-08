@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace Tests\Support;
 
 use App\Domain\Access\Role;
+use App\Domain\Approvals\ApprovalSettings;
 use App\Domain\Crm\ConsentChannel;
 use App\Domain\Crm\ConsentPurpose;
 use App\Domain\Documents\DocumentKind;
 use App\Domain\Maintenance\MeterKind;
 use App\Domain\Modules\Module;
+use App\Models\ApprovalLogEntry;
+use App\Models\ApprovalSetting;
 use App\Models\Bay;
 use App\Models\Branch;
 use App\Models\BranchModule;
@@ -27,6 +30,11 @@ use App\Models\Technician;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\VehicleOwnership;
+use App\Models\WorkOrder;
+use App\Models\WorkOrderEvent;
+use App\Models\WorkOrderLine;
+use App\Models\WorkOrderPart;
+use App\Models\WorkOrderTask;
 use App\Tenancy\TenantManager;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DemoSeeder;
@@ -41,8 +49,9 @@ use LogicException;
  * individual account and pending invitations in the demo organization.
  *
  * `$ids` maps the demo seed's source ids (prov-mekanikomore, fc-actimed, …,
- * branch slugs, user emails) to the ULIDs created; extras are keyed
- * `walk-in`, `invite:*` and `rival*`.
+ * branch slugs, user emails, veh-001, wo-0208, …) to the ULIDs created;
+ * extras are keyed `walk-in`, `invite:*` and `rival*` (the rival has a work
+ * order with a line, task, part, event and approval-log entry).
  */
 final class World
 {
@@ -207,6 +216,71 @@ final class World
             'uploaded_on' => '2026-01-01',
         ])->save();
         $this->ids['rival:document'] = $document->id;
+
+        $this->rivalWorkOrder($organizationId, $accountId, $vehicle->id, $task->id);
+    }
+
+    /** A rival work order with one of everything hanging off it, for the cross-organization probes. */
+    private function rivalWorkOrder(string $organizationId, string $accountId, string $vehicleId, string $taskId): void
+    {
+        (new ApprovalSetting)->forceFill(['organization_id' => $organizationId, 'branch_id' => null] + ApprovalSettings::defaults()->toArray())->save();
+
+        $order = new WorkOrder;
+        $order->forceFill([
+            'organization_id' => $organizationId,
+            'branch_id' => $this->id('rival:branch'),
+            'assigned_branch_id' => $this->id('rival:branch'),
+            'customer_account_id' => $accountId,
+            'vehicle_id' => $vehicleId,
+            'reference' => 'WO-2026-0001',
+            'title' => 'Rival oil change',
+            'type' => 'preventive',
+            'status' => 'scheduled',
+            'opened_on' => '2026-10-01',
+            'scheduled_for' => '2026-10-09',
+            'scheduled_time' => '09:00',
+            'bay_id' => $this->id('rival:bay'),
+            'technician_id' => $this->id('rival:technician'),
+            'technician_name' => 'Rival Mechanic',
+        ])->save();
+        $this->ids['rival:work-order'] = $order->id;
+
+        $line = new WorkOrderLine;
+        $line->forceFill([
+            'organization_id' => $organizationId,
+            'work_order_id' => $order->id,
+            'service_task_id' => $taskId,
+            'description' => 'Oil and filter',
+            'category' => 'engine',
+            'quantity' => '1',
+            'unit_part_rate_cents' => 250000,
+            'part_cost_cents' => 250000,
+            'labour_hours' => '1',
+            'labour_rate_cents' => 65000,
+            'labour_cost_cents' => 65000,
+            'urgency' => 'recommended',
+            'parts_source' => 'supplier_provided',
+            'approval_status' => 'approved',
+            'approved_by_name' => 'Rival Fleet',
+            'approved_at' => '2026-10-02T02:00:00Z',
+        ])->save();
+        $this->ids['rival:work-order-line'] = $line->id;
+
+        $task = new WorkOrderTask;
+        $task->forceFill(['organization_id' => $organizationId, 'work_order_id' => $order->id, 'service_task_id' => $taskId])->save();
+        $this->ids['rival:work-order-task'] = $task->id;
+
+        $part = new WorkOrderPart;
+        $part->forceFill(['organization_id' => $organizationId, 'work_order_id' => $order->id, 'name' => 'Oil filter', 'quantity' => '1', 'unit_cost_cents' => 45000])->save();
+        $this->ids['rival:work-order-part'] = $part->id;
+
+        $event = new WorkOrderEvent;
+        $event->forceFill(['organization_id' => $organizationId, 'work_order_id' => $order->id, 'status' => 'scheduled', 'at' => '2026-10-02T02:00:00Z', 'actor_name' => 'Rival Admin'])->save();
+        $this->ids['rival:work-order-event'] = $event->id;
+
+        $log = new ApprovalLogEntry;
+        $log->forceFill(['organization_id' => $organizationId, 'work_order_id' => $order->id, 'line_id' => $line->id, 'action' => 'approved', 'actor_name' => 'Rival Fleet', 'at' => '2026-10-02T02:00:00Z', 'amount_at_time_cents' => 315000])->save();
+        $this->ids['rival:approval-log'] = $log->id;
     }
 
     private function account(string $organizationId, string $name, string $type): CustomerAccount

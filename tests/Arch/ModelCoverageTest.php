@@ -15,6 +15,8 @@ use App\Tenancy\BelongsToOrganization;
  */
 const MODEL_TENANCY = [
     'App\Models\AlertInteraction' => ['tenant', ''],
+    'App\Models\ApprovalLogEntry' => ['tenant', ''],
+    'App\Models\ApprovalSetting' => ['tenant', ''],
     'App\Models\AuditLog' => ['tenant', ''],
     'App\Models\Bay' => ['tenant', ''],
     'App\Models\Branch' => ['tenant', ''],
@@ -35,6 +37,11 @@ const MODEL_TENANCY = [
     'App\Models\User' => ['tenant', ''],
     'App\Models\Vehicle' => ['tenant', ''],
     'App\Models\VehicleOwnership' => ['tenant', ''],
+    'App\Models\WorkOrder' => ['tenant', ''],
+    'App\Models\WorkOrderEvent' => ['tenant', ''],
+    'App\Models\WorkOrderLine' => ['tenant', ''],
+    'App\Models\WorkOrderPart' => ['tenant', ''],
+    'App\Models\WorkOrderTask' => ['tenant', ''],
 ];
 
 it('classifies every model in app/Models', function () {

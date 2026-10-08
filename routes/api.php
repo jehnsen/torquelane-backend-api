@@ -3,11 +3,13 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\V1\AlertController;
+use App\Http\Controllers\Api\V1\ApprovalSettingsController;
 use App\Http\Controllers\Api\V1\Auth\InvitationAcceptanceController;
 use App\Http\Controllers\Api\V1\Auth\PasswordController;
 use App\Http\Controllers\Api\V1\Auth\SessionController;
 use App\Http\Controllers\Api\V1\BayController;
 use App\Http\Controllers\Api\V1\BranchController;
+use App\Http\Controllers\Api\V1\CheckInController;
 use App\Http\Controllers\Api\V1\ConsentController;
 use App\Http\Controllers\Api\V1\ContactController;
 use App\Http\Controllers\Api\V1\CustomerAccountController;
@@ -20,9 +22,11 @@ use App\Http\Controllers\Api\V1\MeterReadingController;
 use App\Http\Controllers\Api\V1\ModuleController;
 use App\Http\Controllers\Api\V1\OrganizationController;
 use App\Http\Controllers\Api\V1\ServiceTaskController;
+use App\Http\Controllers\Api\V1\ShopController;
 use App\Http\Controllers\Api\V1\TechnicianController;
 use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\VehicleController;
+use App\Http\Controllers\Api\V1\WorkOrderController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -100,6 +104,38 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::post('alerts/read', [AlertController::class, 'read'])->name('alerts.read');
     Route::post('alerts/dismiss', [AlertController::class, 'dismiss'])->name('alerts.dismiss');
     Route::post('alerts/restore', [AlertController::class, 'restore'])->name('alerts.restore');
+
+    // Repair: work orders, approvals, check-in, the shop floor (Phase 3).
+    Route::get('approval-settings', [ApprovalSettingsController::class, 'show'])->name('approval-settings.show');
+    Route::put('approval-settings', [ApprovalSettingsController::class, 'updateOrganization'])->name('approval-settings.update');
+    Route::put('branches/{branch}/approval-settings', [ApprovalSettingsController::class, 'updateBranch'])->name('branches.approval-settings.update');
+
+    Route::get('work-orders', [WorkOrderController::class, 'index'])->name('work-orders.index');
+    Route::post('work-orders', [WorkOrderController::class, 'store'])->middleware('idempotent')->name('work-orders.store');
+    Route::get('work-orders/{work_order}', [WorkOrderController::class, 'show'])->name('work-orders.show');
+    Route::patch('work-orders/{work_order}', [WorkOrderController::class, 'update'])->name('work-orders.update');
+    Route::put('work-orders/{work_order}/lines', [WorkOrderController::class, 'lines'])->name('work-orders.lines');
+    Route::post('work-orders/{work_order}/send', [WorkOrderController::class, 'send'])->name('work-orders.send');
+    Route::post('work-orders/{work_order}/decisions', [WorkOrderController::class, 'decide'])->name('work-orders.decide');
+    Route::post('work-orders/{work_order}/schedule', [WorkOrderController::class, 'schedule'])->name('work-orders.schedule');
+    Route::post('work-orders/{work_order}/start', [WorkOrderController::class, 'start'])->name('work-orders.start');
+    Route::post('work-orders/{work_order}/complete', [WorkOrderController::class, 'complete'])->name('work-orders.complete');
+    Route::post('work-orders/{work_order}/close', [WorkOrderController::class, 'close'])->name('work-orders.close');
+    Route::post('work-orders/{work_order}/collect', [WorkOrderController::class, 'collect'])->name('work-orders.collect');
+    Route::post('work-orders/{work_order}/cancel', [WorkOrderController::class, 'cancel'])->name('work-orders.cancel');
+
+    Route::get('check-in/lookup', [CheckInController::class, 'lookup'])->name('check-in.lookup');
+    Route::post('check-in', [CheckInController::class, 'store'])->middleware('idempotent')->name('check-in.store');
+
+    Route::prefix('shop')->name('shop.')->group(function (): void {
+        Route::get('arriving', [ShopController::class, 'arriving'])->name('arriving');
+        Route::get('in-progress', [ShopController::class, 'inProgress'])->name('in-progress');
+        Route::get('ready-for-collection', [ShopController::class, 'readyForCollection'])->name('ready-for-collection');
+        Route::get('approvals', [ShopController::class, 'approvals'])->name('approvals');
+        Route::get('floor', [ShopController::class, 'floor'])->name('floor');
+        Route::get('technicians', [ShopController::class, 'technicians'])->name('technicians');
+        Route::get('revenue', [ShopController::class, 'revenue'])->name('revenue');
+    });
 });
 
 // A signed, 60-second URL from GET documents/{id}/download: the signature is

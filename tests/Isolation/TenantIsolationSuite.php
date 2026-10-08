@@ -60,20 +60,32 @@ final class TenantIsolationSuite
         'service_tasks' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
         'documents' => ['org' => 'organization_id', 'account' => 'customer_account_id', 'branch' => null],
         'alert_interactions' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
+        // Phase 3: repair. A work order's children belong to their order.
+        'approval_settings' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id'],
+        'work_orders' => ['org' => 'organization_id', 'account' => 'customer_account_id', 'branch' => 'branch_id'],
+        'work_order_lines' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'work_order' => 'work_order_id'],
+        'work_order_tasks' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'work_order' => 'work_order_id'],
+        'work_order_parts' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'work_order' => 'work_order_id'],
+        'work_order_events' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'work_order' => 'work_order_id'],
+        'approval_log' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'work_order' => 'work_order_id'],
     ];
 
     /**
      * Tables that are organization-wide but account-scoped: a portal user may
      * see their own account's rows only. A vehicle's readings and maintenance
      * state belong to the vehicle's CURRENT owner (service history stays with
-     * the vehicle); documents to the account they were filed under.
+     * the vehicle); documents to the account they were filed under; a work
+     * order (and everything on it) to the account it was raised for.
      */
-    private const array ACCOUNT_OWNED = ['customer_accounts', 'contacts', 'consents', 'users', 'invitations', 'vehicles', 'meter_readings', 'maintenance_states', 'documents'];
+    private const array ACCOUNT_OWNED = [
+        'customer_accounts', 'contacts', 'consents', 'users', 'invitations', 'vehicles', 'meter_readings', 'maintenance_states', 'documents',
+        'work_orders', 'work_order_lines', 'work_order_tasks', 'work_order_parts', 'work_order_events', 'approval_log',
+    ];
 
     /** Organization-wide records a portal user may see (the catalogue they are measured against). */
     private const array ORGANIZATION_WIDE = ['organizations', 'service_tasks'];
 
-    /** @var array<string, array{org: string, account: string|null, branch: string|null, table: string, vehicle: string|null}> */
+    /** @var array<string, array{org: string, account: string|null, branch: string|null, table: string, vehicle: string|null, work_order: string|null}> */
     private array $rows = [];
 
     public function __construct(public readonly World $world)
@@ -85,8 +97,10 @@ final class TenantIsolationSuite
                 $columns['account'] === null ? null : $columns['account'].' as account',
                 $columns['branch'] === null ? null : $columns['branch'].' as branch',
             ]));
-            if (isset($columns['vehicle'])) {
-                $select[] = $columns['vehicle'].' as vehicle';
+            foreach (['vehicle', 'work_order'] as $parent) {
+                if (isset($columns[$parent])) {
+                    $select[] = $columns[$parent].' as '.$parent;
+                }
             }
             foreach (DB::table($table)->select($select)->get() as $row) {
                 $this->rows[(string) $row->id] = [
@@ -95,14 +109,20 @@ final class TenantIsolationSuite
                     'branch' => isset($row->branch) ? (string) $row->branch : null,
                     'table' => $table,
                     'vehicle' => isset($row->vehicle) ? (string) $row->vehicle : null,
+                    'work_order' => isset($row->work_order) ? (string) $row->work_order : null,
                 ];
             }
         }
 
-        // Vehicle-owned rows belong to the vehicle's current owner.
+        // Vehicle-owned rows belong to the vehicle's current owner; a work
+        // order's children to the order's account and branch.
         foreach ($this->rows as $id => $row) {
             if ($row['vehicle'] !== null) {
                 $this->rows[$id]['account'] = $this->rows[$row['vehicle']]['account'] ?? null;
+            }
+            if ($row['work_order'] !== null) {
+                $this->rows[$id]['account'] = $this->rows[$row['work_order']]['account'] ?? null;
+                $this->rows[$id]['branch'] = $this->rows[$row['work_order']]['branch'] ?? null;
             }
         }
     }

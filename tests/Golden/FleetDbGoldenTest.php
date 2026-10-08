@@ -17,8 +17,8 @@ use Tests\Golden\Support\WebFixtures;
  *
  *   GET /vehicles/{id}/health  ← pms.json `$health` (evaluateFleet, whole seed fleet)
  *   GET /fleet/summary         ← pms.json summariseFleet sweeps (whole fleet, per client)
- *   GET /alerts                ← alerts.json buildAlerts sweeps, minus the
- *                                work-order alerts (no work orders until a later phase)
+ *   GET /alerts                ← alerts.json buildAlerts sweeps, work-order and
+ *                                approval-SLA alerts included (Phase 3 seeds the orders)
  */
 
 beforeEach(function () {
@@ -38,7 +38,7 @@ function mapIds(array $ids, string $value): string
 {
     $value = (string) preg_replace_callback('/^pms:(veh-\d+):([a-z-]+)$/', fn (array $m): string => 'pms:'.$ids[$m[1]].':'.$ids['task:'.$m[2]], $value);
 
-    return (string) preg_replace_callback('/\b(veh-\d+|doc-\d+)\b/', fn (array $m): string => $ids[$m[1]], $value);
+    return (string) preg_replace_callback('/\b(veh-\d+|doc-\d+|wo-\d+)\b/', fn (array $m): string => $ids[$m[1]], $value);
 }
 
 it('serves every seeded vehicle the health the frontend computed', function () {
@@ -127,7 +127,7 @@ it('derives the alerts the frontend derived, per scope', function (string $sweep
         'vehicle_id' => $alert['vehicleId'] === null ? null : $this->ids[$alert['vehicleId']],
         'href' => mapIds($this->ids, $alert['href']),
         'days_remaining' => $alert['daysRemaining'],
-    ], array_filter($fixture, fn (array $alert): bool => ! in_array($alert['kind'], ['work_order_overdue', 'approval_sla_breach'], true))));
+    ], $fixture));
 
     $actual = array_map(fn (array $alert): array => array_diff_key($alert, ['read' => true, 'dismissed' => true]), $this->getJson('/api/v1/alerts')->assertOk()->json('data'));
 

@@ -22,6 +22,7 @@ use App\Tenancy\TenantManager;
 use Brick\Money\Money;
 use Carbon\CarbonImmutable;
 use Database\Seeders\Demo\FleetSeed;
+use Database\Seeders\Demo\WorkOrderSeed;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -42,7 +43,10 @@ use RuntimeException;
  *    roles, password `demo1234`;
  *  - two branches: MekanikoMoR-Biñan (repair_pms) and Samahuzai-Biñan
  *    (detailing + equipment), with ../web/lib/bays.ts and
- *    ../web/lib/technicians.ts in the repair branch.
+ *    ../web/lib/technicians.ts in the repair branch. Both are VAT-registered
+ *    and quote prices exclusive of VAT (VAT on top, as ../web bills);
+ *  - the fleet (Demo\FleetSeed), then the work orders and approval settings
+ *    (Demo\WorkOrderSeed), booked into the repair branch.
  *
  * API-only additions, marked below: a branch manager and a cashier demo
  * account, and a small detailing floor at Samahuzai-Biñan.
@@ -177,6 +181,7 @@ final class DemoSeeder extends Seeder
         }
 
         FleetSeed::run($organization->id, $data, $this->ids);
+        WorkOrderSeed::run($organization->id, $repair->id, $data, $this->ids);
     }
 
     /**
@@ -193,7 +198,8 @@ final class DemoSeeder extends Seeder
             'address' => 'Biñan, Laguna',
             'timezone' => 'Asia/Manila',
             'is_vat_registered' => true,
-            'prices_include_vat' => true,
+            // VAT on top of quoted prices, as ../web bills. Inclusive pricing arrives with invoicing.
+            'prices_include_vat' => false,
             'status' => 'active',
         ])->save();
         $this->ids[$slug] = $branch->id;
