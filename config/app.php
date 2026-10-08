@@ -57,6 +57,22 @@ return [
     'url' => env('APP_URL', 'http://localhost'),
 
     /*
+    | The product's own domain (APP_DOMAIN, e.g. torquelane.ph). The SPA is
+    | served from app.{domain}; Sanctum's stateful domains and CORS derive
+    | from it unless overridden. Unset locally.
+    */
+
+    'domain' => env('APP_DOMAIN'),
+
+    /*
+    | Where the SPA lives, for links in emails (invitations, password resets).
+    */
+
+    'frontend_url' => is_string($frontend = env('FRONTEND_URL')) && $frontend !== ''
+        ? $frontend
+        : (is_string($domain = env('APP_DOMAIN')) && $domain !== '' ? 'https://app.'.$domain : 'http://localhost:3000'),
+
+    /*
     |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------

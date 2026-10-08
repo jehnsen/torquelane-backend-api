@@ -1,0 +1,12 @@
+{
+    "status": 403,
+    "body": {
+        "error": {
+            "code": "account_suspended",
+            "message": "This customer account is suspended.",
+            "details": {
+                "reason": "account_suspended"
+            }
+        }
+    }
+}

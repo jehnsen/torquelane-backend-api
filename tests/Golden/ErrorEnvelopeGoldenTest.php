@@ -49,6 +49,7 @@ it('matches the golden envelope for every error code', function (string $method,
     'invalid transition 409' => ['POST', '/api/v1/_test/transition', [], 'invalid_transition'],
     'conflict 409' => ['POST', '/api/v1/_test/conflict', [], 'conflict'],
     'module disabled 403' => ['GET', '/api/v1/_test/module', [], 'module_disabled'],
+    'account suspended 403' => ['GET', '/api/v1/_test/account-suspended', [], 'account_suspended'],
     'server error 500' => ['GET', '/api/v1/_test/boom', [], 'server_error'],
 ]);
 

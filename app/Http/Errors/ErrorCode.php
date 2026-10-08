@@ -22,6 +22,8 @@ enum ErrorCode: string
     case InvalidTransition = 'invalid_transition';
     case Conflict = 'conflict';
     case ModuleDisabled = 'module_disabled';
+    /** A portal user of a suspended customer account; also new work for one. */
+    case AccountSuspended = 'account_suspended';
     case RateLimited = 'rate_limited';
     case ServerError = 'server_error';
 
@@ -29,7 +31,7 @@ enum ErrorCode: string
     {
         return match ($this) {
             self::Unauthenticated => 401,
-            self::Forbidden, self::ModuleDisabled => 403,
+            self::Forbidden, self::ModuleDisabled, self::AccountSuspended => 403,
             self::NotFound => 404,
             self::MethodNotAllowed => 405,
             self::BadRequest => 400,
@@ -52,6 +54,7 @@ enum ErrorCode: string
             self::InvalidTransition => 'This transition is not allowed from the current state.',
             self::Conflict => 'The request conflicts with the current state.',
             self::ModuleDisabled => 'This module is not enabled for your organization.',
+            self::AccountSuspended => 'This customer account is suspended.',
             self::RateLimited => 'Too many requests.',
             self::ServerError => 'Server error.',
         };

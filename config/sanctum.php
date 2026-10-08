@@ -10,11 +10,13 @@ use Laravel\Sanctum\Sanctum;
 return [
 
     /*
-    | The /sanctum/csrf-cookie route exists only for SPA cookie auth, which is
-    | undecided until Phase 1. Off, so every route lives under /api/v1.
+    | Phase 1 chose cookie-based SPA auth. The CSRF cookie route lives under
+    | the API prefix like every other route: GET /api/v1/sanctum/csrf-cookie.
     */
 
-    'routes' => false,
+    'routes' => true,
+
+    'prefix' => 'api/v1/sanctum',
 
     /*
     |--------------------------------------------------------------------------
@@ -27,8 +29,14 @@ return [
     |
     */
 
-    // Empty unless SANCTUM_STATEFUL_DOMAINS is set: no cookie auth until Phase 1 opts in.
-    'stateful' => array_values(array_filter(explode(',', is_string($domains = env('SANCTUM_STATEFUL_DOMAINS')) ? $domains : ''))),
+    // SANCTUM_STATEFUL_DOMAINS when set; otherwise app.{APP_DOMAIN}, plus
+    // localhost:3000 (the Next.js dev server) in local and testing.
+    'stateful' => array_values(array_filter(is_string($domains = env('SANCTUM_STATEFUL_DOMAINS')) && $domains !== ''
+        ? explode(',', $domains)
+        : [
+            is_string($domain = env('APP_DOMAIN')) && $domain !== '' ? 'app.'.$domain : null,
+            in_array(env('APP_ENV'), ['local', 'testing'], true) ? 'localhost:3000' : null,
+        ])),
 
     /*
     |--------------------------------------------------------------------------

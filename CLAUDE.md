@@ -48,9 +48,13 @@ app/Http/Resources/              API Resources. Lists extend ApiResourceCollecti
 app/Http/Errors/                 ErrorCode, ErrorEnvelope, ApiExceptionRenderer.
 app/Http/Middleware/             AssignRequestId, ForceJsonResponse, EnforceIdempotency.
 app/Exceptions/                  ApiException + one subclass per deliberate error code.
-app/Policies/                    one per model (from Phase 1).
-app/Models/                      thin Eloquent models; every one HasUlids.
-app/Casts/                       MoneyCast (*_cents ↔ Money), DecimalCast (numeric ↔ BigDecimal).
+app/Policies/                    one per model; extend TenantPolicy (scope → side → capability).
+app/Models/                      thin Eloquent models; every one HasUlids and (unless allowlisted)
+                                 BelongsToOrganization.
+app/Tenancy/                     TenantManager, the BelongsToOrganization trait + OrganizationScope,
+                                 TenantContextResolver, ModuleGate, TenantAwareUserProvider.
+app/Casts/                       MoneyCast (*_cents ↔ Money), DecimalCast (numeric ↔ BigDecimal),
+                                 JsonObject (nullable jsonb object; {} stays {}).
 app/Database/                    migration helpers: AppendOnly, SchemaMacros, EnsureSchemaExists.
 app/OpenApi/                     Scramble extensions (error envelope, fixed server).
 tests/Unit/Domain/               pure tests of app/Domain. No app, no DB.
@@ -58,17 +62,21 @@ tests/Unit/                      other pure tests (casts).
 tests/Arch/                      architecture rules + the model classification (R5).
 tests/Feature/Api/               HTTP behaviour against real Postgres.
 tests/Feature/Database/          database conventions (triggers, revokes, casts, schema).
-tests/Isolation/                 tenant isolation; coverage.php lists every GET route (R5).
+tests/Feature/{Auth,Tenancy,Numbering}/  login, invites, /me, branch header, suspension, guards, series.
+tests/Isolation/                 tenant isolation; coverage.php lists every GET route (R5);
+                                 TenantIsolationSuite probes them all for every demo user.
 tests/Golden/                    byte-exact response fixtures; a diff is an API change.
-tests/Support/                   test-only routes and controllers.
+tests/Golden/fixtures/web/       ../web's golden fixtures (tenancy.json, rbac.json), replayed.
+tests/Support/                   test-only routes, World (demo tenant + a rival organization).
 ```
 
 ## API conventions
 
 - **Every route is under `/api/v1`** (`apiPrefix` in `bootstrap/app.php`).
   `tests/Isolation/RouteCoverageTest` fails on any route outside it, except
-  Scramble's local-only docs UI (`/docs/api`). Sanctum's `/sanctum/csrf-cookie`
-  and the local disk's `/storage/{path}` are switched off.
+  Scramble's local-only docs UI (`/docs/api`). Sanctum's CSRF route is served
+  at `/api/v1/sanctum/csrf-cookie` (`sanctum.prefix`); the local disk's
+  `/storage/{path}` is switched off.
 - **JSON only.** `ForceJsonResponse` sets `Accept: application/json` on every
   request, so the framework never renders HTML or redirects (e.g. the auth
   guard redirecting to a `login` route that doesn't exist).
@@ -94,6 +102,11 @@ tests/Support/                   test-only routes and controllers.
   | `invalid_transition` | 409 | `InvalidTransitionException` (state machines, Phase 2+) |
   | `conflict` | 409 | `ConflictException`, reused Idempotency-Key |
   | `module_disabled` | 403 | `ModuleDisabledException` (entitlements) |
+  | `account_suspended` | 403 | `AccountSuspendedException`: a portal user of a suspended customer account, or new work for one (*Phase 1*) |
+
+  A tenant-context refusal (`forbidden` or `account_suspended` from the
+  `tenant` middleware or login) carries `details.reason`, a `ScopeDenial`
+  value (`role_side_mismatch`, `branch_not_allowed`, `user_disabled`, …).
   | `rate_limited` | 429 | throttle; keeps `Retry-After` |
   | `server_error` | 500 (or the 5xx thrown) | anything else. Generic message; exception details only when `APP_DEBUG=true` |
 
@@ -131,6 +144,8 @@ tests/Support/                   test-only routes and controllers.
   A dead queue → `degraded`, still 200. An unreachable database → 503
   envelope, `server_error`, report under `details.health`.
 - **Rate limit.** The `api` limiter: 120/min per user, or per IP for guests.
+  `login`: 5/min per email+IP and 20/min per IP. `password-reset` (forgot,
+  reset, invitation acceptance): 3/min per email+IP and 10/min per IP.
 
 ## Database conventions
 
@@ -174,7 +189,7 @@ tests/Support/                   test-only routes and controllers.
 
 | Table | Kind | Notes |
 |---|---|---|
-| `users` | framework, ULID | Minimal until Phase 1 adds organizations and roles. |
+| `users` | framework, ULID | Tenant-owned since Phase 1 (see below). |
 | `password_reset_tokens`, `sessions` | framework | `sessions.user_id` is a ULID. |
 | `personal_access_tokens` | Sanctum | `tokenable` is a ULID morph. |
 | `cache`, `cache_locks` | framework | Also holds the queue heartbeat (`health:queue:last_beat_at`). |
@@ -183,6 +198,174 @@ tests/Support/                   test-only routes and controllers.
 
 Function: `forbid_append_only_mutation()`, the trigger body behind
 `AppendOnly::protect`.
+
+### Tables (Phase 1)
+
+Every one is tenant-owned (`organization_id NOT NULL`, indexed, model uses
+`BelongsToOrganization`) except `organizations`. Children reference parents
+through **composite foreign keys that include `organization_id`** (targets
+are `unique (id, organization_id)`), so a row pointing at another
+organization's parent is unrepresentable, not merely unchecked.
+
+| Table | Notes |
+|---|---|
+| `organizations` | The tenant root (../web's provider): name, slug, legal name, TIN (`NNN-NNN-NNN`), contact, support email, branding (logo, colour, `theme_tokens`), status `active`/`suspended`. |
+| `branches` | Slug unique per organization; TIN + BIR `branch_code`; `is_vat_registered`, `prices_include_vat`; `timezone` (default Asia/Manila); branding overrides (`brand_name`, logo, colour, tokens); status `active`/`inactive`. |
+| `customer_accounts` | ../web's fleet client, generalised: `account_type` `company`/`individual`, company and individual fields, payment terms, `credit_limit_cents`, `approval_threshold_overrides` (sparse jsonb object; NULL ≠ `{}`, CHECKed), `tags`, source, notes, portal branding, status `active`/`suspended`. Never deleted. |
+| `contacts` | People at an account; at most one `is_primary` per account (partial unique index). |
+| `consents` | **Append-only.** Account- or contact-level decisions: purpose (`service_records`, `service_reminders`, `marketing`, `vehicle_history_sharing`), granted, channel, `captured_at`, `captured_by`, evidence. Current = latest per purpose (`ConsentLedger`). |
+| `users` (altered) | `organization_id`, `side` `staff`/`portal`, `customer_account_id`, `role`, `title`, `status` `active`/`disabled`, `last_login_at`. CHECKs: role matches side; `customer_account_id` set exactly when portal. |
+| `branch_user` | Staff branch pins (composite PK). **No rows = every branch.** |
+| `invitations` | Pending invites (`token_hash` = SHA-256; the token exists only in the email). CHECK mirrors the invite rules. A user row exists only after acceptance. |
+| `bays` | Branch-owned (../web's static `lib/bays.ts`): name (unique per branch), focus, `capacity_hours_per_day` numeric. |
+| `technicians` | Branch-owned (../web's `lib/technicians.ts`): `skill_tags` (`mechanic`, `detailer`, …), specialty, `home_bay_id` (same branch, composite FK), optional `user_id`. |
+| `organization_modules`, `branch_modules` | One row per switched module; no row = off. Active in a branch = both on. |
+| `document_series` | `(organization_id, branch_id, doc_type, period_key)` unique **NULLS NOT DISTINCT**; prefix, `next_number`, padding. |
+| `audit_logs` | **Append-only.** occurred_at, request_id, actor + role, organization, branch, customer account, entity type/id, action, before/after jsonb. No FK to the audited entity. |
+
+## Identity and tenancy (Phase 1)
+
+### Tenant context
+
+`auth:sanctum` → **`tenant`** (`ResolveTenantContext`) → route-model binding
+(the middleware is prepended ahead of `SubstituteBindings` in the priority
+list). The context is built from the authenticated user's stored row only:
+organization, side, role, customer account (portal), allowed branches
+(pins, or all), and the selected branch from **`X-Branch-Id`** (one allowed
+branch id, or `all`; anything else is 403 `branch_not_allowed`, never
+ignored; absent = the single allowed branch, else all). Portal users have no
+branch dimension; the header is ignored for them.
+
+`App\Domain\Tenancy` holds the rules as pure PHP: `TenantScopeResolver`
+(port of `explainTenantScope` / `visibleFleetClientIds` / `scopeAccounts`),
+`BranchSelection`, `TenantResolution`, `AccountStanding`. Every denial has a
+`ScopeDenial` reason, logged (`tenant.denied`) and returned in
+`details.reason`: `no_session` → 401; `account_suspended` → 403
+account_suspended; the rest → 403 forbidden.
+
+**Scoping, three layers:**
+
+1. `BelongsToOrganization` global scope: `organization_id = <context>`. With
+   no context it **throws** (`TenancyViolation`, a 500) rather than returning
+   everything or nothing. The `saving` hook fills `organization_id` from the
+   context and refuses a write into another organization.
+2. Per query path: each model's `visibleTo($context)` scope (portal → own
+   account only; staff → allowed branches for branch-owned records), used by
+   `DirectoryQueries`.
+3. Policies (`TenantPolicy`): scope first (out of scope → **404**), then side
+   (staff-only screens → 403), then capability (403 with the frontend's
+   `denialReason` text). Module entitlement: `ModuleGate::ensure()` (403
+   module_disabled); no Phase 1 route is module-gated.
+
+**Named system contexts** (`TenantManager::system($reason, fn)`) are the only
+way around the scope: `authentication` (TenantAwareUserProvider: session,
+remember token, email lookups), `tenant resolution`, `invitation acceptance`,
+`invitation email uniqueness`, `demo seeder`, and `test*` in tests. Queue
+jobs that act for a tenant use `TenantManager::actingAs($context, fn)`.
+
+### RULE CHANGE: suspended customer accounts (deliberate)
+
+../web resolved a suspended client to no scope for its own users, and its
+database hid it from the provider too. Here:
+
+- portal users of a suspended account are denied on every request and at
+  login (403 `account_suspended`);
+- staff still **read** a suspended account and everything beneath it
+  (collections, history), and may keep it accurate (contact edits, consent
+  withdrawals);
+- staff **cannot start new work** for it: `CustomerAccountPolicy::createWorkFor`
+  throws `AccountSuspendedException`. Phase 1's only "new work" is a portal
+  invitation; **every later create-work path (work orders, quotes, bookings,
+  sales on account) must authorize `createWorkFor`**.
+- Reinstatement exists here (`POST …/reactivate`); in ../web it was an
+  operator action.
+
+Golden impact: this alters **no** fixture output (`visibleFleetClientIds`
+already kept suspended clients in provider scope; `client_suspended` =
+`account_suspended`). The no-new-work half has no frontend function.
+
+### Golden divergences from ../web (tests/Golden/TenancyGoldenTest.php)
+
+All 220 replayed tenancy cases match except three, all one rule: **staff
+roles are never pinned to a customer account** (invite rules + CHECK), so a
+provider-side session pinned to a client resolves to no scope
+(`role_side_mismatch`) instead of that client's scope. Also: for a session
+with no scope, ../web's `providerBranding` fell back to platform branding;
+the API refuses the session (403) instead. `scopeFleetState` and
+`alertsForScope` are deferred to the phases that add vehicles/work orders and
+alerts (the test fails if a fixture function is neither replayed nor listed).
+
+### Roles and capabilities (`App\Domain\Access`)
+
+One matrix, `AccessMatrix`; GET /me returns the resolved list and the
+frontend stops carrying its own. Every ported grant is identical (replayed
+from rbac.json). API additions:
+
+| Capability (new) | Granted to |
+|---|---|
+| `customer:manage` (accounts, contacts, consent) | provider_admin, service_advisor, branch_manager, cashier, fleet_manager (own account only, by scope) |
+| `organization:manage` (profile, org modules, open/delete branches) | provider_admin |
+
+| Role (new, staff) | Grants |
+|---|---|
+| `branch_manager` | everything except `organization:manage`, only within pinned branches |
+| `cashier` | `customer:manage` only (walk-ins and their consent); POS grants come with the POS module |
+
+**No escalation:** `AccessMatrix::canGrant` lets a granter hand out (invite,
+role change, revoke) only roles whose grants are a subset of their own, and
+requires `access:manage`. A branch-pinned granter may only pin people inside
+their own branches and cannot touch staff who work outside them (an
+unpinned staff member works everywhere, so is beyond any branch manager).
+
+### Auth (Sanctum SPA, cookie sessions)
+
+`GET /api/v1/sanctum/csrf-cookie` → `POST /api/v1/auth/login` (with
+`X-XSRF-TOKEN`, from a stateful origin) → session cookie. Stateful origins:
+`app.{APP_DOMAIN}`, plus `localhost:3000` in local/testing
+(`SANCTUM_STATEFUL_DOMAINS` overrides; CORS likewise via
+`CORS_ALLOWED_ORIGINS`, credentials allowed). **Bearer tokens are never
+read** (`Sanctum::getAccessTokenFromRequestUsing` returns null). Login
+resolves the tenant context and refuses (and signs back out) a session that
+would have none. Password reset uses Laravel's broker; the link points at
+`FRONTEND_URL/reset-password`. Invitations: `POST /invitations` emails
+`FRONTEND_URL/accept-invite?token=…`; `POST /auth/invitations/accept` creates
+the user from the invitation row (7-day expiry, single use, re-checked
+organization/account standing) and signs them in.
+
+`GET /api/v1/me`: user, organization, side, branches (`allowed`, `selected` =
+id / `all` / null, `restricted`), customer account, capabilities, modules
+(`active`, `organization`, `by_branch`), branding. Branding (`Branding`, port
+of `providerBranding`): staff see the organization's mark overlaid by the
+selected branch's overrides; portal users see their account's name, logo and
+colour falling back field by field; support email is always the organization's.
+
+### Numbering, audit, consent
+
+- `DocumentNumbers::issue($org, $branch, DocumentType, $at)` (Actions) must
+  run inside the document's transaction (throws otherwise): `insert … on
+  conflict do nothing`, then `select … for update`, then increment. Yearly
+  Manila period; `WO-2026-0001`. Tested gap-free across rollbacks and with
+  four concurrent processes.
+- `AuditTrail::record()` in every write Action: actor/role from the context,
+  request id from Laravel Context, owner columns read off the row. Snapshots
+  drop password, remember_token, token_hash.
+- Account opening requires `service_records` granted, written in the same
+  transaction. Staff record consent via `in_person`/`paper_form`/`email`/
+  `sms`/`phone`; portal users only via `portal`; `import` is seeders only.
+
+### Demo data
+
+`DemoSeeder` (also `DatabaseSeeder`) loads `database/seeders/data/demo-seed.json`
+(../web/fixtures/seed): organization **MekanikoMoR**; branches
+**MekanikoMoR-Biñan** (repair_pms; ../web's 5 bays and 6 technicians) and
+**Samahuzai-Biñan** (detailing + equipment; brand "Samahuzai"; 2 detail bays,
+2 detailers, API-only); the four fleet clients as company accounts (Bayani
+suspended), each with a primary contact and imported service_records +
+service_reminders consent; ../web's 11 demo users (same emails, roles,
+titles) plus `manager.samahuzai@mekanikomore.ph` (branch_manager, pinned to
+Samahuzai-Biñan) and `cashier@mekanikomore.ph` (cashier, pinned to
+MekanikoMoR-Biñan). Password `demo1234`; refuses to run in production.
+Override keys are converted from pesos/camelCase to centavos/snake_case.
 
 ## Rules that bite
 
@@ -215,7 +398,37 @@ Function: `forbid_append_only_mutation()`, the trigger body behind
   Never on a reachable server.
 - **New model → classify it in `tests/Arch/ModelCoverageTest.php`. New GET
   route → list it in `tests/Isolation/coverage.php`** (R5). Both tests fail
-  otherwise.
+  otherwise. Declared routes are then probed automatically by
+  `TenantIsolationSuite` for every demo user, with every route parameter
+  filled from every ownership bucket; a parameter it cannot map to a model
+  fails the suite.
+- **Reading a tenant model outside a request needs a named system context.**
+  Seeders, commands, jobs and tests: `TenantManager::system('reason', fn)`
+  (tests: `asSystem(fn)`), or `actingAs($context, fn)` for work on a
+  tenant's behalf. Without one the query throws `TenancyViolation`.
+- **`saving` fires before `creating`.** The tenancy fill/guard lives in the
+  `saving` hook for that reason; a `creating` hook would see a new row's
+  `organization_id` too late.
+- **Never `save()` a loaded `Consent` or `AuditLog`.** The triggers reject
+  UPDATE (23001). Append a new row.
+- **`jsonb` reorders object keys.** Compare override/token objects
+  order-insensitively; `JsonObject` writes an empty object as `{}`, never `[]`.
+- **A branch delete must never widen access.** `branch_user` cascades, and a
+  user left with no pins works in every branch, so `DeleteBranch` refuses any
+  branch with pinned staff (and bays, technicians, series). Likewise
+  `branch_ids: []` (= every branch) can only be granted by an unpinned granter.
+- **Every new create-work path authorizes `createWorkFor`** on the customer
+  account (suspended accounts take no new work).
+- **`withHeaders()` persists across requests in a test.** Pass per-request
+  headers (`X-Branch-Id`) as the `getJson($uri, $headers)` argument.
+- **The test suite carries its own throwaway `APP_KEY`** (phpunit.xml):
+  cookie sessions need one. A local `.env` without a key breaks SPA login in
+  `composer dev`; `php artisan key:generate` fixes it.
+- **Phase 1 migrations refuse a `users` table with rows** (Phase 0A users had
+  no organization). Locally: `php artisan migrate:fresh --seed`.
+- **Running only part of the suite in one process**: the arch tests need
+  more than PHP's default 128 MB (`php -d memory_limit=1G vendor/bin/pest …`);
+  `composer test` (parallel) is fine.
 
 ## Running it
 
@@ -295,7 +508,7 @@ The 0A brief asked for titles for Phases 0A–15 but did not supply them. Only
 audit rows). Fill in the rest from the phase plan.
 
 - [x] **0A**: Foundation (scaffold, API conventions, database conventions, quality gates, staging deploy)
-- [ ] **1**: Tenancy & audit *(working title, inferred from the 0A brief)*
+- [x] **1**: Identity & tenancy (organizations, branches, customer accounts, contacts, consents, users/invites, bays, technicians, modules, document series, audit log; Sanctum SPA auth; /me)
 - [ ] **2**: *(title not provided)*
 - [ ] **3**: *(title not provided)*
 - [ ] **4**: *(title not provided)*
@@ -314,3 +527,10 @@ audit rows). Fill in the rest from the phase plan.
 Phase 0A status: done locally (gates green, `openapi.json` committed). CI
 needs a GitHub remote, and the staging deploy needs the server steps in
 docs/deploy.md and the real `{{APP_DOMAIN}}` / `{{DB_HOST}}`.
+
+Phase 1 status: done locally (gates green, golden + isolation suites pass).
+The golden fixtures were copied from pms-monitoring-frontend@d45871e
+(branch `phase-0b/golden-fixtures`); that branch, not `erp-migration`, is
+the `../web` the ported rules come from (`lib/rbac.ts`, `lib/tenancy.ts`,
+`app/api/admin/users/route.ts`). `branch_manager` / `cashier` grants are
+proposals pending review.

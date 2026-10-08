@@ -12,6 +12,1383 @@
         }
     ],
     "paths": {
+        "/bays": {
+            "get": {
+                "operationId": "bays.index",
+                "summary": "List bays",
+                "tags": [
+                    "Bay"
+                ],
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `BayResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/BayCollection"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "bays.store",
+                "description": "`settings:manage` and access to `branch_id`.",
+                "summary": "Add a bay",
+                "tags": [
+                    "Bay"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SaveBayRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "`BayResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/BayResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/bays/{bay}": {
+            "get": {
+                "operationId": "bays.show",
+                "summary": "Show a bay",
+                "tags": [
+                    "Bay"
+                ],
+                "parameters": [
+                    {
+                        "name": "bay",
+                        "in": "path",
+                        "required": true,
+                        "description": "The bay ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`BayResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/BayResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            },
+            "put": {
+                "operationId": "bays.update",
+                "summary": "Update a bay",
+                "tags": [
+                    "Bay"
+                ],
+                "parameters": [
+                    {
+                        "name": "bay",
+                        "in": "path",
+                        "required": true,
+                        "description": "The bay ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SaveBayRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`BayResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/BayResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "bays.destroy",
+                "description": "A technician's home bay is a 409.",
+                "summary": "Delete a bay",
+                "tags": [
+                    "Bay"
+                ],
+                "parameters": [
+                    {
+                        "name": "bay",
+                        "in": "path",
+                        "required": true,
+                        "description": "The bay ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            }
+        },
+        "/branches": {
+            "get": {
+                "operationId": "branches.index",
+                "summary": "List branches",
+                "tags": [
+                    "Branch"
+                ],
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `BranchResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/BranchCollection"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "branches.store",
+                "description": "Needs `organization:manage`. Every module starts switched off.",
+                "summary": "Open a branch",
+                "tags": [
+                    "Branch"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SaveBranchRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "`BranchResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/BranchResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/branches/{branch}": {
+            "get": {
+                "operationId": "branches.show",
+                "summary": "Show a branch",
+                "tags": [
+                    "Branch"
+                ],
+                "parameters": [
+                    {
+                        "name": "branch",
+                        "in": "path",
+                        "required": true,
+                        "description": "The branch ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`BranchResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/BranchResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            },
+            "put": {
+                "operationId": "branches.update",
+                "description": "Needs `settings:manage` and access to the branch.",
+                "summary": "Update a branch",
+                "tags": [
+                    "Branch"
+                ],
+                "parameters": [
+                    {
+                        "name": "branch",
+                        "in": "path",
+                        "required": true,
+                        "description": "The branch ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SaveBranchRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`BranchResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/BranchResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "branches.destroy",
+                "description": "Needs `organization:manage`. A branch with bays, technicians, pinned\nstaff or document series is a 409: mark it inactive instead.",
+                "summary": "Delete an empty branch",
+                "tags": [
+                    "Branch"
+                ],
+                "parameters": [
+                    {
+                        "name": "branch",
+                        "in": "path",
+                        "required": true,
+                        "description": "The branch ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            }
+        },
+        "/customer-accounts/{customerAccount}/consents": {
+            "get": {
+                "operationId": "customer-accounts.consents.index",
+                "description": "Every decision, newest first (cursor-paginated).",
+                "summary": "Consent history",
+                "tags": [
+                    "Consent"
+                ],
+                "parameters": [
+                    {
+                        "name": "customerAccount",
+                        "in": "path",
+                        "required": true,
+                        "description": "The customer account ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `ConsentResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ConsentCollection"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "customer-accounts.consents.store",
+                "description": "`customer:manage`. Staff record how the customer told them (in person,\npaper form, email, SMS, phone); a portal user records their own through\nthe `portal` channel. Allowed on a suspended account.",
+                "summary": "Record a consent decision",
+                "tags": [
+                    "Consent"
+                ],
+                "parameters": [
+                    {
+                        "name": "customerAccount",
+                        "in": "path",
+                        "required": true,
+                        "description": "The customer account ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RecordConsentRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "`ConsentResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ConsentResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/customer-accounts/{customerAccount}/consents/current": {
+            "get": {
+                "operationId": "customer-accounts.consents.current",
+                "description": "The latest decision per purpose, for the account and for each contact.",
+                "summary": "Current consent",
+                "tags": [
+                    "Consent"
+                ],
+                "parameters": [
+                    {
+                        "name": "customerAccount",
+                        "in": "path",
+                        "required": true,
+                        "description": "The customer account ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`ConsentStateResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ConsentStateResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            }
+        },
+        "/customer-accounts/{customerAccount}/contacts": {
+            "get": {
+                "operationId": "customer-accounts.contacts.index",
+                "summary": "List an account's contacts",
+                "tags": [
+                    "Contact"
+                ],
+                "parameters": [
+                    {
+                        "name": "customerAccount",
+                        "in": "path",
+                        "required": true,
+                        "description": "The customer account ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `ContactResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ContactCollection"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "customer-accounts.contacts.store",
+                "description": "`customer:manage`. Marking one primary demotes the previous primary.",
+                "summary": "Add a contact",
+                "tags": [
+                    "Contact"
+                ],
+                "parameters": [
+                    {
+                        "name": "customerAccount",
+                        "in": "path",
+                        "required": true,
+                        "description": "The customer account ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SaveContactRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "`ContactResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ContactResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/customer-accounts/{customerAccount}/contacts/{contact}": {
+            "get": {
+                "operationId": "customer-accounts.contacts.show",
+                "summary": "Show a contact",
+                "tags": [
+                    "Contact"
+                ],
+                "parameters": [
+                    {
+                        "name": "customerAccount",
+                        "in": "path",
+                        "required": true,
+                        "description": "The customer account ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "contact",
+                        "in": "path",
+                        "required": true,
+                        "description": "The contact ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`ContactResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ContactResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            },
+            "put": {
+                "operationId": "customer-accounts.contacts.update",
+                "summary": "Update a contact",
+                "tags": [
+                    "Contact"
+                ],
+                "parameters": [
+                    {
+                        "name": "customerAccount",
+                        "in": "path",
+                        "required": true,
+                        "description": "The customer account ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "contact",
+                        "in": "path",
+                        "required": true,
+                        "description": "The contact ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SaveContactRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`ContactResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ContactResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "customer-accounts.contacts.destroy",
+                "description": "A contact with consent decisions on record cannot be deleted (409).",
+                "summary": "Delete a contact",
+                "tags": [
+                    "Contact"
+                ],
+                "parameters": [
+                    {
+                        "name": "customerAccount",
+                        "in": "path",
+                        "required": true,
+                        "description": "The customer account ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "contact",
+                        "in": "path",
+                        "required": true,
+                        "description": "The contact ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            }
+        },
+        "/sanctum/csrf-cookie": {
+            "get": {
+                "operationId": "sanctum.csrf-cookie",
+                "summary": "Return an empty response simply to trigger the storage of the CSRF cookie in the browser",
+                "tags": [
+                    "CsrfCookie"
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No content\n\nNo content",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/customer-accounts": {
+            "get": {
+                "operationId": "customer-accounts.index",
+                "summary": "List customer accounts",
+                "tags": [
+                    "CustomerAccount"
+                ],
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "active",
+                                "suspended"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "account_type",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "company",
+                                "individual"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 100
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `CustomerAccountResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CustomerAccountCollection"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "customer-accounts.store",
+                "description": "Staff with `customer:manage`. `consents` must include `service_records`,\ngranted; it is recorded in the same transaction as the account.",
+                "summary": "Open a customer account",
+                "tags": [
+                    "CustomerAccount"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SaveCustomerAccountRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "`CustomerAccountResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CustomerAccountResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/customer-accounts/{customerAccount}": {
+            "get": {
+                "operationId": "customer-accounts.show",
+                "summary": "Show a customer account",
+                "tags": [
+                    "CustomerAccount"
+                ],
+                "parameters": [
+                    {
+                        "name": "customerAccount",
+                        "in": "path",
+                        "required": true,
+                        "description": "The customer account ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`CustomerAccountResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CustomerAccountResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            },
+            "put": {
+                "operationId": "customer-accounts.update",
+                "description": "`customer:manage`. Portal users may edit only their own account's\ncontact details and branding.",
+                "summary": "Update a customer account",
+                "tags": [
+                    "CustomerAccount"
+                ],
+                "parameters": [
+                    {
+                        "name": "customerAccount",
+                        "in": "path",
+                        "required": true,
+                        "description": "The customer account ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SaveCustomerAccountRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`CustomerAccountResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CustomerAccountResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/customer-accounts/{customerAccount}/suspend": {
+            "post": {
+                "operationId": "customer-accounts.suspend",
+                "description": "Staff with `settings:manage`. The account's portal users are locked out\nat once and it takes no new work; staff can still read it.",
+                "summary": "Suspend a customer account",
+                "tags": [
+                    "CustomerAccount"
+                ],
+                "parameters": [
+                    {
+                        "name": "customerAccount",
+                        "in": "path",
+                        "required": true,
+                        "description": "The customer account ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`CustomerAccountResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CustomerAccountResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            }
+        },
+        "/customer-accounts/{customerAccount}/reactivate": {
+            "post": {
+                "operationId": "customer-accounts.reactivate",
+                "description": "Staff with `settings:manage`.",
+                "summary": "Reactivate a customer account",
+                "tags": [
+                    "CustomerAccount"
+                ],
+                "parameters": [
+                    {
+                        "name": "customerAccount",
+                        "in": "path",
+                        "required": true,
+                        "description": "The customer account ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`CustomerAccountResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CustomerAccountResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            }
+        },
         "/health": {
             "get": {
                 "operationId": "health",
@@ -86,10 +1463,1776 @@
                 },
                 "security": []
             }
+        },
+        "/invitations": {
+            "get": {
+                "operationId": "invitations.index",
+                "description": "`access:manage`.",
+                "summary": "List pending invitations",
+                "tags": [
+                    "Invitation"
+                ],
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `InvitationResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InvitationCollection"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "invitations.store",
+                "description": "`access:manage`. Portal roles must name an active `customer_account_id`;\nstaff roles must not name one. You can only invite to roles whose grants\nyou hold, and a branch-pinned manager only into their own branches.\nThe invitation link is emailed; the token is never returned.",
+                "summary": "Invite someone",
+                "tags": [
+                    "Invitation"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreInvitationRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "`InvitationResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InvitationResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/invitations/{invitation}": {
+            "delete": {
+                "operationId": "invitations.destroy",
+                "summary": "Revoke an invitation",
+                "tags": [
+                    "Invitation"
+                ],
+                "parameters": [
+                    {
+                        "name": "invitation",
+                        "in": "path",
+                        "required": true,
+                        "description": "The invitation ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`InvitationResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InvitationResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            }
+        },
+        "/auth/invitations/accept": {
+            "post": {
+                "operationId": "auth.invitations.accept",
+                "description": "Creates the account from the emailed invitation token and signs the new\nuser in (when called with a cookie session). Answers with the same body\nas `GET /me`. Rate-limited.",
+                "summary": "Accept an invitation",
+                "tags": [
+                    "InvitationAcceptance"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AcceptInvitationRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "`MeResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/MeResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                },
+                "security": []
+            }
+        },
+        "/modules": {
+            "get": {
+                "operationId": "modules.index",
+                "description": "Every module with its organization switch and, per branch the caller can\nreach, the branch switch and whether it is active there. Staff only.",
+                "summary": "Module entitlements",
+                "tags": [
+                    "Module"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {}
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            }
+        },
+        "/modules/{module}": {
+            "put": {
+                "operationId": "modules.update",
+                "description": "Needs `organization:manage`. Switching it off turns it off in every\nbranch at once.",
+                "summary": "Switch a module for the organization",
+                "tags": [
+                    "Module"
+                ],
+                "parameters": [
+                    {
+                        "name": "module",
+                        "in": "path",
+                        "required": true,
+                        "description": "The module ID",
+                        "schema": {
+                            "$ref": "#/components/schemas/Module"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SetModuleRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "module": {
+                                                    "type": "string"
+                                                },
+                                                "organization_enabled": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "module",
+                                                "organization_enabled"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/branches/{branch}/modules/{module}": {
+            "put": {
+                "operationId": "branches.modules.update",
+                "description": "Needs `settings:manage` and access to the branch. Has no effect while\nthe organization switch is off.",
+                "summary": "Switch a module for a branch",
+                "tags": [
+                    "Module"
+                ],
+                "parameters": [
+                    {
+                        "name": "branch",
+                        "in": "path",
+                        "required": true,
+                        "description": "The branch ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "module",
+                        "in": "path",
+                        "required": true,
+                        "description": "The module ID",
+                        "schema": {
+                            "$ref": "#/components/schemas/Module"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SetModuleRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "module": {
+                                                    "type": "string"
+                                                },
+                                                "branch_id": {
+                                                    "type": "string"
+                                                },
+                                                "enabled": {
+                                                    "type": "boolean"
+                                                },
+                                                "active": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "module",
+                                                "branch_id",
+                                                "enabled",
+                                                "active"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/organization": {
+            "get": {
+                "operationId": "organization.show",
+                "summary": "Organization profile",
+                "tags": [
+                    "Organization"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`OrganizationResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/OrganizationResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            },
+            "patch": {
+                "operationId": "organization.update",
+                "description": "Needs `organization:manage`.",
+                "summary": "Update the organization profile",
+                "tags": [
+                    "Organization"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateOrganizationRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`OrganizationResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/OrganizationResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/auth/forgot-password": {
+            "post": {
+                "operationId": "auth.forgot-password",
+                "description": "Emails a reset link when the address belongs to an account. Answers the\nsame either way, so it cannot be used to discover accounts.\nRate-limited.",
+                "summary": "Request a password reset",
+                "tags": [
+                    "Password"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ForgotPasswordRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "status": {
+                                                    "type": "string",
+                                                    "const": "sent"
+                                                }
+                                            },
+                                            "required": [
+                                                "status"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                },
+                "security": []
+            }
+        },
+        "/auth/reset-password": {
+            "post": {
+                "operationId": "auth.reset-password",
+                "description": "Uses the token from the reset email. Rate-limited.",
+                "summary": "Reset a password",
+                "tags": [
+                    "Password"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ResetPasswordRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "status": {
+                                                    "type": "string",
+                                                    "const": "reset"
+                                                }
+                                            },
+                                            "required": [
+                                                "status"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                },
+                "security": []
+            }
+        },
+        "/auth/login": {
+            "post": {
+                "operationId": "auth.login",
+                "description": "Cookie-session login for the SPA: call `GET /sanctum/csrf-cookie` first,\nthen post with the `X-XSRF-TOKEN` header, from an allowed origin. Answers\nwith the same body as `GET /me`. A session that would resolve to no\ntenant scope (a suspended account's portal user, a disabled user) is\nrefused with its reason. Rate-limited per email and per IP.",
+                "summary": "Sign in",
+                "tags": [
+                    "Session"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/LoginRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`MeResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/MeResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                },
+                "security": []
+            }
+        },
+        "/auth/logout": {
+            "post": {
+                "operationId": "auth.logout",
+                "description": "Ends the cookie session. Works for any signed-in user, including one\nwhose account was suspended mid-session.",
+                "summary": "Sign out",
+                "tags": [
+                    "Session"
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            }
+        },
+        "/me": {
+            "get": {
+                "operationId": "me",
+                "description": "The signed-in user, their organization, side, branches (allowed and\nselected), customer account (portal), resolved capabilities, active\nmodules and branding. The frontend gates its UI from this.",
+                "summary": "Who am I",
+                "tags": [
+                    "Session"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`MeResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/MeResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    }
+                }
+            }
+        },
+        "/technicians": {
+            "get": {
+                "operationId": "technicians.index",
+                "summary": "List technicians",
+                "tags": [
+                    "Technician"
+                ],
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `TechnicianResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/TechnicianCollection"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "technicians.store",
+                "description": "`settings:manage` and access to `branch_id`.",
+                "summary": "Add a technician",
+                "tags": [
+                    "Technician"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SaveTechnicianRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "`TechnicianResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/TechnicianResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/technicians/{technician}": {
+            "get": {
+                "operationId": "technicians.show",
+                "summary": "Show a technician",
+                "tags": [
+                    "Technician"
+                ],
+                "parameters": [
+                    {
+                        "name": "technician",
+                        "in": "path",
+                        "required": true,
+                        "description": "The technician ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`TechnicianResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/TechnicianResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            },
+            "put": {
+                "operationId": "technicians.update",
+                "summary": "Update a technician",
+                "tags": [
+                    "Technician"
+                ],
+                "parameters": [
+                    {
+                        "name": "technician",
+                        "in": "path",
+                        "required": true,
+                        "description": "The technician ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SaveTechnicianRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`TechnicianResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/TechnicianResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "technicians.destroy",
+                "summary": "Delete a technician",
+                "tags": [
+                    "Technician"
+                ],
+                "parameters": [
+                    {
+                        "name": "technician",
+                        "in": "path",
+                        "required": true,
+                        "description": "The technician ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            }
+        },
+        "/users": {
+            "get": {
+                "operationId": "users.index",
+                "summary": "List people",
+                "tags": [
+                    "User"
+                ],
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `UserResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/UserCollection"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/users/{user}": {
+            "get": {
+                "operationId": "users.show",
+                "summary": "Show a person",
+                "tags": [
+                    "User"
+                ],
+                "parameters": [
+                    {
+                        "name": "user",
+                        "in": "path",
+                        "required": true,
+                        "description": "The user ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`UserResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/UserResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            },
+            "put": {
+                "operationId": "users.update",
+                "description": "`access:manage`. Not yourself, and never to or from a role whose grants\nyou do not hold. `branch_ids: []` means every branch, which only an\nunrestricted manager can grant. Roles never move between staff and\nportal.",
+                "summary": "Change someone's access",
+                "tags": [
+                    "User"
+                ],
+                "parameters": [
+                    {
+                        "name": "user",
+                        "in": "path",
+                        "required": true,
+                        "description": "The user ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateUserRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`UserResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/UserResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
         }
     },
     "components": {
         "schemas": {
+            "AcceptInvitationRequest": {
+                "type": "object",
+                "properties": {
+                    "token": {
+                        "type": "string",
+                        "minLength": 64,
+                        "maxLength": 64
+                    },
+                    "password": {
+                        "type": "string",
+                        "minLength": 8,
+                        "maxLength": 255
+                    },
+                    "password_confirmation": {
+                        "type": "string",
+                        "minLength": 8,
+                        "maxLength": 255
+                    }
+                },
+                "required": [
+                    "token",
+                    "password",
+                    "password_confirmation"
+                ],
+                "title": "AcceptInvitationRequest"
+            },
+            "BayCollection": {
+                "type": "array",
+                "items": {
+                    "$ref": "#/components/schemas/BayResource"
+                },
+                "title": "BayCollection"
+            },
+            "BayResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "branch_id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "focus": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "capacity_hours_per_day": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "branch_id",
+                    "name",
+                    "focus",
+                    "capacity_hours_per_day",
+                    "status",
+                    "created_at",
+                    "updated_at"
+                ],
+                "title": "BayResource"
+            },
+            "BranchCollection": {
+                "type": "array",
+                "items": {
+                    "$ref": "#/components/schemas/BranchResource"
+                },
+                "title": "BranchCollection"
+            },
+            "BranchResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "organization_id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "address": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "contact_email": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "contact_phone": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "tin": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "branch_code": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "is_vat_registered": {
+                        "type": "boolean"
+                    },
+                    "prices_include_vat": {
+                        "type": "boolean"
+                    },
+                    "timezone": {
+                        "type": "string"
+                    },
+                    "brand_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "logo_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "brand_color": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "theme_tokens": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "organization_id",
+                    "name",
+                    "slug",
+                    "address",
+                    "contact_email",
+                    "contact_phone",
+                    "tin",
+                    "branch_code",
+                    "is_vat_registered",
+                    "prices_include_vat",
+                    "timezone",
+                    "brand_name",
+                    "logo_url",
+                    "brand_color",
+                    "theme_tokens",
+                    "status",
+                    "created_at",
+                    "updated_at"
+                ],
+                "title": "BranchResource"
+            },
+            "ConsentChannel": {
+                "type": "string",
+                "description": "How a consent decision reached us.\n| |\n|---|\n| `in_person` <br/>  |\n| `paper_form` <br/>  |\n| `email` <br/>  |\n| `sms` <br/>  |\n| `phone` <br/>  |\n| `portal` <br/>  |\n| `import` <br/> Carried over from a record that predates the ledger (the demo seed). |",
+                "enum": [
+                    "in_person",
+                    "paper_form",
+                    "email",
+                    "sms",
+                    "phone",
+                    "portal",
+                    "import"
+                ],
+                "title": "ConsentChannel"
+            },
+            "ConsentCollection": {
+                "type": "array",
+                "items": {
+                    "$ref": "#/components/schemas/ConsentResource"
+                },
+                "title": "ConsentCollection"
+            },
+            "ConsentPurpose": {
+                "type": "string",
+                "description": "What a customer agreed to (Data Privacy Act, RA 10173). `service_records` is the floor: without it the shop cannot keep a job history at all, so an account cannot be created without it granted.\n",
+                "enum": [
+                    "service_records",
+                    "service_reminders",
+                    "marketing",
+                    "vehicle_history_sharing"
+                ],
+                "title": "ConsentPurpose"
+            },
+            "ConsentResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "customer_account_id": {
+                        "type": "string"
+                    },
+                    "contact_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "purpose": {
+                        "type": "string"
+                    },
+                    "granted": {
+                        "type": "boolean"
+                    },
+                    "channel": {
+                        "type": "string"
+                    },
+                    "captured_at": {
+                        "type": "string"
+                    },
+                    "captured_by": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Which staff member recorded it is the shop's business, not the customer's."
+                    },
+                    "evidence": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "created_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "customer_account_id",
+                    "contact_id",
+                    "purpose",
+                    "granted",
+                    "channel",
+                    "captured_at",
+                    "captured_by",
+                    "evidence",
+                    "created_at"
+                ],
+                "title": "ConsentResource"
+            },
+            "ConsentStateResource": {
+                "type": "object",
+                "properties": {
+                    "account": {
+                        "type": "array",
+                        "items": {}
+                    },
+                    "contacts": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "account",
+                    "contacts"
+                ],
+                "title": "ConsentStateResource"
+            },
+            "ContactCollection": {
+                "type": "array",
+                "items": {
+                    "$ref": "#/components/schemas/ContactResource"
+                },
+                "title": "ContactCollection"
+            },
+            "ContactResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "customer_account_id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "role": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "mobile": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "email": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "is_primary": {
+                        "type": "boolean"
+                    },
+                    "receives_invoices": {
+                        "type": "boolean"
+                    },
+                    "receives_reminders": {
+                        "type": "boolean"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "customer_account_id",
+                    "name",
+                    "role",
+                    "mobile",
+                    "email",
+                    "is_primary",
+                    "receives_invoices",
+                    "receives_reminders",
+                    "created_at",
+                    "updated_at"
+                ],
+                "title": "ContactResource"
+            },
+            "CustomerAccountCollection": {
+                "type": "array",
+                "items": {
+                    "$ref": "#/components/schemas/CustomerAccountResource"
+                },
+                "title": "CustomerAccountCollection"
+            },
+            "CustomerAccountResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {}
+                        ]
+                    },
+                    "organization_id": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {}
+                        ]
+                    },
+                    "account_type": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {}
+                        ]
+                    },
+                    "display_name": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {}
+                        ]
+                    },
+                    "registered_name": {
+                        "anyOf": [
+                            {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            {}
+                        ]
+                    },
+                    "tin": {
+                        "anyOf": [
+                            {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            {}
+                        ]
+                    },
+                    "address": {
+                        "anyOf": [
+                            {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            {}
+                        ]
+                    },
+                    "first_name": {
+                        "anyOf": [
+                            {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            {}
+                        ]
+                    },
+                    "last_name": {
+                        "anyOf": [
+                            {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            {}
+                        ]
+                    },
+                    "nickname": {
+                        "anyOf": [
+                            {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            {}
+                        ]
+                    },
+                    "mobile": {
+                        "anyOf": [
+                            {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            {}
+                        ]
+                    },
+                    "email": {
+                        "anyOf": [
+                            {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            {}
+                        ]
+                    },
+                    "birthday": {
+                        "anyOf": [
+                            {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            {}
+                        ]
+                    },
+                    "contact_name": {
+                        "anyOf": [
+                            {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            {}
+                        ]
+                    },
+                    "contact_email": {
+                        "anyOf": [
+                            {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            {}
+                        ]
+                    },
+                    "payment_terms_days": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {}
+                        ]
+                    },
+                    "credit_limit_cents": {
+                        "anyOf": [
+                            {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ]
+                            },
+                            {}
+                        ]
+                    },
+                    "approval_threshold_overrides": {
+                        "anyOf": [
+                            {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            {}
+                        ]
+                    },
+                    "logo_url": {
+                        "anyOf": [
+                            {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            {}
+                        ]
+                    },
+                    "brand_color": {
+                        "anyOf": [
+                            {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            {}
+                        ]
+                    },
+                    "status": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {}
+                        ]
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "organization_id",
+                    "account_type",
+                    "display_name",
+                    "registered_name",
+                    "tin",
+                    "address",
+                    "first_name",
+                    "last_name",
+                    "nickname",
+                    "mobile",
+                    "email",
+                    "birthday",
+                    "contact_name",
+                    "contact_email",
+                    "payment_terms_days",
+                    "credit_limit_cents",
+                    "approval_threshold_overrides",
+                    "logo_url",
+                    "brand_color",
+                    "status",
+                    "created_at",
+                    "updated_at"
+                ],
+                "additionalProperties": {},
+                "title": "CustomerAccountResource"
+            },
+            "ForgotPasswordRequest": {
+                "type": "object",
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "maxLength": 255
+                    }
+                },
+                "required": [
+                    "email"
+                ],
+                "title": "ForgotPasswordRequest"
+            },
             "HealthResource": {
                 "type": "object",
                 "properties": {
@@ -162,6 +3305,1445 @@
                     "checks"
                 ],
                 "title": "HealthResource"
+            },
+            "InvitationCollection": {
+                "type": "array",
+                "items": {
+                    "$ref": "#/components/schemas/InvitationResource"
+                },
+                "title": "InvitationCollection"
+            },
+            "InvitationResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "email": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "side": {
+                        "type": "string"
+                    },
+                    "role": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "customer_account_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "branch_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "invited_by": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "accepted",
+                            "revoked",
+                            "expired",
+                            "pending"
+                        ]
+                    },
+                    "expires_at": {
+                        "type": "string"
+                    },
+                    "accepted_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "revoked_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "created_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "email",
+                    "name",
+                    "side",
+                    "role",
+                    "title",
+                    "customer_account_id",
+                    "branch_ids",
+                    "invited_by",
+                    "status",
+                    "expires_at",
+                    "accepted_at",
+                    "revoked_at",
+                    "created_at"
+                ],
+                "title": "InvitationResource"
+            },
+            "LoginRequest": {
+                "type": "object",
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "maxLength": 255
+                    },
+                    "password": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "remember": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "email",
+                    "password"
+                ],
+                "title": "LoginRequest"
+            },
+            "MeResource": {
+                "type": "object",
+                "properties": {
+                    "user": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "email": {
+                                "type": "string"
+                            },
+                            "title": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "role": {
+                                "type": "string"
+                            },
+                            "role_label": {
+                                "type": "string",
+                                "enum": [
+                                    "Provider Admin",
+                                    "Service Advisor",
+                                    "Provider Technician",
+                                    "Branch Manager",
+                                    "Cashier",
+                                    "Fleet Manager",
+                                    "Operations Staff",
+                                    "Technician",
+                                    "Purchasing Officer",
+                                    "Authorised Viewer"
+                                ]
+                            },
+                            "side": {
+                                "type": "string"
+                            },
+                            "status": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "name",
+                            "email",
+                            "title",
+                            "role",
+                            "role_label",
+                            "side",
+                            "status"
+                        ]
+                    },
+                    "organization": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "slug": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "name",
+                            "slug"
+                        ]
+                    },
+                    "side": {
+                        "type": "string"
+                    },
+                    "branches": {
+                        "type": "object",
+                        "properties": {
+                            "allowed": {
+                                "type": "array",
+                                "items": {}
+                            },
+                            "selected": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "description": "One branch id, \"all\" (staff across every allowed branch), or null (portal)."
+                            },
+                            "restricted": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "allowed",
+                            "selected",
+                            "restricted"
+                        ]
+                    },
+                    "customer_account": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "display_name": {
+                                "type": "string"
+                            },
+                            "account_type": {
+                                "type": "string"
+                            },
+                            "status": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "display_name",
+                            "account_type",
+                            "status"
+                        ]
+                    },
+                    "capabilities": {
+                        "type": "array",
+                        "items": {}
+                    },
+                    "modules": {
+                        "type": "object",
+                        "properties": {
+                            "active": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "organization": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "by_branch": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "active",
+                            "organization",
+                            "by_branch"
+                        ]
+                    },
+                    "branding": {
+                        "type": "object",
+                        "properties": {
+                            "display_name": {
+                                "type": "string"
+                            },
+                            "logo_url": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "brand_color": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "support_email": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "theme_tokens": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "display_name",
+                            "logo_url",
+                            "brand_color",
+                            "support_email",
+                            "theme_tokens"
+                        ]
+                    }
+                },
+                "required": [
+                    "user",
+                    "organization",
+                    "side",
+                    "branches",
+                    "customer_account",
+                    "capabilities",
+                    "modules",
+                    "branding"
+                ],
+                "title": "MeResource"
+            },
+            "Module": {
+                "type": "string",
+                "enum": [
+                    "repair_pms",
+                    "detailing",
+                    "equipment",
+                    "pos",
+                    "crm",
+                    "procurement",
+                    "accounting"
+                ],
+                "title": "Module"
+            },
+            "OrganizationResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "legal_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "tin": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "contact_email": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "contact_phone": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "address": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "support_email": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "logo_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "brand_color": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "theme_tokens": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "slug",
+                    "legal_name",
+                    "tin",
+                    "contact_email",
+                    "contact_phone",
+                    "address",
+                    "support_email",
+                    "logo_url",
+                    "brand_color",
+                    "theme_tokens",
+                    "status",
+                    "created_at",
+                    "updated_at"
+                ],
+                "title": "OrganizationResource"
+            },
+            "RecordConsentRequest": {
+                "type": "object",
+                "properties": {
+                    "purpose": {
+                        "$ref": "#/components/schemas/ConsentPurpose"
+                    },
+                    "granted": {
+                        "type": "boolean"
+                    },
+                    "channel": {
+                        "$ref": "#/components/schemas/ConsentChannel"
+                    },
+                    "contact_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "evidence": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 2000
+                    },
+                    "captured_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "purpose",
+                    "granted",
+                    "channel"
+                ],
+                "title": "RecordConsentRequest"
+            },
+            "ResetPasswordRequest": {
+                "type": "object",
+                "properties": {
+                    "token": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "maxLength": 255
+                    },
+                    "password": {
+                        "type": "string",
+                        "description": "Ported minimum from ../web (8 characters).",
+                        "minLength": 8,
+                        "maxLength": 255
+                    },
+                    "password_confirmation": {
+                        "type": "string",
+                        "minLength": 8,
+                        "maxLength": 255
+                    }
+                },
+                "required": [
+                    "token",
+                    "email",
+                    "password",
+                    "password_confirmation"
+                ],
+                "title": "ResetPasswordRequest"
+            },
+            "Role": {
+                "type": "string",
+                "description": "Every role a user can hold. The eight ported roles keep the frontend's values, labels and descriptions (golden-tested against rbac.json). `branch_manager` and `cashier` are staff roles new in the API. \"Owner\" is not a separate role: the owner is a `provider_admin`.\n",
+                "enum": [
+                    "provider_admin",
+                    "service_advisor",
+                    "provider_technician",
+                    "branch_manager",
+                    "cashier",
+                    "fleet_manager",
+                    "operations",
+                    "technician",
+                    "purchasing_officer",
+                    "viewer"
+                ],
+                "title": "Role"
+            },
+            "SaveBayRequest": {
+                "type": "object",
+                "properties": {
+                    "branch_id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "focus": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    },
+                    "capacity_hours_per_day": {
+                        "type": "number"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "active",
+                            "inactive"
+                        ]
+                    }
+                },
+                "required": [
+                    "branch_id",
+                    "name"
+                ],
+                "title": "SaveBayRequest"
+            },
+            "SaveBranchRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "slug": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                        "maxLength": 64
+                    },
+                    "address": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 2000
+                    },
+                    "contact_email": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "email",
+                        "maxLength": 255
+                    },
+                    "contact_phone": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 32
+                    },
+                    "tin": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "pattern": "^\\d{3}-\\d{3}-\\d{3}$"
+                    },
+                    "branch_code": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "pattern": "^\\d{3,5}$"
+                    },
+                    "is_vat_registered": {
+                        "type": "boolean"
+                    },
+                    "prices_include_vat": {
+                        "type": "boolean"
+                    },
+                    "timezone": {
+                        "type": "string"
+                    },
+                    "brand_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "active",
+                            "inactive"
+                        ]
+                    },
+                    "logo_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uri",
+                        "maxLength": 2048
+                    },
+                    "brand_color": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "pattern": "^#[0-9a-fA-F]{6}$"
+                    },
+                    "theme_tokens": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "string",
+                            "maxLength": 128
+                        },
+                        "maxItems": 64
+                    }
+                },
+                "required": [
+                    "name",
+                    "slug"
+                ],
+                "title": "SaveBranchRequest"
+            },
+            "SaveContactRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "role": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    },
+                    "mobile": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 32
+                    },
+                    "email": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "email",
+                        "maxLength": 255
+                    },
+                    "is_primary": {
+                        "type": "boolean"
+                    },
+                    "receives_invoices": {
+                        "type": "boolean"
+                    },
+                    "receives_reminders": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "name"
+                ],
+                "title": "SaveContactRequest"
+            },
+            "SaveCustomerAccountRequest": {
+                "type": "object",
+                "description": "POST creates (with opening consents), PATCH edits. Status changes have their\nown endpoints, and the account type never changes. Portal users may edit\ntheir own account's contact details and branding, not the shop's commercial\nor internal fields.",
+                "properties": {
+                    "account_type": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "display_name": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "registered_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    },
+                    "tin": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "pattern": "^\\d{3}-\\d{3}-\\d{3}$"
+                    },
+                    "address": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 2000
+                    },
+                    "first_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    },
+                    "last_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    },
+                    "nickname": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    },
+                    "mobile": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 32
+                    },
+                    "email": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "email",
+                        "maxLength": 255
+                    },
+                    "birthday": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date"
+                    },
+                    "contact_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    },
+                    "contact_email": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "email",
+                        "maxLength": 255
+                    },
+                    "payment_terms_days": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 365
+                    },
+                    "credit_limit_cents": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 0
+                    },
+                    "approval_threshold_overrides": {
+                        "type": "object",
+                        "properties": {
+                            "auto_approve_under_cents": {
+                                "type": "integer",
+                                "minimum": 0
+                            },
+                            "ops_approval_under_cents": {
+                                "type": "integer",
+                                "minimum": 0
+                            },
+                            "sla_hours": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 720
+                            },
+                            "variance_threshold_pct": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 100
+                            },
+                            "default_parts_source": {
+                                "type": "string",
+                                "enum": [
+                                    "supplier_provided",
+                                    "own_stock",
+                                    "client_provided"
+                                ]
+                            },
+                            "monthly_budget_cents": {
+                                "type": "integer",
+                                "minimum": 0
+                            }
+                        },
+                        "required": [
+                            "auto_approve_under_cents",
+                            "ops_approval_under_cents",
+                            "sla_hours",
+                            "variance_threshold_pct",
+                            "default_parts_source",
+                            "monthly_budget_cents"
+                        ]
+                    },
+                    "tags": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "maxLength": 64
+                        },
+                        "maxItems": 50,
+                        "uniqueItems": true
+                    },
+                    "source": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 64
+                    },
+                    "notes": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 5000
+                    },
+                    "logo_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uri",
+                        "maxLength": 2048
+                    },
+                    "brand_color": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "pattern": "^#[0-9a-fA-F]{6}$"
+                    }
+                },
+                "title": "SaveCustomerAccountRequest"
+            },
+            "SaveTechnicianRequest": {
+                "type": "object",
+                "properties": {
+                    "branch_id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "skill_tags": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9_]*$",
+                            "maxLength": 32
+                        },
+                        "maxItems": 20,
+                        "uniqueItems": true
+                    },
+                    "specialty": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    },
+                    "home_bay_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "user_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "active",
+                            "inactive"
+                        ]
+                    }
+                },
+                "required": [
+                    "branch_id",
+                    "name"
+                ],
+                "title": "SaveTechnicianRequest"
+            },
+            "SetModuleRequest": {
+                "type": "object",
+                "properties": {
+                    "enabled": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "enabled"
+                ],
+                "title": "SetModuleRequest"
+            },
+            "StoreInvitationRequest": {
+                "type": "object",
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "maxLength": 255
+                    },
+                    "name": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "role": {
+                        "$ref": "#/components/schemas/Role"
+                    },
+                    "title": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    },
+                    "customer_account_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Required for portal roles, forbidden for staff ones (decided by the role, in CreateInvitation)."
+                    },
+                    "branch_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "maxItems": 100
+                    }
+                },
+                "required": [
+                    "email",
+                    "name",
+                    "role"
+                ],
+                "title": "StoreInvitationRequest"
+            },
+            "TechnicianCollection": {
+                "type": "array",
+                "items": {
+                    "$ref": "#/components/schemas/TechnicianResource"
+                },
+                "title": "TechnicianCollection"
+            },
+            "TechnicianResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "branch_id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "skill_tags": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "specialty": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "home_bay_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "user_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "branch_id",
+                    "name",
+                    "skill_tags",
+                    "specialty",
+                    "home_bay_id",
+                    "user_id",
+                    "status",
+                    "created_at",
+                    "updated_at"
+                ],
+                "title": "TechnicianResource"
+            },
+            "UpdateOrganizationRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "legal_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    },
+                    "tin": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "pattern": "^\\d{3}-\\d{3}-\\d{3}$"
+                    },
+                    "contact_email": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "email",
+                        "maxLength": 255
+                    },
+                    "contact_phone": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 32
+                    },
+                    "address": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 2000
+                    },
+                    "support_email": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "email",
+                        "maxLength": 255
+                    },
+                    "logo_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uri",
+                        "maxLength": 2048
+                    },
+                    "brand_color": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "pattern": "^#[0-9a-fA-F]{6}$"
+                    },
+                    "theme_tokens": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "string",
+                            "maxLength": 128
+                        },
+                        "maxItems": 64
+                    }
+                },
+                "title": "UpdateOrganizationRequest"
+            },
+            "UpdateUserRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "title": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    },
+                    "role": {
+                        "$ref": "#/components/schemas/Role"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "active",
+                            "disabled"
+                        ]
+                    },
+                    "branch_ids": {
+                        "type": "array",
+                        "description": "[] = every branch (only an unrestricted granter may give that).",
+                        "items": {
+                            "type": "string"
+                        },
+                        "maxItems": 100
+                    }
+                },
+                "title": "UpdateUserRequest"
+            },
+            "UserCollection": {
+                "type": "array",
+                "items": {
+                    "$ref": "#/components/schemas/UserResource"
+                },
+                "title": "UserCollection"
+            },
+            "UserResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "email": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "side": {
+                        "type": "string"
+                    },
+                    "role": {
+                        "type": "string"
+                    },
+                    "role_label": {
+                        "type": "string",
+                        "enum": [
+                            "Provider Admin",
+                            "Service Advisor",
+                            "Provider Technician",
+                            "Branch Manager",
+                            "Cashier",
+                            "Fleet Manager",
+                            "Operations Staff",
+                            "Technician",
+                            "Purchasing Officer",
+                            "Authorised Viewer"
+                        ]
+                    },
+                    "customer_account_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "branch_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "last_login_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "created_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "email",
+                    "title",
+                    "side",
+                    "role",
+                    "role_label",
+                    "customer_account_id",
+                    "branch_ids",
+                    "status",
+                    "last_login_at",
+                    "created_at"
+                ],
+                "title": "UserResource"
+            }
+        },
+        "responses": {
+            "Error.forbidden": {
+                "description": "This action is unauthorized.",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "object",
+                                    "properties": {
+                                        "code": {
+                                            "type": "string",
+                                            "enum": [
+                                                "forbidden"
+                                            ]
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Human-readable; never branch on it."
+                                        },
+                                        "details": {
+                                            "type": "object",
+                                            "description": "Optional machine-readable context."
+                                        }
+                                    },
+                                    "required": [
+                                        "code",
+                                        "message"
+                                    ]
+                                }
+                            },
+                            "required": [
+                                "error"
+                            ]
+                        }
+                    }
+                }
+            },
+            "Error.validation": {
+                "description": "The given data was invalid.",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "object",
+                                    "properties": {
+                                        "code": {
+                                            "type": "string",
+                                            "enum": [
+                                                "validation"
+                                            ]
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Human-readable; never branch on it."
+                                        },
+                                        "details": {
+                                            "type": "object",
+                                            "properties": {
+                                                "fields": {
+                                                    "type": "object",
+                                                    "description": "Messages per failing field.",
+                                                    "additionalProperties": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "type": "string"
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            "required": [
+                                                "fields"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "code",
+                                        "message",
+                                        "details"
+                                    ]
+                                }
+                            },
+                            "required": [
+                                "error"
+                            ]
+                        }
+                    }
+                }
+            },
+            "Error.unauthenticated": {
+                "description": "Unauthenticated.",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "object",
+                                    "properties": {
+                                        "code": {
+                                            "type": "string",
+                                            "enum": [
+                                                "unauthenticated"
+                                            ]
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Human-readable; never branch on it."
+                                        },
+                                        "details": {
+                                            "type": "object",
+                                            "description": "Optional machine-readable context."
+                                        }
+                                    },
+                                    "required": [
+                                        "code",
+                                        "message"
+                                    ]
+                                }
+                            },
+                            "required": [
+                                "error"
+                            ]
+                        }
+                    }
+                }
+            },
+            "Error.not_found": {
+                "description": "Not found.",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "object",
+                                    "properties": {
+                                        "code": {
+                                            "type": "string",
+                                            "enum": [
+                                                "not_found"
+                                            ]
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Human-readable; never branch on it."
+                                        },
+                                        "details": {
+                                            "type": "object",
+                                            "description": "Optional machine-readable context."
+                                        }
+                                    },
+                                    "required": [
+                                        "code",
+                                        "message"
+                                    ]
+                                }
+                            },
+                            "required": [
+                                "error"
+                            ]
+                        }
+                    }
+                }
             }
         }
     }

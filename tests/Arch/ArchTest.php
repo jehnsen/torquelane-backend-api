@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 use App\Exceptions\ApiException;
+use App\Models\IdempotencyKey;
+use App\Models\Organization;
+use App\Tenancy\BelongsToOrganization;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 
@@ -39,6 +42,18 @@ arch('every model has a ULID key')
     ->classes()
     ->toExtend(Model::class)
     ->toUseTrait(HasUlids::class);
+
+// R5: tenant isolation is the default. Only the allowlisted global models (each
+// with its reason in ModelCoverageTest) may skip the organization scope.
+arch('every model is tenant-scoped unless explicitly allowlisted')
+    ->expect('App\Models')
+    ->classes()
+    ->toUseTrait(BelongsToOrganization::class)
+    ->ignoring([Organization::class, IdempotencyKey::class]);
+
+arch('tenant scoping lives in one place')
+    ->expect('App\Tenancy\OrganizationScope')
+    ->toOnlyBeUsedIn('App\Tenancy');
 
 arch('every error the app raises on purpose carries an envelope code')
     ->expect('App\Exceptions')

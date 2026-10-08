@@ -2,17 +2,32 @@
 
 declare(strict_types=1);
 
+use App\Tenancy\BelongsToOrganization;
+
 /*
  * R5: every model is classified here. Adding a model without classifying it
  * fails this test.
  *
- * Phase 1 adds the `tenant` classification, whose models must use the
- * BelongsToOrganization trait, and asserts it here. Until then every model is
- * `global`, with the reason it carries no organization_id.
+ *  - `tenant`: carries organization_id and uses BelongsToOrganization (its
+ *    global scope + write guards). Asserted below.
+ *  - `global`: carries no organization_id, with the reason. This is the
+ *    explicit allowlist ArchTest's trait rule refers to (GLOBAL_MODELS).
  */
 const MODEL_TENANCY = [
-    'App\Models\User' => ['global', 'Identity spans organizations; membership arrives in Phase 1.'],
+    'App\Models\AuditLog' => ['tenant', ''],
+    'App\Models\Bay' => ['tenant', ''],
+    'App\Models\Branch' => ['tenant', ''],
+    'App\Models\BranchModule' => ['tenant', ''],
+    'App\Models\Consent' => ['tenant', ''],
+    'App\Models\Contact' => ['tenant', ''],
+    'App\Models\CustomerAccount' => ['tenant', ''],
+    'App\Models\DocumentSeries' => ['tenant', ''],
     'App\Models\IdempotencyKey' => ['global', 'Infrastructure keyed per user, pruned after 24h; holds no business data.'],
+    'App\Models\Invitation' => ['tenant', ''],
+    'App\Models\Organization' => ['global', 'The tenant root itself: always loaded by the session\'s own organization_id, never listed.'],
+    'App\Models\OrganizationModule' => ['tenant', ''],
+    'App\Models\Technician' => ['tenant', ''],
+    'App\Models\User' => ['tenant', ''],
 ];
 
 it('classifies every model in app/Models', function () {
@@ -32,5 +47,13 @@ it('gives a reason for every global model', function () {
     foreach (MODEL_TENANCY as $model => [$kind, $reason]) {
         expect($kind)->toBeIn(['global', 'tenant'])
             ->and($kind === 'global' ? $reason : 'n/a')->not->toBeEmpty("{$model} needs a reason");
+    }
+});
+
+it('puts every tenant model behind BelongsToOrganization, and no global one', function () {
+    foreach (MODEL_TENANCY as $model => [$kind]) {
+        $uses = in_array(BelongsToOrganization::class, class_uses_recursive($model), true);
+
+        expect($uses)->toBe($kind === 'tenant', "{$model} is classified {$kind}");
     }
 });

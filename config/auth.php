@@ -64,8 +64,10 @@ return [
     */
 
     'providers' => [
+        // Users are tenant-scoped; this provider finds them in the named
+        // system context "authentication" (App\Tenancy\TenantAwareUserProvider).
         'users' => [
-            'driver' => 'eloquent',
+            'driver' => 'tenant-users',
             'model' => env('AUTH_MODEL', User::class),
         ],
 

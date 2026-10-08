@@ -184,6 +184,15 @@ DB_SCHEMA=torquelane
 DB_SSLMODE=require
 
 MAIL_MAILER=log               # until a real SMTP provider is chosen
+
+# Cookie-based SPA auth (Phase 1). The SPA is app.{{APP_DOMAIN}} in production;
+# for a staging SPA on another host, list it explicitly.
+APP_DOMAIN={{APP_DOMAIN}}
+SESSION_DOMAIN=.{{APP_DOMAIN}}
+SESSION_SECURE_COOKIE=true
+# FRONTEND_URL=https://app-staging.{{APP_DOMAIN}}
+# SANCTUM_STATEFUL_DOMAINS=app-staging.{{APP_DOMAIN}}
+# CORS_ALLOWED_ORIGINS=https://app-staging.{{APP_DOMAIN}}
 ```
 
 The `POSTGRES_VERSION` / `FORWARD_*` variables are for docker-compose only;
