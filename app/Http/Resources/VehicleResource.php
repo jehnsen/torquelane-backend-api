@@ -77,6 +77,10 @@ final class VehicleResource extends JsonResource
                     'days_remaining' => $health->nextItem->daysRemaining,
                     'due_label' => WebFormat::dayDelta($health->nextItem->daysRemaining),
                     'governed_by' => $health->nextItem->governedBy,
+                    // For the list's progress meter: km left (negative = past) and the interval used.
+                    'km_remaining' => $health->nextItem->kmRemaining,
+                    'due_odometer' => $health->nextItem->dueOdometer,
+                    'progress' => $health->nextItem->progress,
                 ],
             ],
             // expired | expiring | ok

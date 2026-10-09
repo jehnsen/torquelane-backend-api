@@ -647,6 +647,21 @@ the caller's scope (staff may narrow with `customer_account_id`):
 **docs/frontend-parity.md** maps every ../web screen and store mutation to
 its endpoints; Phase 5 switches over against it.
 
+Phase 5 additions, so the frontend never derives a value (R2):
+`WorkOrderResource` `approval.waiting_hours` (business hours since the
+quote was sent, while pending; else null), `approval.sla_breached`, and
+`approval.can_approve` (the caller holds `workorder:approve` and authority
+over the pending value — `DecideLines` still checks both itself);
+`VehicleResource` `pms.next_item.km_remaining`, `due_odometer`, `progress`
+(the list's progress meter). The `/shop` section lists (`/shop/arriving`,
+`/shop/ready-for-collection`) label each order with `vehicle` and
+`customer_name`, as `/shop/home` already did.
+
+`PUT /me/password` keeps the session that made the change signed in:
+Sanctum's `AuthenticateSession` re-stores the password hash from the
+signed-in user object after the response, so the controller brings that
+object up to date; every other session still ends.
+
 ### Golden replay (Phase 4)
 
 `tests/Golden/PartsAnalyticsGoldenTest.php` replays parts-forecast.json and
@@ -941,3 +956,14 @@ unique per organization (../web: global); bulk collection all or none
 (../web skipped ineligible orders silently); auto-schedule leaves out
 suspended accounts; a client's Fleet Manager edits its own approval bands
 (new endpoint; the account-update endpoint keeps them staff-only).
+
+Phase 5 status: the frontend (pms-monitoring-frontend, branch
+phase-5/api-cutover) runs on this API alone; its Supabase code and lib/
+domain modules are gone. Gates green locally (pest, phpstan, pint,
+openapi). docs/frontend-parity.md carries a "Phase 5" column: what the
+Playwright sweep exercised from the UI, per role. Fixes the sweep found
+here: section lists unlabelled (no plate), and a password change ending
+its own session. Decisions taken here, for review: the frontend creates
+then sends (one step in the UI) rather than a combined endpoint; staff
+book a bay at check-in only for jobs `send` auto-approves (scheduling is
+legal only once approved), the rest wait on the client.

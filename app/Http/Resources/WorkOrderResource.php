@@ -5,19 +5,23 @@ declare(strict_types=1);
 namespace App\Http\Resources;
 
 use App\Actions\WorkOrders\WorkOrderView;
+use App\Domain\Access\Capability;
 use App\Domain\Approvals\Approvals;
 use App\Domain\Approvals\LineApprovalStatus;
 use App\Domain\Billing\Billing;
 use App\Domain\Billing\BillingTotals;
+use App\Domain\Shared\BusinessHours;
 use App\Domain\Shared\Num;
 use App\Domain\WorkOrders\WorkOrderMachine;
 use App\Domain\WorkOrders\WorkOrderReference;
+use App\Domain\WorkOrders\WorkOrderStatus;
 use App\Models\ApprovalLogEntry;
 use App\Models\WorkOrderEvent;
 use App\Models\WorkOrderLine;
 use App\Models\WorkOrderPart;
 use App\Models\WorkOrderTask;
 use App\Tenancy\TenantManager;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -44,9 +48,13 @@ final class WorkOrderResource extends JsonResource
         $view = $this->resource;
         $order = $view->order;
         $settings = $view->settings;
-        $staff = app(TenantManager::class)->context()?->isStaff() ?? false;
+        $context = app(TenantManager::class)->context();
+        $staff = $context?->isStaff() ?? false;
         $billable = array_values($order->lines->map(fn (WorkOrderLine $l) => $l->billable())->all());
         $staffOnly = fn (?string $id): ?string => $staff ? $id : null;
+        $waiting = $order->status === WorkOrderStatus::PendingApproval && $order->pending_approval_entered_at !== null
+            ? BusinessHours::between($order->pending_approval_entered_at, CarbonImmutable::now())
+            : null;
 
         return [
             'id' => $order->id,
@@ -87,6 +95,14 @@ final class WorkOrderResource extends JsonResource
                 'pending_approval_entered_at' => $order->pending_approval_entered_at?->toIso8601ZuluString(),
                 'approval_wait_hours' => $order->approval_wait_hours === null ? null : Num::of($order->approval_wait_hours),
                 'sla_hours' => $settings->slaHours,
+                // While pending: business hours waited so far, and whether that is past the SLA.
+                'waiting_hours' => $waiting,
+                'sla_breached' => $waiting !== null && $waiting > $settings->slaHours,
+                // Whether the caller may decide the pending lines: the capability and
+                // authority over the order's pending value (DecideLines checks both again).
+                'can_approve' => $context !== null
+                    && $context->can(Capability::WorkOrderApprove)
+                    && Approvals::canApprove($context->role, Approvals::pendingValue($billable), $settings),
             ],
             'lines' => array_values($order->lines->map(fn (WorkOrderLine $line): array => [
                 'id' => $line->id,

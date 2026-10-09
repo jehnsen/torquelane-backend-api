@@ -5050,7 +5050,7 @@
         "/me/password": {
             "put": {
                 "operationId": "me.password",
-                "description": "`current_password` must match (422 otherwise); the new `password`\n(with `password_confirmation`) needs 8+ characters and must differ.\nOther devices' remember-me cookies stop working.",
+                "description": "`current_password` must match (422 otherwise); the new `password`\n(with `password_confirmation`) needs 8+ characters and must differ.\nOther devices' sessions and remember-me cookies stop working; this\nsession stays signed in.",
                 "summary": "Change my password",
                 "tags": [
                     "Profile"
@@ -13826,6 +13826,16 @@
                                     },
                                     "governed_by": {
                                         "type": "string"
+                                    },
+                                    "km_remaining": {
+                                        "description": "For the list's progress meter: km left (negative = past) and the interval used.",
+                                        "type": "number"
+                                    },
+                                    "due_odometer": {
+                                        "type": "number"
+                                    },
+                                    "progress": {
+                                        "type": "number"
                                     }
                                 },
                                 "required": [
@@ -13835,7 +13845,10 @@
                                     "due_date",
                                     "days_remaining",
                                     "due_label",
-                                    "governed_by"
+                                    "governed_by",
+                                    "km_remaining",
+                                    "due_odometer",
+                                    "progress"
                                 ]
                             }
                         },
@@ -14249,6 +14262,20 @@
                             },
                             "sla_hours": {
                                 "type": "integer"
+                            },
+                            "waiting_hours": {
+                                "description": "While pending: business hours waited so far, and whether that is past the SLA.",
+                                "type": [
+                                    "number",
+                                    "null"
+                                ]
+                            },
+                            "sla_breached": {
+                                "type": "string"
+                            },
+                            "can_approve": {
+                                "type": "string",
+                                "description": "Whether the caller may decide the pending lines: the capability and\nauthority over the order's pending value (DecideLines checks both again)."
                             }
                         },
                         "required": [
@@ -14258,7 +14285,10 @@
                             "required_approver",
                             "pending_approval_entered_at",
                             "approval_wait_hours",
-                            "sla_hours"
+                            "sla_hours",
+                            "waiting_hours",
+                            "sla_breached",
+                            "can_approve"
                         ]
                     },
                     "lines": {

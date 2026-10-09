@@ -62,8 +62,12 @@ it('keeps the totals to the caller\'s scope', function () {
 
 it('releases a vehicle\'s finished jobs together, or none of them', function () {
     Sanctum::actingAs($this->world->user('advisor@mekanikomore.ph'));
-    $ready = $this->getJson('/api/v1/shop/ready-for-collection')->assertOk()->json('data.*.id');
-    expect(count($ready))->toBeGreaterThan(2);
+    $list = $this->getJson('/api/v1/shop/ready-for-collection')->assertOk();
+    $ready = $list->json('data.*.id');
+    expect(count($ready))->toBeGreaterThan(2)
+        // Labelled for the counter, as on /shop/home.
+        ->and($list->json('data.0.vehicle.plate_number'))->toBeString()
+        ->and($list->json('data.0.customer_name'))->toBeString();
     $open = $this->getJson('/api/v1/work-orders?stage=active&per_page=1')->json('data.0.id');
 
     // One order not collectable: nothing is collected.

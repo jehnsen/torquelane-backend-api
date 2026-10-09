@@ -231,13 +231,44 @@ it('holds approval to the role\'s band', function () {
     $line = $this->getJson("/api/v1/work-orders/{$id}")->json('data.lines.0.id');
     $decide = fn () => $this->postJson("/api/v1/work-orders/{$id}/decisions", ['decisions' => [['line_id' => $line, 'decision' => 'approved']]]);
 
+    $canApprove = fn () => $this->getJson("/api/v1/work-orders/{$id}")->json('data.approval.can_approve');
+
     // No approval capability at all.
+    expect($canApprove())->toBeFalse();
     $decide()->assertForbidden();
     // Operations: capability, but ₱60,000 is past their ceiling.
     signIn('ops@mekanikomore.ph');
+    expect($canApprove())->toBeFalse();
     $decide()->assertForbidden()->assertJsonPath('error.message', 'Approving ₱60,000.00 needs a Fleet Manager.');
     signIn('donmiguel@mekanikomor.ph');
+    expect($canApprove())->toBeTrue();
     $decide()->assertOk()->assertJsonPath('data.status', 'approved');
+});
+
+it('reports the approval wait in business hours, and the SLA breach, while pending', function () {
+    signIn('advisor@mekanikomore.ph');
+    $id = raiseOrder()->json('data.id');
+    $this->getJson("/api/v1/work-orders/{$id}")
+        ->assertJsonPath('data.approval.waiting_hours', null)
+        ->assertJsonPath('data.approval.sla_breached', false);
+
+    $sent = $this->postJson("/api/v1/work-orders/{$id}/send")->assertOk();
+    expect($sent->json('data.approval.waiting_hours'))->toEqual(0)
+        ->and($sent->json('data.approval.sla_breached'))->toBeFalse();
+
+    // A fortnight later, whatever the SLA, it has been breached.
+    $this->travelTo(CarbonImmutable::parse('2026-10-22T10:00:00+08:00'));
+    $late = $this->getJson("/api/v1/work-orders/{$id}")->assertOk();
+    expect($late->json('data.approval.waiting_hours'))->toBeGreaterThan($late->json('data.approval.sla_hours'))
+        ->and($late->json('data.approval.sla_breached'))->toBeTrue();
+
+    // Decided: no longer waiting.
+    $lines = $late->json('data.lines.*.id');
+    signIn('donmiguel@mekanikomor.ph');
+    $this->postJson("/api/v1/work-orders/{$id}/decisions", ['decisions' => array_map(fn (string $l): array => ['line_id' => $l, 'decision' => 'approved'], $lines)])
+        ->assertOk()
+        ->assertJsonPath('data.approval.waiting_hours', null)
+        ->assertJsonPath('data.approval.sla_breached', false);
 });
 
 it('blocks close-out past the variance threshold until someone with authority re-approves it', function () {

@@ -490,11 +490,14 @@ final class ShopController
     }
 
     /**
+     * Each order labelled with its vehicle and customer name, as on
+     * `/shop/home`: a counter list is read by plate, not by id.
+     *
      * @param  list<WorkOrderFacts>  $facts
      */
     private function orders(Request $request, array $facts): JsonResponse
     {
-        return new JsonResponse(['data' => array_values($this->views($facts))]);
+        return new JsonResponse(['data' => array_values($this->labelled($facts))]);
     }
 
     /**

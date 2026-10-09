@@ -40,11 +40,19 @@ final class ProfileController
      *
      * `current_password` must match (422 otherwise); the new `password`
      * (with `password_confirmation`) needs 8+ characters and must differ.
-     * Other devices' remember-me cookies stop working.
+     * Other devices' sessions and remember-me cookies stop working; this
+     * session stays signed in.
      */
     public function password(ChangePasswordRequest $request, UpdateProfile $profile): Response
     {
-        $profile->changePassword(self::user($request), $request->string('current_password')->toString(), $request->string('password')->toString());
+        $user = self::user($request);
+        $hash = $profile->changePassword($user, $request->string('current_password')->toString(), $request->string('password')->toString());
+
+        // Sanctum's AuthenticateSession ends every session whose stored hash no
+        // longer matches the password, and after this response re-stores the
+        // hash from the signed-in user object. Bringing that object up to date
+        // keeps this session signed in while every other one ends.
+        $user->forceFill(['password' => $hash])->syncOriginalAttribute('password');
 
         return response()->noContent();
     }

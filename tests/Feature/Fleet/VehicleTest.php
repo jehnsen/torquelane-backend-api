@@ -45,7 +45,11 @@ it('registers a vehicle with its first reading and computed state', function () 
     // No history: every task is assumed exactly one interval old on both
     // limits, i.e. due today (0 km, 0 days left): due_soon, as in ../web.
     expect($response->json('data.pms.status'))->toBe('due_soon')
-        ->and($response->json('data.pms.next_item.due_label'))->toBe('Due today');
+        ->and($response->json('data.pms.next_item.due_label'))->toBe('Due today')
+        // The list's progress meter: no distance left, a full interval used.
+        ->and($response->json('data.pms.next_item.km_remaining'))->toEqual(0)
+        ->and($response->json('data.pms.next_item.progress'))->toEqual(1)
+        ->and($response->json('data.pms.next_item.due_odometer'))->toEqual($response->json('data.odometer.value'));
     expect(asSystem(fn () => AuditLog::query()->where('entity_id', $response->json('data.id'))->value('action')))->toBe('created');
 });
 

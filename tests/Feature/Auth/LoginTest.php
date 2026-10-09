@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\User;
 use Database\Seeders\DemoSeeder;
 use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
@@ -93,6 +94,19 @@ it('rate-limits login attempts per email and IP', function () {
         ->assertStatus(429)
         ->assertJsonPath('error.code', 'rate_limited')
         ->assertHeader('Retry-After');
+});
+
+it('keeps the session that changed the password signed in', function () {
+    login('owner@mekanikomore.ph')->assertOk();
+    $this->withHeaders(spaHeaders())->putJson('/api/v1/me/password', [
+        'current_password' => DemoSeeder::PASSWORD,
+        'password' => 'new-secret-1',
+        'password_confirmation' => 'new-secret-1',
+    ])->assertNoContent();
+
+    // Re-read the user through the session, as the next real request does.
+    Auth::forgetGuards();
+    $this->withHeaders(spaHeaders())->getJson('/api/v1/me')->assertOk();
 });
 
 it('signs out', function () {

@@ -51,10 +51,12 @@ final class UpdateProfile
     /**
      * A new password, once the current one is proven. The remember token is
      * rotated, so a "remember me" cookie on another device stops working.
+     *
+     * @return string the new password hash, so the caller can keep its own session
      */
-    public function changePassword(User $user, string $current, string $new): void
+    public function changePassword(User $user, string $current, string $new): string
     {
-        DB::transaction(function () use ($user, $current, $new): void {
+        return DB::transaction(function () use ($user, $current, $new): string {
             $locked = User::query()->lockForUpdate()->findOrFail($user->id);
             if (! Hash::check($current, $locked->getAuthPassword())) {
                 throw ValidationException::withMessages(['current_password' => 'Your current password isn\'t correct.']);
@@ -63,6 +65,8 @@ final class UpdateProfile
             $locked->forceFill(['password' => Hash::make($new)])->setRememberToken(bin2hex(random_bytes(30)));
             $locked->save();
             $this->audit->record($locked, 'password_changed', null, null);
+
+            return $locked->getAuthPassword();
         });
     }
 }
