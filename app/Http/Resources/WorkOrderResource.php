@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources;
 
+use App\Actions\Inventory\JobStockCosts;
 use App\Actions\WorkOrders\WorkOrderView;
 use App\Domain\Access\Capability;
 use App\Domain\Approvals\Approvals;
@@ -52,6 +53,11 @@ final class WorkOrderResource extends JsonResource
         $staff = $context?->isStaff() ?? false;
         $billable = array_values($order->lines->map(fn (WorkOrderLine $l) => $l->billable())->all());
         $staffOnly = fn (?string $id): ?string => $staff ? $id : null;
+        // The shop's own stock room is staff business: item ids and what the parts cost the shop never reach a portal response.
+        if ($staff && $order->lines->contains(fn (WorkOrderLine $l): bool => $l->item_id !== null)) {
+            $order->loadMissing('lines.item');
+        }
+        $stockCosts = $staff ? app(JobStockCosts::class)->forOrder($order) : null;
         $waiting = $order->status === WorkOrderStatus::PendingApproval && $order->pending_approval_entered_at !== null
             ? BusinessHours::between($order->pending_approval_entered_at, CarbonImmutable::now())
             : null;
@@ -104,6 +110,12 @@ final class WorkOrderResource extends JsonResource
                     && $context->can(Capability::WorkOrderApprove)
                     && Approvals::canApprove($context->role, Approvals::pendingValue($billable), $settings),
             ],
+            // What the job's ledger-costed parts cost the shop against what they were approved at (staff).
+            'stock' => $stockCosts === null ? null : [
+                'cost_cents' => $stockCosts['cost_cents'],
+                'price_cents' => $stockCosts['price_cents'],
+                'margin_cents' => $stockCosts['margin_cents'],
+            ],
             'lines' => array_values($order->lines->map(fn (WorkOrderLine $line): array => [
                 'id' => $line->id,
                 'position' => $line->position,
@@ -119,6 +131,9 @@ final class WorkOrderResource extends JsonResource
                 'line_cost_cents' => $line->cost(),
                 'urgency' => $line->urgency->value,
                 'parts_source' => $line->parts_source->value,
+                'item_id' => $staffOnly($line->item_id),
+                'item' => $staff && $line->item_id !== null && $line->item !== null ? InventoryJson::item($line->item) : null,
+                'stock_cost_cents' => $stockCosts['lines'][$line->id] ?? null,
                 'approval_status' => $line->approval_status->value,
                 'approved_by_name' => $line->approved_by_name,
                 'approved_at' => $line->approved_at?->toIso8601ZuluString(),

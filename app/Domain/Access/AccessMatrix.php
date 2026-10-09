@@ -15,6 +15,9 @@ namespace App\Domain\Access;
  *    (the fleet manager only ever within their own account: scope, not this
  *    table, keeps it there);
  *  - `organization:manage` for provider_admin only;
+ *  - `inventory:view` for every staff role and `inventory:manage` for
+ *    provider_admin and branch_manager (the shop's own stock room; never a
+ *    portal role);
  *  - the two new staff roles, branch_manager and cashier.
  */
 final class AccessMatrix
@@ -59,6 +62,7 @@ final class AccessMatrix
             'workorder:update',
             'workorder:complete',
             'document:upload',
+            'inventory:view',
         ],
         'service_advisor' => [
             'vehicle:update',
@@ -67,8 +71,9 @@ final class AccessMatrix
             'workorder:update',
             'document:upload',
             'customer:manage',
+            'inventory:view',
         ],
-        'cashier' => ['customer:manage'],
+        'cashier' => ['customer:manage', 'inventory:view'],
         // Everything but organization:manage, applied only to the branches the
         // manager is pinned to (branch_user).
         'branch_manager' => [
@@ -84,6 +89,8 @@ final class AccessMatrix
             'settings:manage',
             'access:manage',
             'customer:manage',
+            'inventory:view',
+            'inventory:manage',
         ],
         'provider_admin' => [
             'vehicle:update',
@@ -99,6 +106,8 @@ final class AccessMatrix
             'access:manage',
             'customer:manage',
             'organization:manage',
+            'inventory:view',
+            'inventory:manage',
         ],
     ];
 

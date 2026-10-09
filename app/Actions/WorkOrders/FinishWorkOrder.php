@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\WorkOrders;
 
+use App\Actions\Inventory\SyncWorkOrderStock;
 use App\Domain\WorkOrders\WorkOrderStatus;
 use App\Exceptions\InvalidTransitionException;
 use App\Models\WorkOrder;
@@ -15,7 +16,10 @@ use Illuminate\Support\Facades\DB;
  */
 final class FinishWorkOrder
 {
-    public function __construct(private readonly WorkOrderJournal $journal) {}
+    public function __construct(
+        private readonly WorkOrderJournal $journal,
+        private readonly SyncWorkOrderStock $stock,
+    ) {}
 
     /**
      * A vehicle's finished jobs released together (../web collectWorkOrders,
@@ -56,6 +60,8 @@ final class FinishWorkOrder
 
             $locked->forceFill(['status' => WorkOrderStatus::Cancelled, 'cancellation_reason' => $reason])->save();
             $this->journal->event($locked, WorkOrderStatus::Cancelled, CarbonImmutable::now());
+            // A cancelled job owes the shelf nothing: whatever it took comes back.
+            $this->stock->handle($locked);
             $this->journal->audit($locked, 'cancelled', $before);
 
             return $locked;

@@ -24,7 +24,7 @@ final class SaveAccountApprovalSettingsRequest extends ApiRequest
             'ops_approval_under_cents' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'sla_hours' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:720'],
             'variance_threshold_pct' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:100'],
-            'default_parts_source' => ['sometimes', 'nullable', 'string', Rule::enum(PartsSource::class)],
+            'default_parts_source' => ['sometimes', 'nullable', 'string', Rule::enum(PartsSource::class)->except(PartsSource::ShopStock)],
             'monthly_budget_cents' => ['sometimes', 'nullable', 'integer', 'min:0'],
         ];
     }

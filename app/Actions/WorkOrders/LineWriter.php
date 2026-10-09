@@ -12,6 +12,8 @@ use App\Domain\WorkOrders\LineUrgency;
 use App\Domain\WorkOrders\PartsSource;
 use App\Exceptions\ConflictException;
 use App\Models\ApprovalLogEntry;
+use App\Models\Item;
+use App\Models\ItemBranchSetting;
 use App\Models\ServiceTask;
 use App\Models\WorkOrder;
 use App\Models\WorkOrderLine;
@@ -108,9 +110,20 @@ final class LineWriter
         $taskId = isset($input['service_task_id']) && is_string($input['service_task_id']) ? $input['service_task_id'] : null;
         $task = $taskId === null ? null : $tasks[$taskId];
 
+        $source = is_string($input['parts_source'] ?? null) ? PartsSource::from($input['parts_source']) : $settings->defaultPartsSource;
+        $item = $this->itemFor($order, $source, $input);
+
+        // What the customer is charged for the part follows where it comes from:
+        // their own part is free; a shelf part defaults to the branch's price.
+        $unitPartRate = match (true) {
+            $source === PartsSource::CustomerSupplied => 0,
+            $item !== null && ! isset($input['unit_part_rate_cents']) => $this->priceAt($item, $order),
+            default => self::int($input['unit_part_rate_cents'] ?? 0),
+        };
+
         $priced = Billing::recalc(new BillableLine(
             self::decimal($input['quantity'] ?? '1'),
-            self::int($input['unit_part_rate_cents'] ?? 0),
+            $unitPartRate,
             self::decimal($input['labour_hours'] ?? '0'),
             self::int($input['labour_rate_cents'] ?? $settings->defaultLabourRateCents),
             0,
@@ -130,7 +143,8 @@ final class LineWriter
             'labour_rate_cents' => $priced->labourRateCents,
             'labour_cost_cents' => $priced->labourCostCents,
             'urgency' => LineUrgency::from(is_string($input['urgency'] ?? null) ? $input['urgency'] : LineUrgency::Recommended->value),
-            'parts_source' => is_string($input['parts_source'] ?? null) ? PartsSource::from($input['parts_source']) : $settings->defaultPartsSource,
+            'parts_source' => $source,
+            'item_id' => $item?->id,
             'photos' => array_values(array_filter(is_array($input['photos'] ?? null) ? $input['photos'] : [], 'is_string')),
         ]);
 
@@ -167,6 +181,45 @@ final class LineWriter
         }
 
         return $tasks;
+    }
+
+    /**
+     * The inventory item a shop-stock line issues: required for that source,
+     * and refused for any other.
+     *
+     * @param  array<string, mixed>  $input
+     */
+    private function itemFor(WorkOrder $order, PartsSource $source, array $input): ?Item
+    {
+        $itemId = isset($input['item_id']) && is_string($input['item_id']) ? $input['item_id'] : null;
+        if (! $source->movesStock()) {
+            if ($itemId !== null) {
+                throw ValidationException::withMessages(['lines' => 'Only a line whose parts come from shop stock names an inventory item.']);
+            }
+
+            return null;
+        }
+        if ($itemId === null) {
+            throw ValidationException::withMessages(['lines' => 'A line whose parts come from shop stock needs the inventory item.']);
+        }
+        $item = Item::query()->find($itemId);
+        if (! $item instanceof Item || ! $item->is_stocked) {
+            throw ValidationException::withMessages(['lines' => 'That is not a stocked inventory item.']);
+        }
+        if (! $item->is_active) {
+            throw ValidationException::withMessages(['lines' => "{$item->name} is inactive."]);
+        }
+
+        return $item;
+    }
+
+    /** The branch's price for an item: its own override, else the item's price. */
+    private function priceAt(Item $item, WorkOrder $order): int
+    {
+        $branchId = $order->branch_id ?? $order->assigned_branch_id;
+        $override = $branchId === null ? null : ItemBranchSetting::query()->where('item_id', $item->id)->where('branch_id', $branchId)->value('price_override_cents');
+
+        return is_int($override) ? $override : $item->default_price_cents;
     }
 
     private static function decimal(mixed $value): string

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\WorkOrders;
 
+use App\Actions\Inventory\SyncWorkOrderStock;
 use App\Domain\WorkOrders\WorkOrderStatus;
 use App\Exceptions\InvalidTransitionException;
 use App\Models\WorkOrder;
@@ -23,6 +24,7 @@ final class EditWorkOrder
         private readonly WorkOrderJournal $journal,
         private readonly LineWriter $lines,
         private readonly ApprovalSettingsResolver $settings,
+        private readonly SyncWorkOrderStock $stock,
     ) {}
 
     /**
@@ -67,6 +69,7 @@ final class EditWorkOrder
             $before = WorkOrderJournal::snapshot($locked);
 
             $this->lines->replace($locked, $lines, $this->settings->forOrder($locked));
+            $this->stock->handle($locked);
             $this->journal->audit($locked, 'lines_recorded', $before);
 
             return $locked;

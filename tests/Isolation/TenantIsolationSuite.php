@@ -75,6 +75,21 @@ final class TenantIsolationSuite
         'purchase_orders' => ['org' => 'organization_id', 'account' => 'customer_account_id', 'branch' => null],
         'purchase_order_lines' => ['org' => 'organization_id', 'account' => 'customer_account_id', 'branch' => null],
         'purchase_order_events' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'purchase_order' => 'purchase_order_id'],
+        // Phase 6: the shop's stock room. Branch-owned and staff-only; a transfer belongs to both its branches.
+        'items' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
+        'item_branch_settings' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id'],
+        'stock_locations' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id'],
+        'stock_balances' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id'],
+        'stock_moves' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id'],
+        'shop_purchase_orders' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id'],
+        'shop_purchase_order_lines' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'shop_purchase_order' => 'shop_purchase_order_id'],
+        'shop_purchase_order_events' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'shop_purchase_order' => 'shop_purchase_order_id'],
+        'goods_receipts' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id'],
+        'goods_receipt_lines' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'goods_receipt' => 'goods_receipt_id'],
+        'stock_counts' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id'],
+        'stock_count_lines' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'stock_count' => 'stock_count_id'],
+        'stock_transfers' => ['org' => 'organization_id', 'account' => null, 'branch' => 'from_branch_id', 'branch2' => 'to_branch_id'],
+        'stock_transfer_lines' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'stock_transfer' => 'stock_transfer_id'],
     ];
 
     /**
@@ -96,9 +111,9 @@ final class TenantIsolationSuite
     private const array ORGANIZATION_WIDE = ['organizations', 'service_tasks'];
 
     /** Child tables whose owner is their parent row's (column alias → parent). */
-    private const array PARENTS = ['vehicle', 'work_order', 'fleet_part', 'purchase_order'];
+    private const array PARENTS = ['vehicle', 'work_order', 'fleet_part', 'purchase_order', 'shop_purchase_order', 'goods_receipt', 'stock_count', 'stock_transfer'];
 
-    /** @var array<string, array{org: string, account: string|null, branch: string|null, table: string, parents: array<string, string>}> */
+    /** @var array<string, array{org: string, account: string|null, branch: string|null, branches: list<string>, table: string, parents: array<string, string>}> */
     private array $rows = [];
 
     public function __construct(public readonly World $world)
@@ -109,6 +124,7 @@ final class TenantIsolationSuite
                 $columns['org'].' as org',
                 $columns['account'] === null ? null : $columns['account'].' as account',
                 $columns['branch'] === null ? null : $columns['branch'].' as branch',
+                isset($columns['branch2']) ? $columns['branch2'].' as branch2' : null,
             ]));
             foreach (self::PARENTS as $parent) {
                 if (isset($columns[$parent])) {
@@ -126,6 +142,8 @@ final class TenantIsolationSuite
                     'org' => (string) $row->org,
                     'account' => isset($row->account) ? (string) $row->account : null,
                     'branch' => isset($row->branch) ? (string) $row->branch : null,
+                    // Every branch the record belongs to (a transfer has two): visible if the caller may see any.
+                    'branches' => array_values(array_filter([isset($row->branch) ? (string) $row->branch : null, isset($row->branch2) ? (string) $row->branch2 : null])),
                     'table' => $table,
                     'parents' => $parents,
                 ];
@@ -139,6 +157,7 @@ final class TenantIsolationSuite
             foreach ($row['parents'] as $parentId) {
                 $this->rows[$id]['account'] = $this->rows[$parentId]['account'] ?? null;
                 $this->rows[$id]['branch'] = $this->rows[$parentId]['branch'] ?? $row['branch'];
+                $this->rows[$id]['branches'] = $this->rows[$parentId]['branches'] ?? $row['branches'];
             }
         }
     }
@@ -246,7 +265,7 @@ final class TenantIsolationSuite
             return 'staff-only';
         }
 
-        if ($allowedBranches !== null && $row['branch'] !== null && ! in_array($row['branch'], $allowedBranches, true)) {
+        if ($allowedBranches !== null && $row['branches'] !== [] && array_intersect($row['branches'], $allowedBranches) === []) {
             return 'hidden';
         }
 
@@ -308,7 +327,7 @@ final class TenantIsolationSuite
             if ($row['table'] !== $table) {
                 continue;
             }
-            $key = $row['org'].'|'.($row['account'] ?? '-').'|'.($row['branch'] ?? '-');
+            $key = $row['org'].'|'.($row['account'] ?? '-').'|'.($row['branches'] === [] ? '-' : implode('+', $row['branches']));
             $buckets[$key] ??= $id;
         }
 

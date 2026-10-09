@@ -24,6 +24,8 @@ final class SaveBranchRequest extends ApiRequest
             'timezone' => ['sometimes', 'string', 'timezone:all'],
             'brand_name' => ['sometimes', 'nullable', 'string', 'max:255'],
             'status' => ['sometimes', 'string', 'in:active,inactive'],
+            // What a stock move that would take a balance below zero does in this branch.
+            'negative_stock_policy' => ['sometimes', 'string', 'in:allow_and_flag,block'],
             ...self::brandingRules(),
             ...self::themeTokenRules(),
         ];

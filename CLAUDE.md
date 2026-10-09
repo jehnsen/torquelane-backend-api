@@ -687,6 +687,134 @@ attaches 131 documents to their work orders once the orders exist. Demo
 users get first/last names split from `name` and usernames from their email
 (`PersonName`, ../web's backfill rule).
 
+## Shop inventory (Phase 6)
+
+The shop's OWN stock room, as distinct from Phase 4's `fleet_parts` (a customer
+account's spare parts, untouched). Staff only: reads need `inventory:view`
+(every staff role), changes `inventory:manage` (provider admin, branch
+manager). Inventory is core, like vehicles: no module gates it.
+
+### Tables (Phase 6)
+
+| Table | Notes |
+|---|---|
+| `items` | Organization-wide: `sku` (unique per organization, case-insensitive), `barcode` (likewise, where set), name, `item_type` (`part`/`consumable`/`retail`/`ingredient`/`service_fee`), category, `uom` (the stock unit), `purchase_uom` + `purchase_uom_factor` (stock units per purchase unit; 1 with no purchase unit, CHECKed), `tax_class` (`vatable`/`vat_exempt`/`zero_rated`; carried for invoicing, Phase 3 billing still applies one VAT rate), `default_price_cents`, `is_stocked` (a service fee never is, CHECKed), `is_active`, `preferred_vendor_id` (a Phase 4 vendor; clears if the vendor goes). Never deleted: deactivate. |
+| `item_branch_settings` | Per item x branch: `reorder_point`, `reorder_qty`, `bin`, `price_override_cents`. |
+| `stock_locations` | Per branch; every branch has exactly one `store` (partial unique index). Backfilled by the migration, created by `CreateBranch`, and on first use by `StockLocations::storeOf()` for a branch made any other way (seeders, factories). |
+| `stock_moves` | **Append-only.** Signed `quantity` (numeric 14,3), `unit_cost_cents` (what the goods cost per stock unit at that moment), `move_type` (`opening`/`receipt`/`issue`/`return`/`adjustment`/`transfer_out`/`transfer_in`/`consumption`; CHECK ties the sign to the type), `source_type` + `source_id` (`manual`/`goods_receipt`/`work_order_line`/`stock_count`/`stock_transfer`; CHECKed named unless manual), `occurred_at`, `actor_id`/`actor_name`, `reason` (required for an adjustment, CHECKed), `negative_flag`. Carries its location's branch (composite FK). |
+| `stock_balances` | Per (location, item): `on_hand`, `avg_cost_cents`. See "The ledger" for who may write it. |
+| `shop_purchase_orders`, `shop_purchase_order_lines`, `shop_purchase_order_events` | The shop's own POs to a vendor for one branch (not Phase 4's `purchase_orders`). Numbered `SPO-YYYY-NNNN` from the `shop_purchase_order` series at creation. Stored status is only `draft`/`issued`/`cancelled`; `partially_received`/`received` are derived from the receipts (`ShopOrderStatus::derive`). Once issued, header and lines are frozen (triggers); never deleted. Lines are in the PURCHASE unit; `line_total_cents` = round(qty x unit cost) (CHECK). A line has an `item_id`, or none and a `work_order_line_id` (a part bought for one job, which never goes on the shelf). |
+| `goods_receipts`, `goods_receipt_lines` | Issued stock documents (`GR-YYYY-NNNN`, series `goods_receipt`). Lines append-only; the receipt can only be voided, once (trigger). A line records both the purchase-unit figures and what went on the shelf (`stock_quantity`, `stock_unit_cost_cents`). |
+| `stock_counts`, `stock_count_lines` | A count sheet per location (`SC-…`). Lines are edited only while the count is `open` (trigger); `expected_quantity` is refreshed to the books at posting and `variance_quantity` fixed then. |
+| `stock_transfers`, `stock_transfer_lines` | **Append-only.** One document (`TR-…`) for both moves; `reverses_transfer_id` (unique) names the transfer it undoes. |
+| `branches` (altered) | `negative_stock_policy`: `allow_and_flag` (default) or `block`. |
+| `work_order_lines` (altered) | `item_id` (a shop-stock line's item); `parts_source` gains three values; see below. |
+| `document_series` | `doc_type` gains `shop_purchase_order` (`SPO`), `stock_transfer` (`TR`), `stock_count` (`SC`). |
+
+### `parts_source`, per line (the hybrid model, kept)
+
+| Value | Meaning | Stock move | Part charge |
+|---|---|---|---|
+| `supplier_provided` | Phase 3's default: the shop buys it in and earns its markup in the parts-margin report | no | yes |
+| `own_stock` | Phase 3's "client's own stock": no markup | no | yes |
+| `customer_supplied` | The customer brings the part | no | **no** (rate and cost forced to 0; CHECKed) |
+| `shop_stock` | Issued from the branch store; names an `item_id` (and only this source does, CHECKed) | issue on the job | yes, at the item's branch price unless a rate is typed |
+| `purchased_for_job` | Bought on a shop PO line that names this line | no (never on the shelf) | yes |
+
+The two Phase 3 values keep their meaning and every existing line is untouched:
+`own_stock` lines carry a part charge (142 in the demo seed), so mapping them to
+"no charge" would have rewritten stored approved costs (R11). They stay valid;
+new lines are offered the other three. A default source (settings) may be any
+but `shop_stock`.
+
+### The ledger
+
+- **`App\Domain\Inventory\StockLedger`** is the pure maths: `applyMove`
+  (moving weighted average on inbound goods, rounded half-up to a centavo;
+  outbound goods leave at the average, which does not change; onto an empty or
+  negative balance the average becomes the incoming cost once the balance ends
+  above zero), `valuation` (on hand x average, a total summed exactly and
+  rounded once, R6), `moveValue`. The negative-stock policy is a parameter.
+- **`App\Actions\Inventory\PostStockMove`** is the ONLY writer of
+  `stock_balances` and the only thing that appends moves. In the caller's
+  transaction it sets `torquelane.stock_ledger = on` (transaction-local),
+  makes sure the balance row exists, LOCKS it (`for update`), asks the ledger,
+  appends the move and updates the balance. A caller moving several balances
+  calls `lock()` first, which orders them, so two documents cannot deadlock.
+- **The database holds it too.** A row trigger refuses any write to
+  `stock_balances` outside a transaction where the ledger switched that on;
+  deferred constraint triggers check, at commit, that every touched balance
+  equals the sum of its moves. The reconciliation test (and
+  `set constraints all immediate`) prove it over the seeded world and after a
+  busy day through the API.
+- **Negative stock** is a branch setting. `allow_and_flag` posts the move and
+  sets `negative_flag`; `block` refuses it with 409 `conflict`
+  (`details.reason = insufficient_stock`, `on_hand`, `requested`) and the whole
+  document rolls back.
+
+### Flows
+
+- **Receive** (`ReceiveGoods`): against an issued shop PO, in whole or part,
+  never more than is outstanding. One `GR-` document; each stocked line is a
+  `receipt` move into the PO's branch store, the purchase unit converted to the
+  stock unit and the cost per unit rounded half-up (a case of 24 at P1,200 is 24
+  x P50). The invoice may differ from the order's price. **Void** reverses the
+  moves with `return` moves and the PO's status follows.
+- **Work orders** (`SyncWorkOrderStock`, called wherever lines or status are
+  written: `recordLines`, `complete`, `close`, `cancel`): an APPROVED shop-stock
+  line owes the shelf its quantity once the order is in progress or closed; the
+  ledger's net for that line is compared with that target and the difference
+  posted as further `issue` moves or `return` moves (at the line's average issue
+  cost). Moves are never edited, an order in step posts nothing, and a cancelled
+  job gives everything back. **Job cost** (`JobStockCosts`) is the net cost of
+  those moves (and the goods received against `purchased_for_job` lines); the
+  job PRICE stays the approved line's stored amount. Staff see `stock` on the
+  order and `stock_cost_cents` per line; a portal response carries neither
+  (nor the item ids).
+- **Count** (`ManageStockCounts`): draw the sheet from the books, enter counted
+  quantities, post: each variance against what the books hold NOW becomes an
+  `adjustment` move whose reason is the line's, else the count's (a variance
+  with neither is refused). Uncounted lines are left alone.
+- **Transfer** (`TransferStock`): out of the source at its average, into the
+  destination at that same cost, one document, one transaction; reversed once by
+  a mirror transfer.
+- **Opening balance** (`RecordOpeningStock`): only for an item with no history
+  in the location.
+- **Low-stock alerts** (`GET /stock/alerts`) are derived on read from each
+  branch's reorder points (an item with a point and no stock counts as zero);
+  ids are `stock:<item>:<location>`. They are not in `GET /alerts`, whose
+  golden fixtures are unchanged.
+- **Reorder** (`GET /stock/reorder`): per active stocked item and branch, on
+  hand, on order (issued shop POs, converted to stock units), the reorder point
+  and quantity, and Phase 4's forecast shortfall for the item's SKU (summed over
+  the active customer accounts in scope, counted once against the first branch),
+  to `ReorderPlanner`'s `stockout` / `below_reorder_point` / `forecast_shortfall`
+  and a suggestion in stock and purchase units.
+
+- **The shop reports are unchanged.** `Shop::partsMargin` still buckets every
+  line that is not `own_stock` as supplier-bought and applies its flat 22%
+  markup (a `customer_supplied` line has no part cost, so adds nothing). The
+  real margin of a job's ledger-costed parts is on the order (`stock`), not in
+  that report; wiring the two together is a later phase's call.
+
+### Endpoints (Phase 6)
+
+`/items`, `/items/{item}/branch-settings/{branch}`, `/stock-locations`,
+`/stock/{on-hand,moves,alerts,reorder,opening}`, `/shop-purchase-orders`
+(+ `/issue`, `/cancel`, `/receipts`), `/goods-receipts` (+ `/void`),
+`/stock-counts` (+ `/lines`, `/post`, `/cancel`), `/stock-transfers`
+(+ `/reverse`). Movements are cursor-paged. All creates are idempotent.
+
+### Demo data (Phase 6)
+
+`Database\Seeders\Demo\InventorySeed`, built through the real Actions as the
+owner: eleven items (the repair shop's parts, a consumable, a retail item, a fee,
+two detailing consumables; several share a SKU with Actimed's fleet parts, so
+the Reorder view has a forecast to read), opening balances, SPO-2026-0001 issued
+and part-received (GR-2026-0001), a coolant draft (SPO-2026-0002), TR-2026-0001
+(cloths, detailing to repair) and SC-2026-0001 (a litre of coolant short).
+Phase 4's `PO-2026-0003` is still the next customer purchase order.
+
 ## Rules that bite
 
 - **Tests use `RefreshApiDatabase`, never `DatabaseTruncation`.** The
@@ -746,6 +874,12 @@ users get first/last names split from `name` and usernames from their email
   `composer dev`; `php artisan key:generate` fixes it.
 - **Phase 1 migrations refuse a `users` table with rows** (Phase 0A users had
   no organization). Locally: `php artisan migrate:fresh --seed`.
+- **Parallel tests need `max_locks_per_transaction` above the default.** Each
+  worker's `migrate:fresh` drops every table in one statement, locking every
+  index and constraint; past ~70 tables the default 64 runs the shared lock table
+  dry ("out of shared memory", on a drop). `docker-compose.yml` starts Postgres
+  with 256; recreate the container (`docker compose up -d postgres`) after
+  pulling it. A server you run yourself needs the same setting.
 - **The test suite needs more than 128 MB** (the arch tests parse every
   class; workers load the golden fixtures): `phpunit.xml` sets
   `memory_limit=1G` for every worker.
@@ -823,6 +957,39 @@ users get first/last names split from `name` and usernames from their email
 - **Never name a FormRequest method after a `Request` method** (`format()`
   broke every request class's autoload). And the arch security preset bans
   `tempnam`: temporary paths use `random_bytes`.
+
+- **Stock moves only through `PostStockMove`.** It is the only writer of
+  `stock_balances`; a trigger refuses any other write, and deferred triggers
+  check at commit that a balance is the sum of its moves. Never `update` a
+  balance or a move; correct with a compensating move.
+- **A deferred trigger sees the row as it was queued.** The balance check
+  therefore re-reads the CURRENT balance and the moves at commit. The ledger
+  switch (`set_config(..., true)`) lasts to the end of the OUTER transaction, so
+  in a test (wrapped in one) the guard stays on after any ledger post: reset it
+  (`set_config('torquelane.stock_ledger', '', true)`) before asserting it holds.
+- **An immutable document is inserted once, total and all.** A goods receipt's
+  total is computed before the insert because its trigger refuses a later
+  update; the same goes for any stock document you add.
+- **Inventory is staff-only and core.** Policies check side, then branch scope
+  (404), then `inventory:view` / `inventory:manage`; the portal side never holds
+  them. `inventory:*` are API-only capabilities (RbacGoldenTest lists them).
+- **The shop's PO series is `shop_purchase_order` (`SPO-`).** `purchase_order`
+  (`PO-`) is Phase 4's and the customer accounts'; they never share numbers.
+- **`is_stocked`, `include_inactive` and friends take `1`/`0` in a query string**,
+  not `true`/`false` (Laravel's boolean rule).
+- **Resources never lazy-load** (strict mode throws). `WorkOrderResource`
+  `loadMissing`s the item only when a line has one, and only for staff.
+- **A child-process test script must exit non-zero itself.** Laravel's handler
+  prints an uncaught exception and still exits 0; `tests/Support/post-stock-moves.php`
+  catches `Throwable`, writes it to STDERR and exits 1. Its output lines end in
+  `PHP_EOL` (CRLF on Windows): trim them.
+- **Never `TRUNCATE` in a test that has posted stock**: pending deferred trigger
+  events block it. The append-only guards are covered by `AppendOnlyTest`.
+- **The concurrency tests commit real rows** (a throwaway organization on their
+  own connection) and remove them with `session_replication_role = replica`,
+  which needs a superuser (the docker role is).
+- **Request values come out of `mixed` through `App\Http\Requests\Input` and
+  `App\Domain\Inventory\Decimals`**, not casts (Larastan level max).
 
 ## Running it
 
@@ -907,7 +1074,7 @@ audit rows). Fill in the rest from the phase plan.
 - [x] **3**: Repair core (work orders, per-line approvals, billing in centavos, check-in, shop floor)
 - [x] **4**: Parts, purchasing, analytics and API parity (vendors, fleet parts, purchase orders, forecast, analytics, purpose-built reads, docs/frontend-parity.md)
 - [ ] **5**: *(title not provided)*
-- [ ] **6**: *(title not provided)*
+- [x] **6**: Shop inventory (items, branch stock, the append-only stock ledger, receiving against purchase orders, work-order issues, counts, transfers, reorder)
 - [ ] **7**: *(title not provided)*
 - [ ] **8**: *(title not provided)*
 - [ ] **9**: *(title not provided)*
@@ -967,3 +1134,17 @@ its own session. Decisions taken here, for review: the frontend creates
 then sends (one step in the UI) rather than a combined endpoint; staff
 book a bay at check-in only for jobs `send` auto-approves (scheduling is
 legal only once approved), the rest wait on the client.
+
+Phase 6 status: done locally (gates green; golden and isolation suites pass;
+`openapi.json` regenerated). Decisions taken with the user: `parts_source`
+gains three values and keeps its two (no existing record changes meaning);
+the shop gets its own purchase-order family beside Phase 4's, leaving that one
+as it was. Decisions taken here, for review: shop POs have their own `SPO-`
+series (so Phase 4's `PO-` numbers carry on undisturbed); inventory is core (no
+module) and staff-only, with `inventory:view` for every staff role and
+`inventory:manage` for provider admin and branch manager; the cost of a unit
+bought by the case is rounded to a centavo per stock unit; a work order's
+shop-stock lines are issued when the work is recorded or the order closes (not
+at the draft or the approval); returns come back at the line's average issue
+cost; the Reorder view counts the fleet forecast once, against the first branch
+in scope; low-stock alerts are a separate endpoint, not part of `GET /alerts`.

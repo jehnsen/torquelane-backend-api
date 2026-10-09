@@ -11,6 +11,10 @@ name: torquelane-api
 services:
   postgres:
     image: postgres:${POSTGRES_VERSION:-17}
+    # Parallel Pest workers each `migrate:fresh` their own database, which drops every table
+    # (and so locks every index and constraint) in one statement. The default 64 locks per
+    # transaction runs the cluster's shared lock table dry once the schema passes ~70 tables.
+    command: ["postgres", "-c", "max_locks_per_transaction=256"]
     environment:
       POSTGRES_USER: torquelane
       POSTGRES_PASSWORD: torquelane

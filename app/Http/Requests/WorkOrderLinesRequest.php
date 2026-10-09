@@ -35,14 +35,14 @@ final class WorkOrderLinesRequest extends ApiRequest
      */
     public static function normalise(array $lines): array
     {
-        $keys = ['id', 'service_task_id', 'description', 'category', 'quantity', 'unit_part_rate_cents', 'labour_hours', 'labour_rate_cents', 'urgency', 'parts_source', 'photos'];
+        $keys = ['id', 'service_task_id', 'description', 'category', 'quantity', 'unit_part_rate_cents', 'labour_hours', 'labour_rate_cents', 'urgency', 'parts_source', 'item_id', 'photos'];
         $out = [];
         foreach ($lines as $line) {
             if (! is_array($line)) {
                 continue;
             }
             $clean = array_intersect_key($line, array_flip($keys));
-            foreach (['id', 'service_task_id'] as $id) {
+            foreach (['id', 'service_task_id', 'item_id'] as $id) {
                 if (isset($clean[$id]) && is_string($clean[$id])) {
                     $clean[$id] = mb_strtolower($clean[$id]);
                 }

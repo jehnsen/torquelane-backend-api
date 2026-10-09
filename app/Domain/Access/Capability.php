@@ -30,6 +30,10 @@ enum Capability: string
     case CustomerManage = 'customer:manage';
     /** Organization-wide settings: profile, organization modules, opening and closing branches. */
     case OrganizationManage = 'organization:manage';
+    /** See the shop's items, stock, movements, receipts, counts and transfers (staff only). */
+    case InventoryView = 'inventory:view';
+    /** Set up items, receive goods, count, adjust, transfer, raise purchase orders (staff only). */
+    case InventoryManage = 'inventory:manage';
 
     /** Shown in denial reasons. The ported labels are verbatim from the frontend. */
     public function label(): string
@@ -48,12 +52,17 @@ enum Capability: string
             self::AccessManage => 'Manage user access',
             self::CustomerManage => 'Manage customer accounts',
             self::OrganizationManage => 'Manage the organization',
+            self::InventoryView => 'View the shop inventory',
+            self::InventoryManage => 'Manage the shop inventory',
         };
     }
 
     /** True for the capabilities that exist only in the API, not in ../web. */
     public function isApiOnly(): bool
     {
-        return $this === self::CustomerManage || $this === self::OrganizationManage;
+        return match ($this) {
+            self::CustomerManage, self::OrganizationManage, self::InventoryView, self::InventoryManage => true,
+            default => false,
+        };
     }
 }

@@ -59,6 +59,8 @@ final class WorkOrderRules
             "{$prefix}.*.labour_rate_cents" => ['sometimes', 'integer', 'min:0', 'max:100000000000'],
             "{$prefix}.*.urgency" => ['sometimes', 'string', Rule::enum(LineUrgency::class)],
             "{$prefix}.*.parts_source" => ['sometimes', 'string', Rule::enum(PartsSource::class)],
+            // The inventory item a shop-stock line issues (required for that source, refused for any other).
+            "{$prefix}.*.item_id" => ['sometimes', 'nullable', 'string', 'ulid'],
             "{$prefix}.*.photos" => ['sometimes', 'array', 'max:20'],
             "{$prefix}.*.photos.*" => ['string', 'url', 'max:2048'],
         ];

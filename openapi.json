@@ -4084,6 +4084,230 @@
                 }
             }
         },
+        "/goods-receipts": {
+            "get": {
+                "operationId": "goods-receipts.index",
+                "description": "`inventory:view`. Newest first; `status` is `posted` or `voided`.",
+                "summary": "List goods receipts",
+                "tags": [
+                    "GoodsReceipt"
+                ],
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    },
+                    {
+                        "name": "branch_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "vendor_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "shop_purchase_order_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "draft",
+                                "issued",
+                                "partially_received",
+                                "received",
+                                "open",
+                                "cancelled",
+                                "posted",
+                                "voided"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 100
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `GoodsReceiptResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/GoodsReceiptCollection"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/goods-receipts/{goodsReceipt}": {
+            "get": {
+                "operationId": "goods-receipts.show",
+                "summary": "Show a goods receipt",
+                "tags": [
+                    "GoodsReceipt"
+                ],
+                "parameters": [
+                    {
+                        "name": "goodsReceipt",
+                        "in": "path",
+                        "required": true,
+                        "description": "The goods receipt ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`GoodsReceiptResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/GoodsReceiptResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            }
+        },
+        "/goods-receipts/{goodsReceipt}/void": {
+            "post": {
+                "operationId": "goods-receipts.void",
+                "description": "`inventory:manage`, with a reason. The receipt stays on record, marked\nvoid; every move it made is undone by a compensating `return` move, and\nthe purchase order's status follows. Under a branch that blocks\nnegative stock this is refused if the goods have already been used.",
+                "summary": "Void a goods receipt",
+                "tags": [
+                    "GoodsReceipt"
+                ],
+                "parameters": [
+                    {
+                        "name": "goodsReceipt",
+                        "in": "path",
+                        "required": true,
+                        "description": "The goods receipt ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StockReasonRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`GoodsReceiptResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/GoodsReceiptResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
         "/health": {
             "get": {
                 "operationId": "health",
@@ -4363,6 +4587,337 @@
                     }
                 },
                 "security": []
+            }
+        },
+        "/items": {
+            "get": {
+                "operationId": "items.index",
+                "description": "`inventory:view`. By SKU; active items unless `include_inactive`. Each\nitem carries, for every branch the caller may see, its reorder point,\nbin, the price that applies there and what is on hand.",
+                "summary": "List items",
+                "tags": [
+                    "Item"
+                ],
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 100
+                        }
+                    },
+                    {
+                        "name": "item_type",
+                        "in": "query",
+                        "schema": {
+                            "$ref": "#/components/schemas/ItemType"
+                        }
+                    },
+                    {
+                        "name": "category",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 64
+                        }
+                    },
+                    {
+                        "name": "is_stocked",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "name": "include_inactive",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `ItemResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ItemCollection"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "items.store",
+                "description": "`inventory:manage`. The SKU (and barcode) are unique in the organization.\nA service fee is never stocked.",
+                "summary": "Add an item",
+                "tags": [
+                    "Item"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SaveItemRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "`ItemResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ItemResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/items/{item}": {
+            "get": {
+                "operationId": "items.show",
+                "summary": "Show an item",
+                "tags": [
+                    "Item"
+                ],
+                "parameters": [
+                    {
+                        "name": "item",
+                        "in": "path",
+                        "required": true,
+                        "description": "The item ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`ItemResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ItemResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            },
+            "patch": {
+                "operationId": "items.update",
+                "description": "`inventory:manage`. Once stock has moved in an item its stock unit and\nwhether it is stocked are fixed. Items are never deleted: set\n`is_active` to false.",
+                "summary": "Update an item",
+                "tags": [
+                    "Item"
+                ],
+                "parameters": [
+                    {
+                        "name": "item",
+                        "in": "path",
+                        "required": true,
+                        "description": "The item ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SaveItemRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`ItemResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ItemResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/items/{item}/branch-settings/{branch}": {
+            "put": {
+                "operationId": "items.branch-settings",
+                "description": "`inventory:manage` in that branch. Reorder point and quantity (stock\nunits), the bin it is kept in, and a price that overrides the item's\nfor this branch. Send `null` to clear one.",
+                "summary": "Set an item's settings for a branch",
+                "tags": [
+                    "Item"
+                ],
+                "parameters": [
+                    {
+                        "name": "item",
+                        "in": "path",
+                        "required": true,
+                        "description": "The item ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "branch",
+                        "in": "path",
+                        "required": true,
+                        "description": "The branch ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SaveItemBranchSettingsRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`ItemResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ItemResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
             }
         },
         "/vehicles/{vehicle}/readings": {
@@ -7318,6 +7873,1669 @@
                 }
             }
         },
+        "/shop-purchase-orders": {
+            "get": {
+                "operationId": "shop-purchase-orders.index",
+                "description": "`inventory:view`. Newest first. `status` is `draft`, `cancelled`, or\none of the derived ones: `issued` (nothing in yet), `partially_received`,\n`received`, or `open` (issued or partially received).",
+                "summary": "List shop purchase orders",
+                "tags": [
+                    "ShopPurchaseOrder"
+                ],
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    },
+                    {
+                        "name": "branch_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "vendor_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "shop_purchase_order_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "draft",
+                                "issued",
+                                "partially_received",
+                                "received",
+                                "open",
+                                "cancelled",
+                                "posted",
+                                "voided"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 100
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `ShopPurchaseOrderResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ShopPurchaseOrderCollection"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "shop-purchase-orders.store",
+                "description": "`inventory:manage` in `branch_id`. A draft, numbered from the\norganization's `shop_purchase_order` series (`SPO-\u2026`) in this transaction. Lines are in\nthe purchase unit (quantity \u00d7 unit cost, rounded once to a centavo by the\nserver): a stocked `item_id`, or a line bought for a job\n(`work_order_line_id` of a line marked \"purchased for job\").",
+                "summary": "Raise a purchase order",
+                "tags": [
+                    "ShopPurchaseOrder"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SaveShopOrderRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "`ShopPurchaseOrderResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ShopPurchaseOrderResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/shop-purchase-orders/{shopPurchaseOrder}": {
+            "get": {
+                "operationId": "shop-purchase-orders.show",
+                "summary": "Show a purchase order",
+                "tags": [
+                    "ShopPurchaseOrder"
+                ],
+                "parameters": [
+                    {
+                        "name": "shopPurchaseOrder",
+                        "in": "path",
+                        "required": true,
+                        "description": "The shop purchase order ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`ShopPurchaseOrderResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ShopPurchaseOrderResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            },
+            "patch": {
+                "operationId": "shop-purchase-orders.update",
+                "description": "`inventory:manage`. Only a draft; an issued order's lines never change.",
+                "summary": "Edit a draft",
+                "tags": [
+                    "ShopPurchaseOrder"
+                ],
+                "parameters": [
+                    {
+                        "name": "shopPurchaseOrder",
+                        "in": "path",
+                        "required": true,
+                        "description": "The shop purchase order ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SaveShopOrderRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`ShopPurchaseOrderResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ShopPurchaseOrderResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/shop-purchase-orders/{shopPurchaseOrder}/issue": {
+            "post": {
+                "operationId": "shop-purchase-orders.issue",
+                "description": "`inventory:manage`. Sends the draft to the vendor; its lines freeze.",
+                "summary": "Issue a purchase order",
+                "tags": [
+                    "ShopPurchaseOrder"
+                ],
+                "parameters": [
+                    {
+                        "name": "shopPurchaseOrder",
+                        "in": "path",
+                        "required": true,
+                        "description": "The shop purchase order ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`ShopPurchaseOrderResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ShopPurchaseOrderResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            }
+        },
+        "/shop-purchase-orders/{shopPurchaseOrder}/cancel": {
+            "post": {
+                "operationId": "shop-purchase-orders.cancel",
+                "description": "`inventory:manage`, with a reason, while nothing has been received\nagainst it.",
+                "summary": "Cancel a purchase order",
+                "tags": [
+                    "ShopPurchaseOrder"
+                ],
+                "parameters": [
+                    {
+                        "name": "shopPurchaseOrder",
+                        "in": "path",
+                        "required": true,
+                        "description": "The shop purchase order ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StockReasonRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`ShopPurchaseOrderResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ShopPurchaseOrderResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/shop-purchase-orders/{shopPurchaseOrder}/receipts": {
+            "post": {
+                "operationId": "shop-purchase-orders.receive",
+                "description": "`inventory:manage`. Takes in some or all of the outstanding quantity of\nan issued order: one numbered goods receipt, and for each stocked line a\n`receipt` move into the branch's store (the purchase unit converted to\nthe stock unit; the average cost moves with it). More than is\noutstanding is refused. Partial receipts leave the order\n`partially_received`.",
+                "summary": "Receive goods",
+                "tags": [
+                    "ShopPurchaseOrder"
+                ],
+                "parameters": [
+                    {
+                        "name": "shopPurchaseOrder",
+                        "in": "path",
+                        "required": true,
+                        "description": "The shop purchase order ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ReceiveGoodsRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "`GoodsReceiptResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/GoodsReceiptResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/stock-locations": {
+            "get": {
+                "operationId": "stock-locations.index",
+                "description": "`inventory:view`. The locations of the branches the caller may see\n(each branch has one store).",
+                "summary": "List stock locations",
+                "tags": [
+                    "Stock"
+                ],
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `StockLocationResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/StockLocationCollection"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/stock/on-hand": {
+            "get": {
+                "operationId": "stock.on-hand",
+                "description": "`inventory:view`. Every item in every location of the selected branch\n(or `branch_id`), by SKU: quantity, average cost, value (on hand \u00d7\naverage, rounded once), the branch's reorder point and bin.\n`summary` covers the whole filtered set: its value is summed exactly\nand rounded once, so it can differ by a centavo from the rows added up.",
+                "summary": "Stock on hand",
+                "tags": [
+                    "Stock"
+                ],
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    },
+                    {
+                        "name": "branch_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "location_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 100
+                        }
+                    },
+                    {
+                        "name": "item_type",
+                        "in": "query",
+                        "schema": {
+                            "$ref": "#/components/schemas/ItemType"
+                        }
+                    },
+                    {
+                        "name": "hide_zero",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "name": "low",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `StockBalanceResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/StockBalanceCollection"
+                                        },
+                                        "summary": {
+                                            "type": "object",
+                                            "properties": {
+                                                "lines": {
+                                                    "type": "integer"
+                                                },
+                                                "value_cents": {
+                                                    "type": "integer"
+                                                },
+                                                "low": {
+                                                    "type": "integer"
+                                                },
+                                                "negative": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "lines",
+                                                "value_cents",
+                                                "low",
+                                                "negative"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "summary"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/stock/moves": {
+            "get": {
+                "operationId": "stock.moves",
+                "description": "`inventory:view`. The stock ledger, newest first, cursor-paged. Filter\nby item, location, type, source and Manila business dates (`from`,\n`to`). Quantity is signed; `source_reference` is the receipt,\ntransfer, count or work order behind the move.",
+                "summary": "Item movements",
+                "tags": [
+                    "Stock"
+                ],
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    },
+                    {
+                        "name": "branch_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "location_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "item_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "move_type",
+                        "in": "query",
+                        "schema": {
+                            "$ref": "#/components/schemas/MoveType"
+                        }
+                    },
+                    {
+                        "name": "source_type",
+                        "in": "query",
+                        "schema": {
+                            "$ref": "#/components/schemas/StockSource"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `StockMoveResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/StockMoveCollection"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/stock/alerts": {
+            "get": {
+                "operationId": "stock.alerts",
+                "description": "`inventory:view`. Derived on read from the balances and each branch's\nreorder points; never stored. Worst first: out of stock (critical),\nthen at or under the reorder point (warning). An alert's id is\n`stock:<item>:<location>`.",
+                "summary": "Low-stock alerts",
+                "tags": [
+                    "Stock"
+                ],
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    },
+                    {
+                        "name": "branch_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "location_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 100
+                        }
+                    },
+                    {
+                        "name": "item_type",
+                        "in": "query",
+                        "schema": {
+                            "$ref": "#/components/schemas/ItemType"
+                        }
+                    },
+                    {
+                        "name": "hide_zero",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "name": "low",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {}
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "total": {
+                                                    "type": "integer"
+                                                },
+                                                "critical": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "total",
+                                                "critical"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/stock/reorder": {
+            "get": {
+                "operationId": "stock.reorder",
+                "description": "`inventory:view`. For each active stocked item, per branch: on hand, on\norder (issued purchase orders still to arrive), the reorder point and\nquantity, and the fleet forecast's shortfall for the same SKU over\n`horizon_weeks` (default 6; Phase 4's forecast, per active customer\naccount). From those: `reason` (`stockout`, `below_reorder_point`,\n`forecast_shortfall`) and what to buy, in stock and in purchase units.\nOnly rows that need something, unless `all`. The forecast is the\nfleet's, so it is counted once, against the first branch in scope.",
+                "summary": "Reorder",
+                "tags": [
+                    "Stock"
+                ],
+                "parameters": [
+                    {
+                        "name": "branch_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "horizon_weeks",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 26
+                        }
+                    },
+                    {
+                        "name": "customer_account_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "all",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {}
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "total": {
+                                                    "type": "integer"
+                                                },
+                                                "needing_order": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "total",
+                                                "needing_order"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/stock/opening": {
+            "post": {
+                "operationId": "stock.opening",
+                "description": "`inventory:manage` in the location's branch. The first count of items\nin a location, each at a stated cost (an `opening` move). Refused for\nan item that already has stock history there: correct it with a stock\ncount instead.",
+                "summary": "Record an opening balance",
+                "tags": [
+                    "Stock"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RecordOpeningStockRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {}
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/stock-counts": {
+            "get": {
+                "operationId": "stock-counts.index",
+                "description": "`inventory:view`. Newest first; `status` is `open`, `posted` or `cancelled`.",
+                "summary": "List stock counts",
+                "tags": [
+                    "StockCount"
+                ],
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    },
+                    {
+                        "name": "branch_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "vendor_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "shop_purchase_order_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "draft",
+                                "issued",
+                                "partially_received",
+                                "received",
+                                "open",
+                                "cancelled",
+                                "posted",
+                                "voided"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 100
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `StockCountResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/StockCountCollection"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "stock-counts.store",
+                "description": "`inventory:manage` in the location's branch. Lists the items the books\nhold there (and any in `item_ids`), each with what the books say now.\nNumbered from the `stock_count` series.",
+                "summary": "Draw a count sheet",
+                "tags": [
+                    "StockCount"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OpenStockCountRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "`StockCountResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/StockCountResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/stock-counts/{stockCount}": {
+            "get": {
+                "operationId": "stock-counts.show",
+                "summary": "Show a count",
+                "tags": [
+                    "StockCount"
+                ],
+                "parameters": [
+                    {
+                        "name": "stockCount",
+                        "in": "path",
+                        "required": true,
+                        "description": "The stock count ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`StockCountResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/StockCountResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            }
+        },
+        "/stock-counts/{stockCount}/lines": {
+            "put": {
+                "operationId": "stock-counts.lines",
+                "description": "`inventory:manage`, while the count is open. A line may carry its own\nreason; `counted_quantity: null` un-counts it.",
+                "summary": "Enter counted quantities",
+                "tags": [
+                    "StockCount"
+                ],
+                "parameters": [
+                    {
+                        "name": "stockCount",
+                        "in": "path",
+                        "required": true,
+                        "description": "The stock count ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/EnterStockCountRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`StockCountResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/StockCountResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/stock-counts/{stockCount}/post": {
+            "post": {
+                "operationId": "stock-counts.post",
+                "description": "`inventory:manage`. Every counted line's variance against what the books\nhold now becomes an `adjustment` move carrying a reason (the line's, else\nthe count's; a variance with neither is refused). Uncounted lines are\nleft alone.",
+                "summary": "Post a count",
+                "tags": [
+                    "StockCount"
+                ],
+                "parameters": [
+                    {
+                        "name": "stockCount",
+                        "in": "path",
+                        "required": true,
+                        "description": "The stock count ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`StockCountResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/StockCountResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            }
+        },
+        "/stock-counts/{stockCount}/cancel": {
+            "post": {
+                "operationId": "stock-counts.cancel",
+                "description": "`inventory:manage`. Only an open sheet; nothing moves.",
+                "summary": "Cancel a count",
+                "tags": [
+                    "StockCount"
+                ],
+                "parameters": [
+                    {
+                        "name": "stockCount",
+                        "in": "path",
+                        "required": true,
+                        "description": "The stock count ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`StockCountResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/StockCountResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            }
+        },
+        "/stock-transfers": {
+            "get": {
+                "operationId": "stock-transfers.index",
+                "description": "`inventory:view`. Transfers into or out of the branches the caller may\nsee, newest first.",
+                "summary": "List transfers",
+                "tags": [
+                    "StockTransfer"
+                ],
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    },
+                    {
+                        "name": "branch_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "vendor_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "shop_purchase_order_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "draft",
+                                "issued",
+                                "partially_received",
+                                "received",
+                                "open",
+                                "cancelled",
+                                "posted",
+                                "voided"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 100
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `StockTransferResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/StockTransferCollection"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "stock-transfers.store",
+                "description": "`inventory:manage` in the branch the goods leave. One numbered document:\na `transfer_out` at the source's average cost and a `transfer_in` of the\nsame quantity and cost at the destination, in one transaction. A source\nthat would go negative is refused if its branch blocks negative stock.",
+                "summary": "Transfer stock",
+                "tags": [
+                    "StockTransfer"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TransferStockRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "`StockTransferResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/StockTransferResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/stock-transfers/{stockTransfer}": {
+            "get": {
+                "operationId": "stock-transfers.show",
+                "summary": "Show a transfer",
+                "tags": [
+                    "StockTransfer"
+                ],
+                "parameters": [
+                    {
+                        "name": "stockTransfer",
+                        "in": "path",
+                        "required": true,
+                        "description": "The stock transfer ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`StockTransferResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/StockTransferResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            }
+        },
+        "/stock-transfers/{stockTransfer}/reverse": {
+            "post": {
+                "operationId": "stock-transfers.reverse",
+                "description": "`inventory:manage` in the branch the goods are now in. A new transfer,\nthe other way, naming this one. A transfer is reversed at most once, and\na reversal is not itself reversed (make a new transfer).",
+                "summary": "Reverse a transfer",
+                "tags": [
+                    "StockTransfer"
+                ],
+                "parameters": [
+                    {
+                        "name": "stockTransfer",
+                        "in": "path",
+                        "required": true,
+                        "description": "The stock transfer ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "`StockTransferResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/StockTransferResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            }
+        },
         "/technicians": {
             "get": {
                 "operationId": "technicians.index",
@@ -9895,6 +12113,9 @@
                     "prices_include_vat": {
                         "type": "boolean"
                     },
+                    "negative_stock_policy": {
+                        "type": "string"
+                    },
                     "timezone": {
                         "type": "string"
                     },
@@ -9944,6 +12165,7 @@
                     "branch_code",
                     "is_vat_registered",
                     "prices_include_vat",
+                    "negative_stock_policy",
                     "timezone",
                     "brand_name",
                     "logo_url",
@@ -10838,6 +13060,48 @@
                 ],
                 "title": "DocumentResource"
             },
+            "EnterStockCountRequest": {
+                "type": "object",
+                "properties": {
+                    "lines": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "item_id": {
+                                    "type": "string"
+                                },
+                                "counted_quantity": {
+                                    "type": [
+                                        "number",
+                                        "null"
+                                    ],
+                                    "description": "null un-counts a line.",
+                                    "pattern": "^\\d{1,11}(\\.\\d{1,3})?$",
+                                    "minimum": 0
+                                },
+                                "reason": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ],
+                                    "maxLength": 500
+                                }
+                            },
+                            "required": [
+                                "item_id",
+                                "counted_quantity"
+                            ]
+                        },
+                        "minItems": 1,
+                        "maxItems": 500
+                    }
+                },
+                "required": [
+                    "lines"
+                ],
+                "title": "EnterStockCountRequest"
+            },
             "FleetPartCollection": {
                 "type": "array",
                 "items": {
@@ -11070,6 +13334,110 @@
                 ],
                 "title": "ForgotPasswordRequest"
             },
+            "GoodsReceiptCollection": {
+                "type": "array",
+                "items": {
+                    "$ref": "#/components/schemas/GoodsReceiptResource"
+                },
+                "title": "GoodsReceiptCollection"
+            },
+            "GoodsReceiptResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "reference": {
+                        "type": "string"
+                    },
+                    "branch_id": {
+                        "type": "string"
+                    },
+                    "location_id": {
+                        "type": "string"
+                    },
+                    "shop_purchase_order_id": {
+                        "type": "string"
+                    },
+                    "order_reference": {
+                        "type": "string"
+                    },
+                    "vendor_name": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "received_on": {
+                        "type": "string"
+                    },
+                    "supplier_ref": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "notes": {
+                        "type": "string"
+                    },
+                    "total_cents": {
+                        "type": "integer"
+                    },
+                    "received_by_name": {
+                        "type": "string"
+                    },
+                    "voided_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "voided_by_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "void_reason": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "can_void": {
+                        "type": "boolean"
+                    },
+                    "lines": {
+                        "type": "array",
+                        "items": {}
+                    },
+                    "created_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "reference",
+                    "branch_id",
+                    "location_id",
+                    "shop_purchase_order_id",
+                    "order_reference",
+                    "vendor_name",
+                    "status",
+                    "received_on",
+                    "supplier_ref",
+                    "notes",
+                    "total_cents",
+                    "received_by_name",
+                    "voided_at",
+                    "voided_by_name",
+                    "void_reason",
+                    "can_void",
+                    "lines",
+                    "created_at"
+                ],
+                "title": "GoodsReceiptResource"
+            },
             "HealthResource": {
                 "type": "object",
                 "properties": {
@@ -11234,6 +13602,218 @@
                     "created_at"
                 ],
                 "title": "InvitationResource"
+            },
+            "ItemCollection": {
+                "type": "array",
+                "items": {
+                    "$ref": "#/components/schemas/ItemResource"
+                },
+                "title": "ItemCollection"
+            },
+            "ItemResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "sku": {
+                        "type": "string"
+                    },
+                    "barcode": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "item_type": {
+                        "type": "string"
+                    },
+                    "category": {
+                        "type": "string"
+                    },
+                    "uom": {
+                        "type": "string"
+                    },
+                    "purchase_uom": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "purchase_uom_factor": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "tax_class": {
+                        "type": "string"
+                    },
+                    "default_price_cents": {
+                        "type": "integer"
+                    },
+                    "is_stocked": {
+                        "type": "boolean"
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "preferred_vendor_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "preferred_vendor_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "branches": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "branch_id": {
+                                    "type": "string"
+                                },
+                                "location_id": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "reorder_point": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "reorder_qty": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "bin": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "price_override_cents": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "effective_price_cents": {
+                                    "description": "What a line for this item is priced at in this branch.",
+                                    "type": [
+                                        "string",
+                                        "integer"
+                                    ]
+                                },
+                                "on_hand": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "avg_cost_cents": {
+                                    "anyOf": [
+                                        {
+                                            "type": "string"
+                                        },
+                                        {
+                                            "type": "integer",
+                                            "enum": [
+                                                0
+                                            ]
+                                        }
+                                    ]
+                                },
+                                "value_cents": {
+                                    "type": "integer"
+                                }
+                            },
+                            "required": [
+                                "branch_id",
+                                "location_id",
+                                "reorder_point",
+                                "reorder_qty",
+                                "bin",
+                                "price_override_cents",
+                                "effective_price_cents",
+                                "on_hand",
+                                "avg_cost_cents",
+                                "value_cents"
+                            ]
+                        }
+                    },
+                    "totals": {
+                        "type": "object",
+                        "properties": {
+                            "on_hand": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "value_cents": {
+                                "type": "integer"
+                            }
+                        },
+                        "required": [
+                            "on_hand",
+                            "value_cents"
+                        ]
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "sku",
+                    "barcode",
+                    "name",
+                    "item_type",
+                    "category",
+                    "uom",
+                    "purchase_uom",
+                    "purchase_uom_factor",
+                    "tax_class",
+                    "default_price_cents",
+                    "is_stocked",
+                    "is_active",
+                    "preferred_vendor_id",
+                    "preferred_vendor_name",
+                    "branches",
+                    "totals",
+                    "created_at",
+                    "updated_at"
+                ],
+                "title": "ItemResource"
+            },
+            "ItemType": {
+                "type": "string",
+                "description": "What an item is. A service fee is never stocked.\n",
+                "enum": [
+                    "part",
+                    "consumable",
+                    "retail",
+                    "ingredient",
+                    "service_fee"
+                ],
+                "title": "ItemType"
             },
             "LineUrgency": {
                 "type": "string",
@@ -11576,6 +14156,54 @@
                 ],
                 "title": "Module"
             },
+            "MoveType": {
+                "type": "string",
+                "description": "Why stock moved. The sign of a move's quantity says which way; each type says which signs it may carry. - opening      the first count of an item in a location (inbound, costed)  - receipt      goods received against a purchase order (inbound, costed)  - issue        parts issued to a work order (outbound)  - return       the reversal of an issue (inbound) or of a receipt (outbound)  - adjustment   a stock count's variance, either way  - transfer_out / transfer_in   the two halves of one transfer document  - consumption  used up inside the shop (outbound)\n",
+                "enum": [
+                    "opening",
+                    "receipt",
+                    "issue",
+                    "return",
+                    "adjustment",
+                    "transfer_out",
+                    "transfer_in",
+                    "consumption"
+                ],
+                "title": "MoveType"
+            },
+            "OpenStockCountRequest": {
+                "type": "object",
+                "properties": {
+                    "location_id": {
+                        "type": "string"
+                    },
+                    "item_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "maxItems": 500
+                    },
+                    "reason": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 500
+                    },
+                    "notes": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 2000
+                    }
+                },
+                "required": [
+                    "location_id"
+                ],
+                "title": "OpenStockCountRequest"
+            },
             "OrganizationResource": {
                 "type": "object",
                 "properties": {
@@ -11673,10 +14301,13 @@
             },
             "PartsSource": {
                 "type": "string",
-                "description": "Who supplies a line's part: the shop buys it in (and earns its markup), or it comes from the customer's own stock (no margin).\n",
+                "description": "Where a line's part comes from, per line (the hybrid model). Phase 3's two values keep their meaning and no stock moves for them:  - own_stock          the part is charged, and earns no markup (\"the client's  *                       own stock\", Shop::partsMargin);  - supplier_provided  the shop buys it in, charged, earning its markup.  Phase 6 adds three, which say what the inventory does:  - customer_supplied  the customer brings the part: no stock move, NO part charge;  - shop_stock         issued from the branch's inventory: a stock move out of                       the branch store, and the part is charged;  - purchased_for_job  bought on a shop purchase order for this job: the part is                       charged, its cost is the goods received, and it never                       goes through the shelf.\n",
                 "enum": [
                     "own_stock",
-                    "supplier_provided"
+                    "supplier_provided",
+                    "customer_supplied",
+                    "shop_stock",
+                    "purchased_for_job"
                 ],
                 "title": "PartsSource"
             },
@@ -11854,6 +14485,58 @@
                 ],
                 "title": "RaisePurchaseOrdersRequest"
             },
+            "ReceiveGoodsRequest": {
+                "type": "object",
+                "properties": {
+                    "supplier_ref": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 64
+                    },
+                    "notes": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 2000
+                    },
+                    "lines": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "shop_purchase_order_line_id": {
+                                    "type": "string"
+                                },
+                                "quantity": {
+                                    "type": "number",
+                                    "pattern": "^\\d{1,11}(\\.\\d{1,3})?$"
+                                },
+                                "unit_cost_cents": {
+                                    "type": [
+                                        "integer",
+                                        "null"
+                                    ],
+                                    "minimum": 0,
+                                    "maximum": 9999999999
+                                }
+                            },
+                            "required": [
+                                "shop_purchase_order_line_id",
+                                "quantity"
+                            ]
+                        },
+                        "minItems": 1,
+                        "maxItems": 200
+                    }
+                },
+                "required": [
+                    "lines"
+                ],
+                "title": "ReceiveGoodsRequest"
+            },
             "RecordConsentRequest": {
                 "type": "object",
                 "properties": {
@@ -11893,6 +14576,53 @@
                     "channel"
                 ],
                 "title": "RecordConsentRequest"
+            },
+            "RecordOpeningStockRequest": {
+                "type": "object",
+                "properties": {
+                    "location_id": {
+                        "type": "string"
+                    },
+                    "reason": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 500
+                    },
+                    "lines": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "item_id": {
+                                    "type": "string"
+                                },
+                                "quantity": {
+                                    "type": "number",
+                                    "pattern": "^\\d{1,11}(\\.\\d{1,3})?$"
+                                },
+                                "unit_cost_cents": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9999999999
+                                }
+                            },
+                            "required": [
+                                "item_id",
+                                "quantity",
+                                "unit_cost_cents"
+                            ]
+                        },
+                        "minItems": 1,
+                        "maxItems": 500
+                    }
+                },
+                "required": [
+                    "location_id",
+                    "lines"
+                ],
+                "title": "RecordOpeningStockRequest"
             },
             "RecordReadingRequest": {
                 "type": "object",
@@ -12009,13 +14739,17 @@
                         "maximum": 100
                     },
                     "default_parts_source": {
-                        "anyOf": [
-                            {
-                                "$ref": "#/components/schemas/PartsSource"
-                            },
-                            {
-                                "type": "null"
-                            }
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Where a line's part comes from, per line (the hybrid model). Phase 3's two values keep their meaning and no stock moves for them:  - own_stock          the part is charged, and earns no markup (\"the client's  *                       own stock\", Shop::partsMargin);  - supplier_provided  the shop buys it in, charged, earning its markup.  Phase 6 adds three, which say what the inventory does:  - customer_supplied  the customer brings the part: no stock move, NO part charge;  - shop_stock         issued from the branch's inventory: a stock move out of                       the branch store, and the part is charged;  - purchased_for_job  bought on a shop purchase order for this job: the part is                       charged, its cost is the goods received, and it never                       goes through the shelf.\n",
+                        "enum": [
+                            "own_stock",
+                            "supplier_provided",
+                            "customer_supplied",
+                            "purchased_for_job",
+                            null
                         ]
                     },
                     "monthly_budget_cents": {
@@ -12053,7 +14787,14 @@
                         "maximum": 1000
                     },
                     "default_parts_source": {
-                        "$ref": "#/components/schemas/PartsSource"
+                        "type": "string",
+                        "description": "Where a line's part comes from, per line (the hybrid model). Phase 3's two values keep their meaning and no stock moves for them:  - own_stock          the part is charged, and earns no markup (\"the client's  *                       own stock\", Shop::partsMargin);  - supplier_provided  the shop buys it in, charged, earning its markup.  Phase 6 adds three, which say what the inventory does:  - customer_supplied  the customer brings the part: no stock move, NO part charge;  - shop_stock         issued from the branch's inventory: a stock move out of                       the branch store, and the part is charged;  - purchased_for_job  bought on a shop purchase order for this job: the part is                       charged, its cost is the goods received, and it never                       goes through the shelf.\n",
+                        "enum": [
+                            "own_stock",
+                            "supplier_provided",
+                            "customer_supplied",
+                            "purchased_for_job"
+                        ]
                     },
                     "monthly_budget_cents": {
                         "type": "integer",
@@ -12182,6 +14923,14 @@
                         "enum": [
                             "active",
                             "inactive"
+                        ]
+                    },
+                    "negative_stock_policy": {
+                        "type": "string",
+                        "description": "What a stock move that would take a balance below zero does in this branch.",
+                        "enum": [
+                            "allow_and_flag",
+                            "block"
                         ]
                     },
                     "logo_url": {
@@ -12388,7 +15137,14 @@
                                 "maximum": 100
                             },
                             "default_parts_source": {
-                                "$ref": "#/components/schemas/PartsSource"
+                                "type": "string",
+                                "description": "Where a line's part comes from, per line (the hybrid model). Phase 3's two values keep their meaning and no stock moves for them:  - own_stock          the part is charged, and earns no markup (\"the client's  *                       own stock\", Shop::partsMargin);  - supplier_provided  the shop buys it in, charged, earning its markup.  Phase 6 adds three, which say what the inventory does:  - customer_supplied  the customer brings the part: no stock move, NO part charge;  - shop_stock         issued from the branch's inventory: a stock move out of                       the branch store, and the part is charged;  - purchased_for_job  bought on a shop purchase order for this job: the part is                       charged, its cost is the goods received, and it never                       goes through the shelf.\n",
+                                "enum": [
+                                    "own_stock",
+                                    "supplier_provided",
+                                    "customer_supplied",
+                                    "purchased_for_job"
+                                ]
                             },
                             "monthly_budget_cents": {
                                 "type": "integer",
@@ -12534,6 +15290,118 @@
                 ],
                 "title": "SaveFleetPartRequest"
             },
+            "SaveItemBranchSettingsRequest": {
+                "type": "object",
+                "properties": {
+                    "reorder_point": {
+                        "type": [
+                            "number",
+                            "null"
+                        ],
+                        "pattern": "^\\d{1,11}(\\.\\d{1,3})?$",
+                        "minimum": 0
+                    },
+                    "reorder_qty": {
+                        "type": [
+                            "number",
+                            "null"
+                        ],
+                        "pattern": "^\\d{1,11}(\\.\\d{1,3})?$",
+                        "minimum": 0
+                    },
+                    "bin": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 32
+                    },
+                    "price_override_cents": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 0,
+                        "maximum": 9999999999
+                    }
+                },
+                "title": "SaveItemBranchSettingsRequest"
+            },
+            "SaveItemRequest": {
+                "type": "object",
+                "properties": {
+                    "sku": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                    },
+                    "barcode": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 64
+                    },
+                    "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 255
+                    },
+                    "item_type": {
+                        "$ref": "#/components/schemas/ItemType"
+                    },
+                    "category": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 64
+                    },
+                    "uom": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 16
+                    },
+                    "purchase_uom": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 16
+                    },
+                    "purchase_uom_factor": {
+                        "type": "number",
+                        "pattern": "^\\d{1,11}(\\.\\d{1,3})?$"
+                    },
+                    "tax_class": {
+                        "$ref": "#/components/schemas/TaxClass"
+                    },
+                    "default_price_cents": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9999999999
+                    },
+                    "is_stocked": {
+                        "type": "boolean"
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "preferred_vendor_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "sku",
+                    "name",
+                    "item_type",
+                    "uom"
+                ],
+                "title": "SaveItemRequest"
+            },
             "SaveServiceTaskRequest": {
                 "type": "object",
                 "properties": {
@@ -12596,6 +15464,79 @@
                     "interval_months"
                 ],
                 "title": "SaveServiceTaskRequest"
+            },
+            "SaveShopOrderRequest": {
+                "type": "object",
+                "properties": {
+                    "branch_id": {
+                        "type": "string"
+                    },
+                    "vendor_id": {
+                        "type": "string"
+                    },
+                    "notes": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 2000
+                    },
+                    "expected_on": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date"
+                    },
+                    "lines": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "item_id": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "description": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ],
+                                    "maxLength": 255
+                                },
+                                "quantity": {
+                                    "type": "number",
+                                    "pattern": "^\\d{1,11}(\\.\\d{1,3})?$"
+                                },
+                                "unit_cost_cents": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9999999999
+                                },
+                                "work_order_line_id": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                }
+                            },
+                            "required": [
+                                "quantity",
+                                "unit_cost_cents"
+                            ]
+                        },
+                        "minItems": 1,
+                        "maxItems": 200
+                    }
+                },
+                "required": [
+                    "branch_id",
+                    "vendor_id",
+                    "lines"
+                ],
+                "title": "SaveShopOrderRequest"
             },
             "SaveTechnicianRequest": {
                 "type": "object",
@@ -12954,6 +15895,12 @@
                                 "parts_source": {
                                     "$ref": "#/components/schemas/PartsSource"
                                 },
+                                "item_id": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
                                 "photos": {
                                     "type": "array",
                                     "items": {
@@ -13050,6 +15997,616 @@
                 ],
                 "title": "SetModuleRequest"
             },
+            "ShopPurchaseOrderCollection": {
+                "type": "array",
+                "items": {
+                    "$ref": "#/components/schemas/ShopPurchaseOrderResource"
+                },
+                "title": "ShopPurchaseOrderCollection"
+            },
+            "ShopPurchaseOrderResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "reference": {
+                        "type": "string"
+                    },
+                    "branch_id": {
+                        "type": "string"
+                    },
+                    "vendor_id": {
+                        "type": "string"
+                    },
+                    "vendor_name": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "notes": {
+                        "type": "string"
+                    },
+                    "created_on": {
+                        "type": "string"
+                    },
+                    "expected_on": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "created_by_name": {
+                        "type": "string"
+                    },
+                    "total_cents": {
+                        "type": "integer"
+                    },
+                    "issued_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "issued_by_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "cancelled_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "cancelled_by_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "cancellation_reason": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "can_edit": {
+                        "type": "boolean"
+                    },
+                    "can_issue": {
+                        "type": "string"
+                    },
+                    "can_receive": {
+                        "type": "boolean"
+                    },
+                    "can_cancel": {
+                        "type": "boolean"
+                    },
+                    "lines": {
+                        "type": "array",
+                        "items": {}
+                    },
+                    "receipts": {
+                        "type": "array",
+                        "items": {}
+                    },
+                    "history": {
+                        "type": "array",
+                        "items": {}
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "reference",
+                    "branch_id",
+                    "vendor_id",
+                    "vendor_name",
+                    "status",
+                    "notes",
+                    "created_on",
+                    "expected_on",
+                    "created_by_name",
+                    "total_cents",
+                    "issued_at",
+                    "issued_by_name",
+                    "cancelled_at",
+                    "cancelled_by_name",
+                    "cancellation_reason",
+                    "can_edit",
+                    "can_issue",
+                    "can_receive",
+                    "can_cancel",
+                    "lines",
+                    "receipts",
+                    "history",
+                    "created_at",
+                    "updated_at"
+                ],
+                "title": "ShopPurchaseOrderResource"
+            },
+            "StockBalanceCollection": {
+                "type": "array",
+                "items": {
+                    "$ref": "#/components/schemas/StockBalanceResource"
+                },
+                "title": "StockBalanceCollection"
+            },
+            "StockBalanceResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "item": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "sku": {
+                                "type": "string"
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "uom": {
+                                "type": "string"
+                            },
+                            "item_type": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "sku",
+                            "name",
+                            "uom",
+                            "item_type"
+                        ]
+                    },
+                    "branch_id": {
+                        "type": "string"
+                    },
+                    "location_id": {
+                        "type": "string"
+                    },
+                    "location_name": {
+                        "type": "string"
+                    },
+                    "on_hand": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "avg_cost_cents": {
+                        "type": "integer"
+                    },
+                    "value_cents": {
+                        "type": "integer"
+                    },
+                    "reorder_point": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "reorder_qty": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "bin": {},
+                    "is_low": {
+                        "type": "string"
+                    },
+                    "is_negative": {
+                        "type": "boolean"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "item",
+                    "branch_id",
+                    "location_id",
+                    "location_name",
+                    "on_hand",
+                    "avg_cost_cents",
+                    "value_cents",
+                    "reorder_point",
+                    "reorder_qty",
+                    "bin",
+                    "is_low",
+                    "is_negative",
+                    "updated_at"
+                ],
+                "title": "StockBalanceResource"
+            },
+            "StockCountCollection": {
+                "type": "array",
+                "items": {
+                    "$ref": "#/components/schemas/StockCountResource"
+                },
+                "title": "StockCountCollection"
+            },
+            "StockCountResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "reference": {
+                        "type": "string"
+                    },
+                    "branch_id": {
+                        "type": "string"
+                    },
+                    "location_id": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "reason": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "notes": {
+                        "type": "string"
+                    },
+                    "created_on": {
+                        "type": "string"
+                    },
+                    "created_by_name": {
+                        "type": "string"
+                    },
+                    "posted_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "posted_by_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "cancelled_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "cancelled_by_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "can_edit": {
+                        "type": "boolean"
+                    },
+                    "summary": {
+                        "type": "object",
+                        "properties": {
+                            "lines": {
+                                "type": "integer",
+                                "minimum": 0
+                            },
+                            "counted_lines": {
+                                "type": "integer"
+                            },
+                            "variance_lines": {
+                                "type": "integer"
+                            },
+                            "net_variance_value_cents": {
+                                "type": "integer"
+                            }
+                        },
+                        "required": [
+                            "lines",
+                            "counted_lines",
+                            "variance_lines",
+                            "net_variance_value_cents"
+                        ]
+                    },
+                    "lines": {
+                        "type": "array",
+                        "items": {}
+                    },
+                    "created_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "reference",
+                    "branch_id",
+                    "location_id",
+                    "status",
+                    "reason",
+                    "notes",
+                    "created_on",
+                    "created_by_name",
+                    "posted_at",
+                    "posted_by_name",
+                    "cancelled_at",
+                    "cancelled_by_name",
+                    "can_edit",
+                    "summary",
+                    "lines",
+                    "created_at"
+                ],
+                "title": "StockCountResource"
+            },
+            "StockLocationCollection": {
+                "type": "array",
+                "items": {
+                    "$ref": "#/components/schemas/StockLocationResource"
+                },
+                "title": "StockLocationCollection"
+            },
+            "StockLocationResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "branch_id": {
+                        "type": "string"
+                    },
+                    "kind": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "id",
+                    "branch_id",
+                    "kind",
+                    "name",
+                    "is_active"
+                ],
+                "title": "StockLocationResource"
+            },
+            "StockMoveCollection": {
+                "type": "array",
+                "items": {
+                    "$ref": "#/components/schemas/StockMoveResource"
+                },
+                "title": "StockMoveCollection"
+            },
+            "StockMoveResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "item": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "sku": {
+                                "type": "string"
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "uom": {
+                                "type": "string"
+                            },
+                            "item_type": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "sku",
+                            "name",
+                            "uom",
+                            "item_type"
+                        ]
+                    },
+                    "branch_id": {
+                        "type": "string"
+                    },
+                    "location_id": {
+                        "type": "string"
+                    },
+                    "move_type": {
+                        "type": "string"
+                    },
+                    "quantity": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "unit_cost_cents": {
+                        "type": "integer"
+                    },
+                    "value_cents": {
+                        "type": "integer"
+                    },
+                    "source_type": {
+                        "type": "string"
+                    },
+                    "source_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "source_reference": {},
+                    "source_document_id": {},
+                    "occurred_at": {
+                        "type": "string"
+                    },
+                    "actor_name": {
+                        "type": "string"
+                    },
+                    "reason": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "negative_flag": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "id",
+                    "item",
+                    "branch_id",
+                    "location_id",
+                    "move_type",
+                    "quantity",
+                    "unit_cost_cents",
+                    "value_cents",
+                    "source_type",
+                    "source_id",
+                    "source_reference",
+                    "source_document_id",
+                    "occurred_at",
+                    "actor_name",
+                    "reason",
+                    "negative_flag"
+                ],
+                "title": "StockMoveResource"
+            },
+            "StockReasonRequest": {
+                "type": "object",
+                "description": "Cancelling a purchase order, voiding a goods receipt: the reason is required and kept.",
+                "properties": {
+                    "reason": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 500
+                    }
+                },
+                "required": [
+                    "reason"
+                ],
+                "title": "StockReasonRequest"
+            },
+            "StockSource": {
+                "type": "string",
+                "description": "What produced a stock move.\n",
+                "enum": [
+                    "manual",
+                    "goods_receipt",
+                    "work_order_line",
+                    "stock_count",
+                    "stock_transfer"
+                ],
+                "title": "StockSource"
+            },
+            "StockTransferCollection": {
+                "type": "array",
+                "items": {
+                    "$ref": "#/components/schemas/StockTransferResource"
+                },
+                "title": "StockTransferCollection"
+            },
+            "StockTransferResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "reference": {
+                        "type": "string"
+                    },
+                    "from_branch_id": {
+                        "type": "string"
+                    },
+                    "from_location_id": {
+                        "type": "string"
+                    },
+                    "to_branch_id": {
+                        "type": "string"
+                    },
+                    "to_location_id": {
+                        "type": "string"
+                    },
+                    "reverses_transfer_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "reversed_by_transfer_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "can_reverse": {
+                        "type": "string"
+                    },
+                    "notes": {
+                        "type": "string"
+                    },
+                    "transferred_on": {
+                        "type": "string"
+                    },
+                    "created_by_name": {
+                        "type": "string"
+                    },
+                    "total_value_cents": {
+                        "type": "integer"
+                    },
+                    "lines": {
+                        "type": "array",
+                        "items": {}
+                    },
+                    "created_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "reference",
+                    "from_branch_id",
+                    "from_location_id",
+                    "to_branch_id",
+                    "to_location_id",
+                    "reverses_transfer_id",
+                    "reversed_by_transfer_id",
+                    "can_reverse",
+                    "notes",
+                    "transferred_on",
+                    "created_by_name",
+                    "total_value_cents",
+                    "lines",
+                    "created_at"
+                ],
+                "title": "StockTransferResource"
+            },
             "StoreInvitationRequest": {
                 "type": "object",
                 "properties": {
@@ -13093,6 +16650,16 @@
                     "role"
                 ],
                 "title": "StoreInvitationRequest"
+            },
+            "TaxClass": {
+                "type": "string",
+                "description": "How an item is taxed (carried for invoicing; Phase 3 billing applies one VAT rate to the order).\n",
+                "enum": [
+                    "vatable",
+                    "vat_exempt",
+                    "zero_rated"
+                ],
+                "title": "TaxClass"
             },
             "TechnicianCollection": {
                 "type": "array",
@@ -13160,6 +16727,51 @@
                     "updated_at"
                 ],
                 "title": "TechnicianResource"
+            },
+            "TransferStockRequest": {
+                "type": "object",
+                "properties": {
+                    "from_location_id": {
+                        "type": "string"
+                    },
+                    "to_location_id": {
+                        "type": "string"
+                    },
+                    "notes": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 2000
+                    },
+                    "lines": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "item_id": {
+                                    "type": "string"
+                                },
+                                "quantity": {
+                                    "type": "number",
+                                    "pattern": "^\\d{1,11}(\\.\\d{1,3})?$"
+                                }
+                            },
+                            "required": [
+                                "item_id",
+                                "quantity"
+                            ]
+                        },
+                        "minItems": 1,
+                        "maxItems": 200
+                    }
+                },
+                "required": [
+                    "from_location_id",
+                    "to_location_id",
+                    "lines"
+                ],
+                "title": "TransferStockRequest"
             },
             "TransferVehicleRequest": {
                 "type": "object",
@@ -14025,6 +17637,12 @@
                                 "parts_source": {
                                     "$ref": "#/components/schemas/PartsSource"
                                 },
+                                "item_id": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
                                 "photos": {
                                     "type": "array",
                                     "items": {
@@ -14291,6 +17909,29 @@
                             "can_approve"
                         ]
                     },
+                    "stock": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "description": "What the job's ledger-costed parts cost the shop against what they were approved at (staff).",
+                        "properties": {
+                            "cost_cents": {
+                                "type": "string"
+                            },
+                            "price_cents": {
+                                "type": "string"
+                            },
+                            "margin_cents": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "cost_cents",
+                            "price_cents",
+                            "margin_cents"
+                        ]
+                    },
                     "lines": {
                         "type": "array",
                         "items": {}
@@ -14362,6 +18003,7 @@
                     "totals",
                     "approved_totals",
                     "approval",
+                    "stock",
                     "lines",
                     "task_ids",
                     "parts",

@@ -14,6 +14,7 @@ use Brick\Math\BigDecimal;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * `part_cost_cents` / `labour_cost_cents` are stored, written only through
@@ -35,6 +36,8 @@ use Illuminate\Database\Eloquent\Model;
  * @property int $labour_cost_cents
  * @property LineUrgency $urgency
  * @property PartsSource $parts_source
+ * @property string|null $item_id
+ * @property-read Item|null $item
  * @property LineApprovalStatus $approval_status
  * @property string|null $approved_by
  * @property string|null $approved_by_name
@@ -67,6 +70,16 @@ final class WorkOrderLine extends Model
             'approved_at' => 'immutable_datetime',
             'photos' => 'array',
         ];
+    }
+
+    /**
+     * The inventory item a shop-stock line issues.
+     *
+     * @return BelongsTo<Item, $this>
+     */
+    public function item(): BelongsTo
+    {
+        return $this->belongsTo(Item::class);
     }
 
     public function billable(): BillableLine

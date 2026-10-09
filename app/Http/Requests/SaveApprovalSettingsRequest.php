@@ -28,7 +28,7 @@ final class SaveApprovalSettingsRequest extends ApiRequest
             'ops_approval_under_cents' => $money,
             'sla_hours' => ['sometimes', ...$nullable, 'integer', 'min:0', 'max:720'],
             'variance_threshold_pct' => [...$pct, 'max:1000'],
-            'default_parts_source' => ['sometimes', ...$nullable, 'string', Rule::enum(PartsSource::class)],
+            'default_parts_source' => ['sometimes', ...$nullable, 'string', Rule::enum(PartsSource::class)->except(PartsSource::ShopStock)],
             'monthly_budget_cents' => $money,
             // 0 is a real rate (not VAT-registered), not a missing one.
             'vat_rate_pct' => [...$pct, 'max:100'],

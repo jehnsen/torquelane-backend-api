@@ -86,4 +86,21 @@ return [
     'api/v1/purchase-orders/export' => $isolated,
     'api/v1/purchase-orders/{purchase_order}' => $isolated,
     'api/v1/purchase-orders/{purchase_order}/export' => $isolated,
+
+    // Phase 6: the shop's inventory (staff only; branch-owned records are 404 outside the caller's branches)
+    'api/v1/items' => $isolated,
+    'api/v1/items/{item}' => $isolated,
+    'api/v1/stock-locations' => $isolated,
+    'api/v1/stock/on-hand' => $isolated,
+    'api/v1/stock/moves' => $isolated,
+    'api/v1/stock/alerts' => $isolated,
+    'api/v1/stock/reorder' => $isolated,
+    'api/v1/shop-purchase-orders' => $isolated,
+    'api/v1/shop-purchase-orders/{shop_purchase_order}' => $isolated,
+    'api/v1/goods-receipts' => $isolated,
+    'api/v1/goods-receipts/{goods_receipt}' => $isolated,
+    'api/v1/stock-counts' => $isolated,
+    'api/v1/stock-counts/{stock_count}' => $isolated,
+    'api/v1/stock-transfers' => $isolated,
+    'api/v1/stock-transfers/{stock_transfer}' => $isolated,
 ];

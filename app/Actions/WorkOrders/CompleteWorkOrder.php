@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\WorkOrders;
 
 use App\Actions\Fleet\FleetQueries;
+use App\Actions\Inventory\SyncWorkOrderStock;
 use App\Domain\Access\Capability;
 use App\Domain\Approvals\ApprovalAction;
 use App\Domain\Approvals\Approvals;
@@ -51,6 +52,7 @@ final class CompleteWorkOrder
         private readonly LineWriter $lines,
         private readonly ApprovalSettingsResolver $settings,
         private readonly FleetQueries $fleet,
+        private readonly SyncWorkOrderStock $stock,
     ) {}
 
     /**
@@ -83,6 +85,8 @@ final class CompleteWorkOrder
             if (isset($data['task_ids'])) {
                 $this->lines->replaceTasks($locked, $data['task_ids']);
             }
+            // The work is being recorded: what the approved shop-stock lines owe the shelf goes out now.
+            $this->stock->handle($locked);
             $this->journal->audit($locked, 'work_recorded', $before);
 
             return $locked;
@@ -174,6 +178,8 @@ final class CompleteWorkOrder
                 'odometer_at_service' => (string) $odometer,
             ])->save();
             $this->journal->event($locked, WorkOrderStatus::Closed, $now);
+            // Closing settles the shelf too, whether or not the work was recorded first.
+            $this->stock->handle($locked);
             $this->journal->audit($locked, 'closed', $before);
 
             return $locked;

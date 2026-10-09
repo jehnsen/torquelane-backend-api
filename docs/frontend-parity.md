@@ -170,6 +170,35 @@ Audited against pms-monitoring-frontend@d45871e. Paths are under `/api/v1`.
 | `addVendor` / `updateVendor` / `deleteVendor` | `POST /vendors`, `PATCH /vendors/{vendor}`, `DELETE /vendors/{vendor}` | staff | done | | ✓ PA; portal: gated |
 | `resetFleet` | `GET /me` | both | done | A refetch, not a write. | ✓ PA SA T FM V NW |
 
+## The shop's inventory (Phase 6, staff only)
+
+The stock room has no counterpart in `../web`: these screens are new. Every
+endpoint is staff-only (`inventory:view` to read, `inventory:manage` to change;
+a portal session gets 403). The **Phase 6** column is the real frontend
+driven against this API on a fresh demo seed by `e2e/inventory.spec.ts`, as
+provider admin (PA), service advisor (SA) and fleet manager (FM, the
+out-of-scope check). A write the browser did not drive says so; the Pest suite
+covers it (`tests/Feature/Inventory`).
+
+| Screen / action | Endpoint(s) | Side | Status | Notes | Phase 6 |
+|---|---|---|---|---|---|
+| `/shop/inventory`: items, search by SKU / name / barcode, type filter | `GET /items?q=filter&item_type=part`, `GET /items/{item}` | staff | done | Each item carries, for every branch the caller may see, its reorder point, bin, the price that applies and what is on hand. | ✓ PA SA; portal: gated |
+| Items: add / edit / deactivate (`inventory:manage`) | `POST /items`, `PATCH /items/{item}` | staff | done | SKU and barcode unique per organization, whatever their case; never deleted; the stock unit is fixed once stock has moved. | ✓ PA (add, duplicate SKU refused); edit / deactivate: API-tested only (Pest) |
+| Items: reorder point, bin, branch price | `PUT /items/{item}/branch-settings/{branch}` | staff | done | Only in a branch the caller works in (404 otherwise). | ✓ PA |
+| `/shop/inventory/stock`: stock on hand, value, low / negative | `GET /stock/on-hand?low=1`, `GET /stock-locations`, `GET /stock/alerts` | staff | done | Value is on hand × moving-average cost, summed exactly and rounded once. Alerts are derived on read. | ✓ PA SA |
+| Stock on hand: opening balance | `POST /stock/opening` | staff | done | Only for an item with no history in the location. | API-tested only (Pest) |
+| Stock on hand: negative-stock policy | `PATCH /branches/{branch}` | staff | done | `negative_stock_policy`: `allow_and_flag` (default) or `block`. `organization:manage`. | API-tested only (Pest) |
+| `/shop/inventory/movements`: the ledger | `GET /stock/moves?item_id={item}&from=2026-10-01` | staff | done | Cursor-paged, newest first; quantity signed; each move names its document. | ✓ PA |
+| `/shop/inventory/purchasing`: the shop's purchase orders | `GET /shop-purchase-orders?status=open`, `GET /shop-purchase-orders/{shop_purchase_order}` | staff | done | `status` is derived from the goods receipts. Not Phase 4's `/purchase-orders`. | ✓ PA |
+| Purchase orders: raise, edit a draft, issue, cancel | `POST /shop-purchase-orders`, `PATCH /shop-purchase-orders/{shop_purchase_order}`, `POST /shop-purchase-orders/{shop_purchase_order}/issue`, `POST /shop-purchase-orders/{shop_purchase_order}/cancel` | staff | done | Numbered `SPO-…` at creation; lines frozen once issued. | ✓ PA (raise a draft); edit, issue, cancel: API-tested only (Pest) |
+| Receive PO: goods receipts, partial or full; void | `POST /shop-purchase-orders/{shop_purchase_order}/receipts`, `GET /goods-receipts`, `GET /goods-receipts/{goods_receipt}`, `POST /goods-receipts/{goods_receipt}/void` | staff | done | `GR-…`; no more than is outstanding; a void is a reversal, never an edit. | ✓ PA (partial receipt); void: API-tested only (Pest) |
+| `/shop/inventory/counts`: count sheets | `GET /stock-counts`, `GET /stock-counts/{stock_count}` | staff | done | | ✓ PA |
+| Stock count: draw, enter, post, cancel | `POST /stock-counts`, `PUT /stock-counts/{stock_count}/lines`, `POST /stock-counts/{stock_count}/post`, `POST /stock-counts/{stock_count}/cancel` | staff | done | Posting turns each variance into an adjustment move with a reason. | ✓ PA (draw, enter, post); cancel: API-tested only (Pest) |
+| `/shop/inventory/transfers`: transfers between branches | `GET /stock-transfers`, `GET /stock-transfers/{stock_transfer}` | staff | done | Seen by staff of either branch. | ✓ PA |
+| Transfers: make one, reverse one | `POST /stock-transfers`, `POST /stock-transfers/{stock_transfer}/reverse` | staff | done | One document, both moves; a reversal is at most once. | ✓ PA (make); reverse: API-tested only (Pest) |
+| `/shop/inventory/reorder`: what to buy | `GET /stock/reorder?horizon_weeks=6` | staff | done | On hand, on order, reorder points and Phase 4's forecast (matched by SKU). | ✓ PA |
+| Work order lines: parts source and the item a shop-stock line issues | `POST /work-orders`, `PUT /work-orders/{work_order}/lines` | both | done | `item_id` / `item` / `stock_cost_cents` and the order's `stock` figures are staff-only; a portal response carries none. | ✓ PA (shop stock, issued on completion, job cost shown); customer supplied / bought for this job: API-tested only (Pest) |
+
 ## What moved from the browser to the server
 
 The frontend used to compute these itself. It now renders them:

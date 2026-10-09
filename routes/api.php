@@ -20,8 +20,10 @@ use App\Http\Controllers\Api\V1\DocumentController;
 use App\Http\Controllers\Api\V1\DocumentFileController;
 use App\Http\Controllers\Api\V1\FleetPartController;
 use App\Http\Controllers\Api\V1\FleetSummaryController;
+use App\Http\Controllers\Api\V1\GoodsReceiptController;
 use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\InvitationController;
+use App\Http\Controllers\Api\V1\ItemController;
 use App\Http\Controllers\Api\V1\MeterReadingController;
 use App\Http\Controllers\Api\V1\ModuleController;
 use App\Http\Controllers\Api\V1\OrganizationController;
@@ -29,6 +31,10 @@ use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\PurchaseOrderController;
 use App\Http\Controllers\Api\V1\ServiceTaskController;
 use App\Http\Controllers\Api\V1\ShopController;
+use App\Http\Controllers\Api\V1\ShopPurchaseOrderController;
+use App\Http\Controllers\Api\V1\StockController;
+use App\Http\Controllers\Api\V1\StockCountController;
+use App\Http\Controllers\Api\V1\StockTransferController;
 use App\Http\Controllers\Api\V1\TechnicianController;
 use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\VehicleController;
@@ -179,6 +185,47 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::post('purchase-orders/{purchase_order}/send', [PurchaseOrderController::class, 'send'])->name('purchase-orders.send');
     Route::post('purchase-orders/{purchase_order}/receive', [PurchaseOrderController::class, 'receive'])->name('purchase-orders.receive');
     Route::post('purchase-orders/{purchase_order}/cancel', [PurchaseOrderController::class, 'cancel'])->name('purchase-orders.cancel');
+
+    // The shop's own inventory (Phase 6): items, stock, the movement ledger,
+    // purchase orders and goods receipts, counts, transfers. Staff only.
+    Route::get('items', [ItemController::class, 'index'])->name('items.index');
+    Route::post('items', [ItemController::class, 'store'])->middleware('idempotent')->name('items.store');
+    Route::get('items/{item}', [ItemController::class, 'show'])->name('items.show');
+    Route::patch('items/{item}', [ItemController::class, 'update'])->name('items.update');
+    Route::put('items/{item}/branch-settings/{branch}', [ItemController::class, 'branchSettings'])->name('items.branch-settings');
+
+    Route::get('stock-locations', [StockController::class, 'locations'])->name('stock-locations.index');
+    Route::prefix('stock')->name('stock.')->group(function (): void {
+        Route::get('on-hand', [StockController::class, 'onHand'])->name('on-hand');
+        Route::get('moves', [StockController::class, 'moves'])->name('moves');
+        Route::get('alerts', [StockController::class, 'alerts'])->name('alerts');
+        Route::get('reorder', [StockController::class, 'reorder'])->name('reorder');
+        Route::post('opening', [StockController::class, 'opening'])->middleware('idempotent')->name('opening');
+    });
+
+    Route::get('shop-purchase-orders', [ShopPurchaseOrderController::class, 'index'])->name('shop-purchase-orders.index');
+    Route::post('shop-purchase-orders', [ShopPurchaseOrderController::class, 'store'])->middleware('idempotent')->name('shop-purchase-orders.store');
+    Route::get('shop-purchase-orders/{shop_purchase_order}', [ShopPurchaseOrderController::class, 'show'])->name('shop-purchase-orders.show');
+    Route::patch('shop-purchase-orders/{shop_purchase_order}', [ShopPurchaseOrderController::class, 'update'])->name('shop-purchase-orders.update');
+    Route::post('shop-purchase-orders/{shop_purchase_order}/issue', [ShopPurchaseOrderController::class, 'issue'])->name('shop-purchase-orders.issue');
+    Route::post('shop-purchase-orders/{shop_purchase_order}/cancel', [ShopPurchaseOrderController::class, 'cancel'])->name('shop-purchase-orders.cancel');
+    Route::post('shop-purchase-orders/{shop_purchase_order}/receipts', [ShopPurchaseOrderController::class, 'receive'])->middleware('idempotent')->name('shop-purchase-orders.receive');
+
+    Route::get('goods-receipts', [GoodsReceiptController::class, 'index'])->name('goods-receipts.index');
+    Route::get('goods-receipts/{goods_receipt}', [GoodsReceiptController::class, 'show'])->name('goods-receipts.show');
+    Route::post('goods-receipts/{goods_receipt}/void', [GoodsReceiptController::class, 'void'])->name('goods-receipts.void');
+
+    Route::get('stock-counts', [StockCountController::class, 'index'])->name('stock-counts.index');
+    Route::post('stock-counts', [StockCountController::class, 'store'])->middleware('idempotent')->name('stock-counts.store');
+    Route::get('stock-counts/{stock_count}', [StockCountController::class, 'show'])->name('stock-counts.show');
+    Route::put('stock-counts/{stock_count}/lines', [StockCountController::class, 'enter'])->name('stock-counts.lines');
+    Route::post('stock-counts/{stock_count}/post', [StockCountController::class, 'post'])->name('stock-counts.post');
+    Route::post('stock-counts/{stock_count}/cancel', [StockCountController::class, 'cancel'])->name('stock-counts.cancel');
+
+    Route::get('stock-transfers', [StockTransferController::class, 'index'])->name('stock-transfers.index');
+    Route::post('stock-transfers', [StockTransferController::class, 'store'])->middleware('idempotent')->name('stock-transfers.store');
+    Route::get('stock-transfers/{stock_transfer}', [StockTransferController::class, 'show'])->name('stock-transfers.show');
+    Route::post('stock-transfers/{stock_transfer}/reverse', [StockTransferController::class, 'reverse'])->name('stock-transfers.reverse');
 });
 
 // A signed, 60-second URL from GET documents/{id}/download: the signature is

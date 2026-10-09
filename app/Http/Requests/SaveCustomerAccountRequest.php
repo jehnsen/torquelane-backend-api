@@ -53,7 +53,7 @@ final class SaveCustomerAccountRequest extends ApiRequest
             'approval_threshold_overrides.ops_approval_under_cents' => ['integer', 'min:0'],
             'approval_threshold_overrides.sla_hours' => ['integer', 'min:0', 'max:720'],
             'approval_threshold_overrides.variance_threshold_pct' => ['integer', 'min:0', 'max:100'],
-            'approval_threshold_overrides.default_parts_source' => ['string', Rule::enum(PartsSource::class)],
+            'approval_threshold_overrides.default_parts_source' => ['string', Rule::enum(PartsSource::class)->except(PartsSource::ShopStock)],
             'approval_threshold_overrides.monthly_budget_cents' => ['integer', 'min:0'],
             'tags' => ['sometimes', 'array', 'max:50'],
             'tags.*' => ['string', 'max:64', 'distinct'],

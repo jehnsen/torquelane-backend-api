@@ -37,6 +37,7 @@ final class BranchResource extends JsonResource
             'branch_code' => $branch->branch_code,
             'is_vat_registered' => $branch->is_vat_registered,
             'prices_include_vat' => $branch->prices_include_vat,
+            'negative_stock_policy' => $branch->negative_stock_policy->value,
             'timezone' => $branch->timezone,
             'brand_name' => $branch->brand_name,
             'logo_url' => $branch->logo_url,

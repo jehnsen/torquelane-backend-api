@@ -4,6 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Support;
 
+use App\Actions\Inventory\ManageStockCounts;
+use App\Actions\Inventory\ProgressShopPurchaseOrder;
+use App\Actions\Inventory\ReceiveGoods;
+use App\Actions\Inventory\RecordOpeningStock;
+use App\Actions\Inventory\SaveItem;
+use App\Actions\Inventory\SaveShopPurchaseOrder;
+use App\Actions\Inventory\StockLocations;
+use App\Actions\Inventory\TransferStock;
 use App\Domain\Access\Role;
 use App\Domain\Approvals\ApprovalSettings;
 use App\Domain\Crm\ConsentChannel;
@@ -41,6 +49,7 @@ use App\Models\WorkOrderEvent;
 use App\Models\WorkOrderLine;
 use App\Models\WorkOrderPart;
 use App\Models\WorkOrderTask;
+use App\Tenancy\TenantContextResolver;
 use App\Tenancy\TenantManager;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DemoSeeder;
@@ -285,6 +294,49 @@ final class World
         $vendor->forceFill(['organization_id' => $organizationId, 'name' => 'Rival Parts Co'])->save();
         $this->ids['rival:vendor'] = $vendor->id;
         $this->purchasing($organizationId, $accountId, 'rival', $task->id, $this->id('rival:admin'), 'PO-2026-0001');
+        $this->rivalInventory($organizationId);
+    }
+
+    /**
+     * The rival's stock room, built through the real Actions as its admin:
+     * two branches with stores, an item with an opening balance, a purchase
+     * order issued and received, a count and a transfer between the stores.
+     */
+    private function rivalInventory(string $organizationId): void
+    {
+        $annex = new Branch;
+        $annex->forceFill(['organization_id' => $organizationId, 'name' => 'Other Motorworks Annex', 'slug' => 'annex'])->save();
+        $this->ids['rival:annex'] = $annex->id;
+
+        $context = app(TenantContextResolver::class)->resolve($this->user('rival:admin'), null)->context;
+        app(TenantManager::class)->actingAs($context, function () use ($annex): void {
+            $locations = app(StockLocations::class);
+            $main = $locations->storeOf($this->id('rival:branch'));
+            $second = $locations->storeOf($annex->id);
+            $this->ids['rival:location'] = $main->id;
+            $this->ids['rival:location-annex'] = $second->id;
+
+            $item = app(SaveItem::class)->create(['sku' => 'RIVAL-OIL', 'name' => 'Rival oil filter', 'item_type' => 'part', 'uom' => 'pc', 'default_price_cents' => 30000, 'preferred_vendor_id' => $this->id('rival:vendor')]);
+            $this->ids['rival:item'] = $item->id;
+            $this->ids['rival:item-setting'] = app(SaveItem::class)->setBranchSettings($item, $this->id('rival:branch'), ['reorder_point' => '5', 'reorder_qty' => '10', 'bin' => 'R1'])->id;
+
+            app(RecordOpeningStock::class)->handle($main, [['item_id' => $item->id, 'quantity' => '10', 'unit_cost_cents' => 20000]], 'Opening balance');
+
+            $order = app(SaveShopPurchaseOrder::class)->create(['branch_id' => $this->id('rival:branch'), 'vendor_id' => $this->id('rival:vendor'), 'lines' => [['item_id' => $item->id, 'quantity' => '4', 'unit_cost_cents' => 21000]]]);
+            $this->ids['rival:shop-po'] = $order->id;
+            app(ProgressShopPurchaseOrder::class)->issue($order);
+            $order->load('lines');
+            $this->ids['rival:shop-po-line'] = $order->lines[0]->id;
+            $receipt = app(ReceiveGoods::class)->receive($order, ['lines' => [['shop_purchase_order_line_id' => $order->lines[0]->id, 'quantity' => '2']]]);
+            $this->ids['rival:goods-receipt'] = $receipt->id;
+
+            $counts = app(ManageStockCounts::class);
+            $count = $counts->open($main, ['reason' => 'Rival count']);
+            $counts->enter($count, [['item_id' => $item->id, 'counted_quantity' => '11']]);
+            $this->ids['rival:stock-count'] = $counts->post($count)->id;
+
+            $this->ids['rival:stock-transfer'] = app(TransferStock::class)->handle($main, $second, [['item_id' => $item->id, 'quantity' => '3']])->id;
+        });
     }
 
     /** A rival work order with one of everything hanging off it, for the cross-organization probes. */

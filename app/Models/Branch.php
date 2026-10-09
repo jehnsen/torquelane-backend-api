@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Casts\JsonObject;
 use App\Domain\Branding\BrandMark;
+use App\Domain\Inventory\NegativeStockPolicy;
 use App\Domain\Tenancy\TenantContext;
 use App\Tenancy\BelongsToOrganization;
 use Carbon\CarbonImmutable;
@@ -28,6 +29,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $branch_code
  * @property bool $is_vat_registered
  * @property bool $prices_include_vat
+ * @property NegativeStockPolicy $negative_stock_policy
  * @property string $timezone
  * @property string|null $brand_name
  * @property string|null $logo_url
@@ -49,6 +51,7 @@ final class Branch extends Model
         'prices_include_vat' => true,
         'timezone' => 'Asia/Manila',
         'status' => 'active',
+        'negative_stock_policy' => 'allow_and_flag',
     ];
 
     protected function casts(): array
@@ -57,6 +60,7 @@ final class Branch extends Model
             'is_vat_registered' => 'boolean',
             'prices_include_vat' => 'boolean',
             'theme_tokens' => JsonObject::class,
+            'negative_stock_policy' => NegativeStockPolicy::class,
         ];
     }
 

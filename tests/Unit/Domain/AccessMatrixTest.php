@@ -18,8 +18,8 @@ it('gives the branch manager everything but organization:manage', function () {
     expect($missing)->toBe([Capability::OrganizationManage]);
 });
 
-it('gives the cashier only customer:manage until the POS module arrives', function () {
-    expect(AccessMatrix::capabilitiesOf(Role::Cashier))->toBe([Capability::CustomerManage]);
+it('gives the cashier customer:manage and a view of the stock room until the POS module arrives', function () {
+    expect(AccessMatrix::capabilitiesOf(Role::Cashier))->toBe([Capability::CustomerManage, Capability::InventoryView]);
 });
 
 it('keeps access:manage with staff only', function () {

@@ -27,17 +27,17 @@ function expectedCapabilities(): array
     }
 
     return [
-        'provider_admin' => [...$web['provider_admin'], 'customer:manage', 'organization:manage'],
-        'service_advisor' => [...$web['service_advisor'], 'customer:manage'],
-        'provider_technician' => $web['provider_technician'],
+        'provider_admin' => [...$web['provider_admin'], 'customer:manage', 'organization:manage', 'inventory:view', 'inventory:manage'],
+        'service_advisor' => [...$web['service_advisor'], 'customer:manage', 'inventory:view'],
+        'provider_technician' => [...$web['provider_technician'], 'inventory:view'],
         'fleet_manager' => [...$web['fleet_manager'], 'customer:manage'],
         'operations' => $web['operations'],
         'technician' => $web['technician'],
         'purchasing_officer' => $web['purchasing_officer'],
         'viewer' => $web['viewer'],
         // Proposed grants for the API-only roles (see CLAUDE.md, "Roles").
-        'branch_manager' => ['vehicle:update', 'vehicle:manage', 'workorder:create', 'workorder:update', 'workorder:complete', 'workorder:approve', 'po:issue', 'document:upload', 'document:delete', 'settings:manage', 'access:manage', 'customer:manage'],
-        'cashier' => ['customer:manage'],
+        'branch_manager' => ['vehicle:update', 'vehicle:manage', 'workorder:create', 'workorder:update', 'workorder:complete', 'workorder:approve', 'po:issue', 'document:upload', 'document:delete', 'settings:manage', 'access:manage', 'customer:manage', 'inventory:view', 'inventory:manage'],
+        'cashier' => ['customer:manage', 'inventory:view'],
     ];
 }
 
