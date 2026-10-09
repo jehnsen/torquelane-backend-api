@@ -14,15 +14,35 @@ use App\Domain\Access\Capability;
  */
 final class WorkOrderMachine
 {
+    /**
+     * ../web's projection, which knew no invoices: a closed job is completed
+     * once collected. Phase 7 reads it through `billingStage` (an order never
+     * invoiced, settled = collected), so the golden replay still holds.
+     */
     public static function lifecycleStage(WorkOrderStatus $status, bool $collected): LifecycleStage
+    {
+        return self::billingStage($status, false, $collected);
+    }
+
+    /**
+     * The stage with invoicing (Phase 7). A closed job is:
+     *  - completed once settled: its invoice is paid (`collected_at` is
+     *    stamped then), or it was collected before invoices existed;
+     *  - invoiced while a standing (issued, not void) invoice carries it;
+     *  - ready for billing otherwise: closed and not invoiced.
+     */
+    public static function billingStage(WorkOrderStatus $status, bool $invoiced, bool $settled): LifecycleStage
     {
         return match ($status) {
             WorkOrderStatus::Draft => LifecycleStage::Draft,
             WorkOrderStatus::PendingApproval => LifecycleStage::PendingApproval,
             WorkOrderStatus::Approved, WorkOrderStatus::PartiallyApproved => LifecycleStage::Approved,
             WorkOrderStatus::Scheduled, WorkOrderStatus::InProgress => LifecycleStage::InProgress,
-            // Revenue is recognised on collection, so "completed" waits for it.
-            WorkOrderStatus::Closed => $collected ? LifecycleStage::Completed : LifecycleStage::ReadyForBilling,
+            WorkOrderStatus::Closed => match (true) {
+                $settled => LifecycleStage::Completed,
+                $invoiced => LifecycleStage::Invoiced,
+                default => LifecycleStage::ReadyForBilling,
+            },
             WorkOrderStatus::Declined => LifecycleStage::Declined,
             WorkOrderStatus::Cancelled => LifecycleStage::Cancelled,
         };

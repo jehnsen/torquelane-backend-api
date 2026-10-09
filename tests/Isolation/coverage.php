@@ -103,4 +103,18 @@ return [
     'api/v1/stock-counts/{stock_count}' => $isolated,
     'api/v1/stock-transfers' => $isolated,
     'api/v1/stock-transfers/{stock_transfer}' => $isolated,
+
+    // Phase 7: order-to-cash. Invoices and payments are account-owned (a portal user sees their own, issued ones) and branch-owned for staff.
+    'api/v1/billing/queue' => $isolated,
+    'api/v1/invoices' => $isolated,
+    'api/v1/invoices/{invoice}' => $isolated,
+    'api/v1/invoices/{invoice}/pdf' => $isolated,
+    'api/v1/payments' => $isolated,
+    'api/v1/payments/{payment}' => $isolated,
+    'api/v1/payments/{payment}/pdf' => $isolated,
+    'api/v1/receivables/aging' => $isolated,
+    'api/v1/receivables/revenue' => $isolated,
+    'api/v1/customer-accounts/{customer_account}/balance' => $isolated,
+    'api/v1/customer-accounts/{customer_account}/statement' => $isolated,
+    'api/v1/customer-accounts/{customer_account}/statement/pdf' => $isolated,
 ];

@@ -35,7 +35,7 @@ use Illuminate\Pagination\LengthAwarePaginator as Paginator;
  */
 final class WorkOrderQueries
 {
-    public const array RELATIONS = ['lines', 'tasks', 'parts', 'events', 'approvalLog'];
+    public const array RELATIONS = ['lines', 'tasks', 'parts', 'events', 'approvalLog', 'invoiceLinks.invoice'];
 
     public function __construct(
         private readonly TenantManager $tenancy,
@@ -206,6 +206,7 @@ final class WorkOrderQueries
             $order->technician_id ?? '',
             $order->pending_approval_entered_at,
             $order->approval_wait_hours === null ? null : Num::of($order->approval_wait_hours),
+            $order->released_at,
         );
     }
 

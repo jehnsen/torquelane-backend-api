@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Support;
 
+use App\Actions\Billing\ManageInvoices;
+use App\Actions\Billing\RecordPayment;
 use App\Actions\Inventory\ManageStockCounts;
 use App\Actions\Inventory\ProgressShopPurchaseOrder;
 use App\Actions\Inventory\ReceiveGoods;
@@ -295,6 +297,24 @@ final class World
         $this->ids['rival:vendor'] = $vendor->id;
         $this->purchasing($organizationId, $accountId, 'rival', $task->id, $this->id('rival:admin'), 'PO-2026-0001');
         $this->rivalInventory($organizationId);
+        $this->rivalBilling($accountId);
+    }
+
+    /** The rival's receivables, through the real Actions as its admin: an issued invoice, part-paid. */
+    private function rivalBilling(string $accountId): void
+    {
+        $context = app(TenantContextResolver::class)->resolve($this->user('rival:admin'), null)->context;
+        app(TenantManager::class)->actingAs($context, function () use ($accountId): void {
+            $account = CustomerAccount::query()->findOrFail($accountId);
+            $invoices = app(ManageInvoices::class);
+            $invoice = $invoices->manual($account, $this->id('rival:branch'), [['description' => 'Rival diagnostic', 'quantity' => '1', 'unit_price_cents' => 150000]]);
+            $invoices->issue($invoice);
+            $this->ids['rival:invoice'] = $invoice->id;
+            $this->ids['rival:invoice-line'] = (string) $invoice->lines()->value('id');
+            $payment = app(RecordPayment::class)->record($account, ['branch_id' => $this->id('rival:branch'), 'method' => 'cash', 'amount_cents' => 50000]);
+            $this->ids['rival:payment'] = $payment->id;
+            $this->ids['rival:payment-allocation'] = (string) $payment->allocations()->value('id');
+        });
     }
 
     /**

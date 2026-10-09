@@ -80,6 +80,8 @@ function parityPlaceholders(World $world, string $document): array
         'bay' => (string) Bay::query()->where('branch_id', $world->id('mekanikomor-binan'))->orderBy('id')->value('id'),
         'contact' => (string) Contact::query()->where('customer_account_id', $world->id('fc-actimed'))->orderBy('id')->value('id'),
         'reading' => (string) MeterReading::query()->where('vehicle_id', $world->id('veh-001'))->orderBy('id')->value('id'),
+        'invoice' => $world->id('invoice:actimed-overdue'),
+        'payment' => $world->id('payment:actimed-partial'),
     ]);
 }
 

@@ -37,4 +37,13 @@ final class WebFormat
 
         return sprintf('in %d %s', $days, $days === 1 ? 'day' : 'days');
     }
+
+    /** Centavos as pesos, for invoices and messages: `₱1,234.50`, `-₱75.00`. Exact: no float. */
+    public static function pesos(int $cents): string
+    {
+        $sign = $cents < 0 ? '-' : '';
+        $abs = abs($cents);
+
+        return sprintf('%s₱%s.%02d', $sign, number_format(intdiv($abs, 100), 0, '.', ','), $abs % 100);
+    }
 }

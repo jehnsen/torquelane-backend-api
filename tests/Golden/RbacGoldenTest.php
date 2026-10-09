@@ -16,10 +16,13 @@ use Tests\Golden\Support\WebFixtures;
 
 /** Grants the API adds to ported roles (capabilities that do not exist in ../web). */
 const API_GRANTS_ON_PORTED_ROLES = [
-    'provider_admin' => ['customer:manage', 'organization:manage', 'inventory:view', 'inventory:manage'],
-    'service_advisor' => ['customer:manage', 'inventory:view'],
+    'provider_admin' => ['customer:manage', 'organization:manage', 'inventory:view', 'inventory:manage', 'billing:view', 'billing:manage', 'billing:void'],
+    'service_advisor' => ['customer:manage', 'inventory:view', 'billing:view', 'billing:manage'],
     'provider_technician' => ['inventory:view'],
-    'fleet_manager' => ['customer:manage'],
+    'fleet_manager' => ['customer:manage', 'billing:view'],
+    // Phase 7: a customer's own invoices, payments and statement.
+    'purchasing_officer' => ['billing:view'],
+    'viewer' => ['billing:view'],
 ];
 
 dataset('rbac cases', function (): array {
@@ -94,7 +97,7 @@ it('adds only the documented capabilities and roles', function () {
     $constants = rbacConstants();
 
     $added = array_values(array_diff(array_map(fn (Capability $c): string => $c->value, Capability::cases()), $constants['ALL_CAPABILITIES']));
-    expect($added)->toBe(['customer:manage', 'organization:manage', 'inventory:view', 'inventory:manage'])
+    expect($added)->toBe(['customer:manage', 'organization:manage', 'inventory:view', 'inventory:manage', 'billing:view', 'billing:manage', 'billing:void'])
         ->and(array_values(array_map(fn (Capability $c): string => $c->value, array_filter(Capability::cases(), fn (Capability $c): bool => $c->isApiOnly()))))->toBe($added);
 
     $newRoles = array_values(array_diff(array_map(fn (Role $r): string => $r->value, Role::cases()), array_keys($constants['ROLE_LABEL'])));

@@ -74,12 +74,17 @@ it('releases a vehicle\'s finished jobs together, or none of them', function () 
     $this->postJson('/api/v1/work-orders/collect', ['work_order_ids' => [$ready[0], $open]])
         ->assertStatus(409)
         ->assertJsonPath('error.code', 'invalid_transition');
-    expect(asSystem(fn () => WorkOrder::query()->findOrFail($ready[0])->collected_at))->toBeNull();
+    expect(asSystem(fn () => WorkOrder::query()->findOrFail($ready[0])->released_at))->toBeNull();
 
-    $this->postJson('/api/v1/work-orders/collect', ['work_order_ids' => [$ready[0], $ready[1]]])
+    // Phase 7: handing vehicles back releases them; it settles nothing (payment does).
+    $released = $this->postJson('/api/v1/work-orders/collect', ['work_order_ids' => [$ready[0], $ready[1]]])
         ->assertOk()
         ->assertJsonPath('data.collected', 2)
-        ->assertJsonPath('data.work_orders.0.lifecycle_stage', 'completed');
+        ->json('data.work_orders');
+    expect(array_column($released, 'released_at'))->each->not->toBeNull()
+        ->and(array_column($released, 'collected_at'))->each->toBeNull()
+        ->and(array_column($released, 'lifecycle_stage'))->each->toBeIn(['ready_for_billing', 'invoiced'])
+        ->and($this->getJson('/api/v1/shop/ready-for-collection')->json('data.*.id'))->not->toContain($ready[0]);
 
     // Another organization's order is missing, not forbidden.
     $this->postJson('/api/v1/work-orders/collect', ['work_order_ids' => [$this->world->id('rival:work-order')]])->assertNotFound();

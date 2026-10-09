@@ -199,6 +199,38 @@ covers it (`tests/Feature/Inventory`).
 | `/shop/inventory/reorder`: what to buy | `GET /stock/reorder?horizon_weeks=6` | staff | done | On hand, on order, reorder points and Phase 4's forecast (matched by SKU). | ✓ PA |
 | Work order lines: parts source and the item a shop-stock line issues | `POST /work-orders`, `PUT /work-orders/{work_order}/lines` | both | done | `item_id` / `item` / `stock_cost_cents` and the order's `stock` figures are staff-only; a portal response carries none. | ✓ PA (shop stock, issued on completion, job cost shown); customer supplied / bought for this job: API-tested only (Pest) |
 
+## Order-to-cash (Phase 7)
+
+Invoices, payments and receivables have no counterpart in `../web`: these
+screens are new. Billing is core (no module). Staff with `billing:view` read
+everything in their branches; `billing:manage` raises and issues invoices and
+records payments; `billing:void` voids. A portal user with `billing:view`
+(fleet manager, purchasing officer, viewer) sees their own account's ISSUED
+invoices, payments, balance and statement, and prints them; nothing else. The
+**Phase 7** column is the real frontend driven against this API on a fresh
+demo seed (PA provider admin, SA service advisor, C cashier, FM fleet manager);
+a write the browser did not drive says so, and `tests/Feature/Billing` covers it.
+
+| Screen / action | Endpoint(s) | Side | Status | Notes | Phase 7 |
+|---|---|---|---|---|---|
+| `/shop/billing`: billing queue (closed, not invoiced) | `GET /billing/queue?customer_account_id={customer_account}` | staff | done | Oldest finished first; a job on a standing invoice, or settled before invoicing existed, is not listed. | ✓ PA (seeded queue, account filter); portal: gated |
+| Billing queue: invoice selected jobs (one account, one branch) | `POST /invoices` | staff | done | `work_order_ids`; each approved line billed at its STORED cost (parts and labour as two lines, then the job's fee). A job already on a standing invoice is 409. | ✓ PA (one job → draft) |
+| `/invoices`: invoices, by status (incl. `open`, `overdue`), account, search | `GET /invoices?status=open` | both | done | Portal: own account, issued only. | ✓ PA FM (own account only; Northwind's not listed) |
+| `/invoices/[id]`: invoice detail | `GET /invoices/{invoice}` | both | done | Totals (VATable / exempt / zero-rated / non-VAT sales, VAT, total due), payments applied, `can_*`. | ✓ PA C FM |
+| Invoice detail: PDF | `GET /invoices/{invoice}/pdf` | both | done | `application/pdf`; same policy as the invoice. | ✓ C FM (download) |
+| Invoice detail: edit a draft (notes, discounts, typed-in lines), discard | `PATCH /invoices/{invoice}`, `DELETE /invoices/{invoice}` | staff | done | Only a draft; an issued invoice is 409. | API-tested only (Pest); discount editor built |
+| Invoice detail: issue | `POST /invoices/{invoice}/issue` | staff | done | `Idempotency-Key` required; `INV-YYYY-NNNN` from the invoice series; due date from the account's terms. | ✓ PA |
+| Invoice detail: void | `POST /invoices/{invoice}/void` | staff | done | `billing:void`; only with nothing paid against it; keeps its number; its jobs return to the queue. | API-tested only (Pest) |
+| Record payment | `POST /payments` | staff | done | `Idempotency-Key` required; spread as asked, else oldest due first; the rest is credit. A paid invoice stamps its jobs collected. | ✓ C (cash, invoice paid) |
+| `/payments`: payments; detail; acknowledgment receipt PDF | `GET /payments`, `GET /payments/{payment}`, `GET /payments/{payment}/pdf` | both | done | Portal: own account. | ✓ PA C (list, receipt download); FM: list |
+| Payment: apply credit, void | `POST /payments/{payment}/allocations`, `POST /payments/{payment}/void` | staff | done | Void: `billing:void`; its invoices are owed again. | API-tested only (Pest); void control built |
+| Customer balance tab (`/shop/clients/[id]`, portal `/invoices`) | `GET /customer-accounts/{customer_account}/balance` | both | done | Outstanding, overdue, credit, credit limit (`over_limit` warns, never blocks). | ✓ PA (Northwind, over limit) FM (own) |
+| Statement of account, and its PDF | `GET /customer-accounts/{customer_account}/statement?from=2026-07-01&to=2026-10-08`, `GET /customer-accounts/{customer_account}/statement/pdf` | both | done | Balance brought forward, each invoice / payment / void, running and closing balance. | ✓ PA FM (statement, PDF download) |
+| `/shop/receivables`: AR aging | `GET /receivables/aging?as_of=2026-10-08` | staff | done | Per account: current, 1–30, 31–60, 61–90, over 90, credit. | ✓ PA |
+| Receivables: revenue, accrual and cash | `GET /receivables/revenue?from=2026-10-01&to=2026-10-08` | staff | done | Invoiced (net, VAT, total) and received (by method). | ✓ PA |
+| Raise a work order for an account over its credit limit | `POST /work-orders` | both | done | Still created; `warnings[].code = credit_limit_exceeded`; the override is audited. | API-tested only (Pest); the dialog and check-in show the warning |
+| Check-out: hand the vehicle back | `POST /work-orders/collect` | staff | done | Phase 7: stamps `released_at`; settles nothing (payment does). | API-tested (Pest); check-out wording updated |
+
 ## What moved from the browser to the server
 
 The frontend used to compute these itself. It now renders them:

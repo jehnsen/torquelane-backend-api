@@ -26,6 +26,12 @@ final class SaveBranchRequest extends ApiRequest
             'status' => ['sometimes', 'string', 'in:active,inactive'],
             // What a stock move that would take a balance below zero does in this branch.
             'negative_stock_policy' => ['sometimes', 'string', 'in:allow_and_flag,block'],
+            // What this branch's invoices print (Phase 7): its BIR-registered name and
+            // business style, and header / footer text worded by its accountant.
+            'registered_name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'business_style' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'invoice_header' => ['sometimes', 'nullable', 'string', 'max:1000'],
+            'invoice_footer' => ['sometimes', 'nullable', 'string', 'max:2000'],
             ...self::brandingRules(),
             ...self::themeTokenRules(),
         ];

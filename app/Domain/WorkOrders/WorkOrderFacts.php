@@ -39,11 +39,18 @@ final readonly class WorkOrderFacts
         public array $history,
         /** Y-m-d */
         public ?string $completedOn,
+        /** Settled: revenue recognised (Phase 7: stamped when the order's invoice is paid). */
         public ?DateTimeImmutable $collectedAt,
         /** Whoever is assigned: a technician id here, a name in ../web. */
         public string $technician,
         public ?DateTimeImmutable $pendingApprovalEnteredAt,
         public float|int|null $approvalWaitHours,
+        /**
+         * Phase 7: when the vehicle was handed back at the counter. Before
+         * invoicing, collection was both the hand-back and the revenue, so a
+         * ported order passes its `collectedAt` here too.
+         */
+        public ?DateTimeImmutable $releasedAt = null,
     ) {}
 
     /** ../web pms.ts resolvePartsCost: itemised parts once recorded, else the estimate. Rounded once. */

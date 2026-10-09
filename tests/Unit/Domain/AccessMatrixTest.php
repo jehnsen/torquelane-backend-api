@@ -18,8 +18,21 @@ it('gives the branch manager everything but organization:manage', function () {
     expect($missing)->toBe([Capability::OrganizationManage]);
 });
 
-it('gives the cashier customer:manage and a view of the stock room until the POS module arrives', function () {
-    expect(AccessMatrix::capabilitiesOf(Role::Cashier))->toBe([Capability::CustomerManage, Capability::InventoryView]);
+it('gives the cashier customer:manage, a view of the stock room, and the counter\'s billing until the POS module arrives', function () {
+    expect(AccessMatrix::capabilitiesOf(Role::Cashier))->toBe([Capability::CustomerManage, Capability::InventoryView, Capability::BillingView, Capability::BillingManage]);
+});
+
+it('lets only managers void money, and gives the portal a view of its own billing only', function () {
+    $voiders = array_values(array_filter(Role::cases(), fn (Role $r): bool => AccessMatrix::can($r, Capability::BillingVoid)));
+    expect($voiders)->toBe([Role::ProviderAdmin, Role::BranchManager]);
+
+    foreach (Role::portal() as $role) {
+        expect(AccessMatrix::can($role, Capability::BillingManage))->toBeFalse($role->value)
+            ->and(AccessMatrix::can($role, Capability::BillingVoid))->toBeFalse($role->value);
+    }
+    expect(AccessMatrix::can(Role::ProviderTechnician, Capability::BillingView))->toBeFalse()
+        ->and(AccessMatrix::can(Role::Operations, Capability::BillingView))->toBeFalse()
+        ->and(AccessMatrix::can(Role::FleetManager, Capability::BillingView))->toBeTrue();
 });
 
 it('keeps access:manage with staff only', function () {

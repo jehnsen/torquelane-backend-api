@@ -85,4 +85,13 @@ final class CustomerAccountPolicy extends TenantPolicy
 
         return Response::allow();
     }
+
+    /** Balance and statement of account (Phase 7): staff, or the account's own portal users, with `billing:view`. */
+    public function viewBilling(User $user, CustomerAccount $account): Response
+    {
+        return $this->first(
+            $this->visible($this->context()->canReachAccount($account->id)),
+            $this->capability(Capability::BillingView),
+        );
+    }
 }

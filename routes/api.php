@@ -23,12 +23,15 @@ use App\Http\Controllers\Api\V1\FleetSummaryController;
 use App\Http\Controllers\Api\V1\GoodsReceiptController;
 use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\InvitationController;
+use App\Http\Controllers\Api\V1\InvoiceController;
 use App\Http\Controllers\Api\V1\ItemController;
 use App\Http\Controllers\Api\V1\MeterReadingController;
 use App\Http\Controllers\Api\V1\ModuleController;
 use App\Http\Controllers\Api\V1\OrganizationController;
+use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\PurchaseOrderController;
+use App\Http\Controllers\Api\V1\ReceivablesController;
 use App\Http\Controllers\Api\V1\ServiceTaskController;
 use App\Http\Controllers\Api\V1\ShopController;
 use App\Http\Controllers\Api\V1\ShopPurchaseOrderController;
@@ -226,6 +229,30 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::post('stock-transfers', [StockTransferController::class, 'store'])->middleware('idempotent')->name('stock-transfers.store');
     Route::get('stock-transfers/{stock_transfer}', [StockTransferController::class, 'show'])->name('stock-transfers.show');
     Route::post('stock-transfers/{stock_transfer}/reverse', [StockTransferController::class, 'reverse'])->name('stock-transfers.reverse');
+
+    // Order-to-cash (Phase 7): invoices, payments, receivables. Core: no module.
+    Route::get('billing/queue', [ReceivablesController::class, 'queue'])->name('billing.queue');
+    Route::get('invoices', [InvoiceController::class, 'index'])->name('invoices.index');
+    Route::post('invoices', [InvoiceController::class, 'store'])->middleware('idempotent')->name('invoices.store');
+    Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
+    Route::patch('invoices/{invoice}', [InvoiceController::class, 'update'])->name('invoices.update');
+    Route::delete('invoices/{invoice}', [InvoiceController::class, 'destroy'])->name('invoices.destroy');
+    Route::post('invoices/{invoice}/issue', [InvoiceController::class, 'issue'])->middleware('idempotent:required')->name('invoices.issue');
+    Route::post('invoices/{invoice}/void', [InvoiceController::class, 'void'])->name('invoices.void');
+    Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'pdf'])->name('invoices.pdf');
+
+    Route::get('payments', [PaymentController::class, 'index'])->name('payments.index');
+    Route::post('payments', [PaymentController::class, 'store'])->middleware('idempotent:required')->name('payments.store');
+    Route::get('payments/{payment}', [PaymentController::class, 'show'])->name('payments.show');
+    Route::post('payments/{payment}/allocations', [PaymentController::class, 'allocate'])->middleware('idempotent')->name('payments.allocate');
+    Route::post('payments/{payment}/void', [PaymentController::class, 'void'])->name('payments.void');
+    Route::get('payments/{payment}/pdf', [PaymentController::class, 'pdf'])->name('payments.pdf');
+
+    Route::get('receivables/aging', [ReceivablesController::class, 'aging'])->name('receivables.aging');
+    Route::get('receivables/revenue', [ReceivablesController::class, 'revenue'])->name('receivables.revenue');
+    Route::get('customer-accounts/{customer_account}/balance', [ReceivablesController::class, 'balance'])->name('customer-accounts.balance');
+    Route::get('customer-accounts/{customer_account}/statement', [ReceivablesController::class, 'statement'])->name('customer-accounts.statement');
+    Route::get('customer-accounts/{customer_account}/statement/pdf', [ReceivablesController::class, 'statementPdf'])->name('customer-accounts.statement-pdf');
 });
 
 // A signed, 60-second URL from GET documents/{id}/download: the signature is

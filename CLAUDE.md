@@ -308,6 +308,9 @@ from rbac.json). API additions:
 |---|---|
 | `customer:manage` (accounts, contacts, consent) | provider_admin, service_advisor, branch_manager, cashier, fleet_manager (own account only, by scope) |
 | `organization:manage` (profile, org modules, open/delete branches) | provider_admin |
+| `billing:view` (invoices, payments, balance, statement; staff also aging, revenue, the billing queue) — Phase 7 | every staff role but provider_technician; fleet_manager, purchasing_officer, viewer (own account, issued invoices only, by scope) |
+| `billing:manage` (raise, edit, issue invoices; record and allocate payments) — Phase 7 | provider_admin, branch_manager, service_advisor, cashier |
+| `billing:void` (void invoices and payments) — Phase 7 | provider_admin, branch_manager |
 
 | Role (new, staff) | Grants |
 |---|---|
@@ -815,6 +818,142 @@ and part-received (GR-2026-0001), a coolant draft (SPO-2026-0002), TR-2026-0001
 (cloths, detailing to repair) and SC-2026-0001 (a litre of coolant short).
 Phase 4's `PO-2026-0003` is still the next customer purchase order.
 
+## Order-to-cash (Phase 7)
+
+TODO: confirm invoice format with the accountant under the EOPT Act before go-live.
+
+Invoices, payments and receivables. Billing is **core** (no module) and works
+in every branch. Staff with `billing:view` read the branches they work in;
+`billing:manage` raises and issues invoices and records payments;
+`billing:void` voids. A portal user with `billing:view` sees their own
+account's ISSUED invoices (never a draft), its payments, balance and
+statement, and prints them; nothing else.
+
+### Tables (Phase 7)
+
+| Table | Notes |
+|---|---|
+| `invoices` | Branch + customer account (composite FKs); `number` (null only while `draft`; `INV-YYYY-NNNN` from the organization's `invoice` series at ISSUE, kept by a void); `status` `draft`/`issued`/`partially_paid`/`paid`/`void`; `source` `work_orders`/`manual`; `issue_date`, `due_date` (issue + the account's `payment_terms_days`, snapshotted); buyer snapshot (name, TIN, address); seller snapshot (branch registered name, business style, TIN + branch code, address, VAT registration, the branch's header / footer text); `prices_include_vat`, `vat_rate_pct`; totals `vatable_sales_cents`, `vat_exempt_sales_cents`, `zero_rated_sales_cents`, `non_vat_sales_cents` (*added: a non-VAT branch's sales fall in no VAT category*), `discount_total_cents`, `vat_amount_cents`, `total_due_cents`; `paid_cents`; void fields. CHECKs: total = VATable + VAT + exempt + zero-rated + non-VAT; paid ≤ total; status agrees with paid; a non-VAT invoice has no VAT. Trigger: once issued only `status`, `paid_cents` and the void stamp move; a void invoice never changes; only a draft is deleted. |
+| `invoice_lines` | `kind` `parts`/`labour`/`fee`/`manual`; links to `work_order_id`, `work_order_line_id`, `item_id`, `service_task_id` (nullable); `quantity`, `unit_price_cents`, `discount_cents`, `tax_class`, `line_total_cents` (CHECK = round(qty × price) − discount). Trigger: changes only while the invoice is a draft. |
+| `invoice_work_orders` | The orders an invoice carries; composite FKs keep each to the invoice's own account. `released_at` is stamped by a void. **Partial unique index on `work_order_id` where `released_at` is null: a work order is on at most one standing invoice.** |
+| `payments` | Branch + account; `number` (`PAY-YYYY-NNNN` from the new `payment` series, at creation); `status` `posted`/`void`; `method` `cash`/`gcash`/`maya`/`card`/`bank_transfer`/`check` (all but cash carry `reference_no`, CHECKed); `amount_cents` > 0; `received_on` (business date), `received_by(_name)`; void fields. Trigger: never edited or deleted, voided once. |
+| `payment_allocations` | **Append-only.** Some of one payment applied to one invoice of the SAME account (composite FKs); `amount_cents`, `allocated_on` (business date), `allocated_at`, by whom. A trigger refuses an allocation past what the payment holds, from a void payment, or to an invoice that is not issued and unpaid. What a payment does not allocate is the customer's credit. |
+| `branches` (altered) | `registered_name`, `business_style`, `invoice_header`, `invoice_footer`: what the branch's invoices print (BIR header / footer, worded by its accountant). |
+| `work_orders` (altered) | `released_at` / `released_by`: the vehicle handed back at the counter (backfilled from `collected_at`). |
+| `document_series` | `doc_type` gains `payment` (`PAY`). |
+
+Deferred constraint triggers on `invoices`, `payment_allocations` and
+`payments` check, at COMMIT, that every invoice's `paid_cents` equals the
+allocations of its payments that still stand.
+
+### Invoicing (`App\Domain\Invoicing`, `App\Actions\Billing`)
+
+- **Raising** (`ManageInvoices::fromWorkOrders`): closed jobs of ONE account
+  raised in ONE branch, not settled (`collected_at` null) and on no standing
+  invoice (rows locked; the partial unique index is the backstop, its 23505
+  answered as 409). Each APPROVED line bills its parts (quantity × part rate)
+  and its labour (hours × labour rate) as two lines, either left out at zero;
+  then the job's flat misc fee. These are the STORED approved costs (the
+  database holds cost = round(qty × rate)), so an exclusive-VAT invoice of one
+  job totals exactly the order's `approved_totals`. Parts of a shop-stock item
+  carry the item's `tax_class`; everything else is VATable. A typed-in invoice
+  (`manual`) names its own lines.
+- **VAT** (`Invoicing::totals`, one rounding per total, R6): prices exclusive
+  (the branch's `prices_include_vat` false) → VAT = round(VATable × r / 100)
+  on top; inclusive → VAT = round(VATable × r / (100 + r)) extracted and
+  VATable sales are the gross less it; exempt and zero-rated lines carry none;
+  a branch that is not VAT-registered charges none, files its sales as
+  `non_vat_sales` and prints `Invoicing::NON_VAT_NOTICE` ("THIS DOCUMENT IS NOT
+  VALID FOR CLAIM OF INPUT TAX."). The rate is the account's effective
+  `vat_rate_pct` at the branch. Discounts come off the line before tax.
+- **Drafts** are edited (`notes`; a typed-in invoice's lines; any line's
+  discount) and re-totalled on every edit, or discarded (deleted: they never
+  had a number). **Issue** (`Idempotency-Key` required) refreshes the buyer and
+  seller snapshots, re-totals, numbers it in the same transaction (R8), dates
+  it (today, or an earlier business date that does not run behind the last
+  invoice issued, so the series stays in date order) and freezes it (R7).
+- **Void**: only an issued invoice with nothing paid (void its payments
+  first); keeps its number; releases its work orders to the billing queue.
+
+### Payments, settlement, `collected_at`
+
+- **Record** (`RecordPayment::record`, `Idempotency-Key` required): numbered
+  at creation; spread over the account's open invoices as the request says
+  (`Allocation::checked`: once per invoice, never past a balance or the
+  payment), else oldest due first (`Allocation::oldestFirst`); the rest is
+  credit, applied later by `POST /payments/{id}/allocations`. Locks: the
+  account's open invoices (id order), then the payment, in every money action.
+- **`InvoiceSettlement::refresh` is the only writer of `paid_cents` and the
+  paid status**: re-summed from the standing allocations, never incremented.
+- **`collected_at` is now a derived compatibility field**: stamped on every
+  order an invoice carries when it becomes PAID, cleared if a payment void
+  takes it back below paid. The shop reports (`Shop::revenue*`,
+  `rollupAccounts`) keep reading it, so their revenue is now recognised when
+  paid. An order settled before invoicing (seeded `collected_at`) is never
+  invoiced.
+- **Lifecycle** (`WorkOrderMachine::billingStage`): a closed order is
+  `ready_for_billing` (not invoiced), `invoiced` (on a standing issued
+  invoice, unpaid; a new stage), `completed` (settled). `lifecycleStage(status,
+  collected)` is the same function with no invoice, so the golden replay holds.
+- **The counter's "collect" is now a hand-back**: `POST /work-orders/{id}/collect`
+  (and `/work-orders/collect`) stamp `released_at`, not `collected_at`, and
+  settle nothing. `/shop/ready-for-collection` lists closed orders not yet
+  released (`WorkOrderFacts::releasedAt`).
+
+### Receivables
+
+- `GET /receivables/aging?as_of=`: per account, open balances AS OF the date
+  (issued by then, not voided by then, less allocations dated by then from
+  payments not voided by then) in current / 1–30 / 31–60 / 61–90 / over 90
+  days past due (`Aging`), with each account's unallocated credit.
+- `GET /customer-accounts/{id}/statement?from=&to=` (+ `/pdf`): balance
+  brought forward, then each invoice (charge), payment (credit) and void (its
+  reversal, on the day it was voided) with the running balance (`Statement`).
+- `GET /customer-accounts/{id}/balance`: outstanding, overdue, credit, the
+  credit limit and `over_limit`.
+- **Credit limit WARNS, never blocks**: `CreateWorkOrder` asks
+  `CreditLimit::checkNewWork`; an account whose open balance less its credit
+  exceeds `credit_limit_cents` still gets the work, the response carries
+  `warnings: [{code: credit_limit_exceeded, …}]`, and the override is an audit
+  row (`credit_limit_override`) on the new order plus a log line. The limit is
+  the account's, across every branch.
+- `GET /receivables/revenue?from=&to=`: accrual (invoices issued and still
+  standing: net sales, VAT, total) and cash (payments received and still
+  standing, by method).
+
+### Documents and events
+
+- PDFs (`App\Documents\BillingPdf`, dompdf, Blade in `resources/views/pdf`,
+  remote resources off): the invoice (a draft prints as not issued, a void one
+  stamped), the payment's ACKNOWLEDGMENT RECEIPT (says it is not an invoice and
+  not valid for input tax) and the statement of account. Behind the same
+  policies as the records. No document or screen claims BIR accreditation;
+  permit and series wording comes from the branch's own header / footer.
+- `invoice.issued`, `invoice.voided`, `payment.received`
+  (`App\Events\*`, `ShouldDispatchAfterCommit`): announced only once the
+  transaction commits, to the queued `App\Listeners\PublishBillingEvent`
+  (logs today). An e-invoicing (EIS) submission integration plugs in there.
+
+### Endpoints (Phase 7)
+
+`GET /billing/queue`; `/invoices` (+ `PATCH`, `DELETE` a draft, `/issue`,
+`/void`, `/pdf`); `/payments` (+ `/allocations`, `/void`, `/pdf`);
+`/receivables/aging`, `/receivables/revenue`;
+`/customer-accounts/{id}/balance`, `/statement`, `/statement/pdf`.
+`POST /invoices` and `POST /payments/{id}/allocations` take an optional
+Idempotency-Key; `/invoices/{id}/issue` and `POST /payments` require one.
+
+### Demo data (Phase 7)
+
+`Database\Seeders\Demo\BillingSeed`, through the real Actions as the owner,
+dated relative to today: INV-2026-0001 (Actimed, its three oldest closed jobs,
+issued 75 days ago, part-paid by PAY-2026-0001 by bank transfer 30 days ago),
+INV-2026-0002 (Northwind, issued 50 days ago, 45-day terms, unpaid; Northwind's
+credit limit is set to ₱5,000 so new work for it warns), INV-2026-0003
+(Actimed, issued 20 days ago), and a Sagrada draft. Nothing is fully paid, so
+no seeded `collected_at` moves (the golden revenue sweeps read it). Every
+other closed job is in the billing queue.
+
 ## Rules that bite
 
 - **Tests use `RefreshApiDatabase`, never `DatabaseTruncation`.** The
@@ -991,6 +1130,28 @@ Phase 4's `PO-2026-0003` is still the next customer purchase order.
 - **Request values come out of `mixed` through `App\Http\Requests\Input` and
   `App\Domain\Inventory\Decimals`**, not casts (Larastan level max).
 
+- **Billing moves money only through `ManageInvoices` and `RecordPayment`.**
+  `paid_cents` is written by `InvoiceSettlement::refresh` alone; the deferred
+  settlement triggers fail the COMMIT otherwise. In a test, check them with
+  `set constraints all immediate` (then set them back to deferred).
+- **Never set `collected_at` directly.** It follows the invoice being paid.
+  The counter's hand-back is `released_at`.
+- **A work order is invoiced once** (partial unique index on the standing
+  link). Re-invoicing needs the first invoice voided (or the draft discarded).
+- **An issued invoice and a posted payment are immutable** (triggers): correct
+  with a void, never an edit. A void invoice keeps its number; an issued
+  invoice with payments against it cannot be voided until they are.
+- **Invoice numbers run in date order**: an issue may be backdated, never
+  behind the last invoice issued in the organization.
+- **Billing is core and branch-owned**: a pinned staff member sees only their
+  branches' invoices and payments (404 otherwise); the balance's credit
+  position (amounts only) is the account's, across branches.
+- **PDF tests render HTML** (`BillingPdf::invoiceHtml` etc.) to assert wording;
+  dompdf's output is compressed. Render inside a tenant or system context:
+  the lines lazy-load.
+- **`composer openapi` needs more than 128 MB** since Phase 7
+  (`php -d memory_limit=1G artisan scramble:export --path=openapi.json`).
+
 ## Running it
 
 Prerequisites: PHP 8.4 with `pdo_pgsql` (plus `mbstring`, `intl`, `bcmath`,
@@ -1075,7 +1236,7 @@ audit rows). Fill in the rest from the phase plan.
 - [x] **4**: Parts, purchasing, analytics and API parity (vendors, fleet parts, purchase orders, forecast, analytics, purpose-built reads, docs/frontend-parity.md)
 - [ ] **5**: *(title not provided)*
 - [x] **6**: Shop inventory (items, branch stock, the append-only stock ledger, receiving against purchase orders, work-order issues, counts, transfers, reorder)
-- [ ] **7**: *(title not provided)*
+- [x] **7**: Order-to-cash (invoices with VAT and BIR snapshots, payments and allocations, receivables: aging, statements, credit limit; PDFs; billing events)
 - [ ] **8**: *(title not provided)*
 - [ ] **9**: *(title not provided)*
 - [ ] **10**: *(title not provided)*
@@ -1148,3 +1309,24 @@ shop-stock lines are issued when the work is recorded or the order closes (not
 at the draft or the approval); returns come back at the line's average issue
 cost; the Reorder view counts the fleet forecast once, against the first branch
 in scope; low-stock alerts are a separate endpoint, not part of `GET /alerts`.
+
+Phase 7 status: done locally (gates green: Pest, Larastan max, Pint,
+`openapi.json` regenerated; golden and isolation suites pass; the frontend's
+billing screens driven end to end against this API). The brief's
+"TODO: confirm invoice format with the accountant under the EOPT Act before
+go-live." stands (see the Phase 7 section). Decisions taken here, for review:
+the counter's "collect" becomes a vehicle hand-back (`released_at`) and
+`collected_at` is stamped when the invoice is paid (the shop reports' revenue
+therefore moves to payment); a closed job on an issued, unpaid invoice is a
+new `invoiced` stage; invoice numbers are organization-wide (`INV-`, like
+work orders; BIR may want per-branch series, which `document_series` already
+supports with a distinct prefix); payments are numbered from a new `payment`
+series (`PAY-`), leaving `receipt` (`OR-`) unused; a non-VAT branch's sales are
+filed as `non_vat_sales_cents`; drafts are discarded (deleted), not voided;
+a work order's parts and labour bill as two lines; billing capabilities:
+`billing:view` for every staff role but the technician and for the portal's
+fleet manager, purchasing officer and viewer, `billing:manage` for provider
+admin, branch manager, service advisor and cashier, `billing:void` for
+provider admin and branch manager; the credit check counts open invoices less
+unallocated credit (not uninvoiced work); a payment from an invoice is
+allocated to it, without one oldest due first.

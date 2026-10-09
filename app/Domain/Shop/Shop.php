@@ -183,7 +183,8 @@ final class Shop
      */
     public static function readyForCollection(array $orders): array
     {
-        $ready = array_values(array_filter($orders, fn (WorkOrderFacts $order): bool => $order->status === WorkOrderStatus::Closed && $order->collectedAt === null));
+        // Phase 7: the vehicle still at the shop (not handed back), paid for or not.
+        $ready = array_values(array_filter($orders, fn (WorkOrderFacts $order): bool => $order->status === WorkOrderStatus::Closed && $order->releasedAt === null));
         usort($ready, fn (WorkOrderFacts $a, WorkOrderFacts $b): int => strcmp($a->completedOn ?? '', $b->completedOn ?? ''));
 
         return $ready;

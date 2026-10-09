@@ -83,7 +83,7 @@ it('raises an unnumbered draft and prices every line on the server', function ()
         ->assertJsonPath('data.history.0.actor_name', 'Divina Lacson');
 });
 
-it('takes an order from draft to collected', function () {
+it('takes an order from draft to the vehicle handed back', function () {
     signIn('advisor@mekanikomore.ph');
     $id = raiseOrder()->assertCreated()->json('data.id');
     [$brakes, $wipers] = $this->getJson("/api/v1/work-orders/{$id}")->json('data.lines.*.id');
@@ -149,10 +149,12 @@ it('takes an order from draft to collected', function () {
         ->and($state->last_done_on->toDateString())->toBe('2026-10-08')
         ->and((string) asSystem(fn () => MeterReading::query()->where('vehicle_id', $this->world->id('veh-001'))->where('source', 'work_order')->value('value')))->toBe('45700.000');
 
+    // Phase 7: handing the vehicle back releases it; the job stays to be billed (it completes when its invoice is paid).
     signIn('advisor@mekanikomore.ph');
     $this->postJson("/api/v1/work-orders/{$id}/collect")
         ->assertOk()
-        ->assertJsonPath('data.lifecycle_stage', 'completed');
+        ->assertJsonPath('data.lifecycle_stage', 'ready_for_billing')
+        ->assertJsonPath('data.collected_at', null);
     $this->postJson("/api/v1/work-orders/{$id}/collect")->assertStatus(409)->assertJsonPath('error.code', 'invalid_transition');
 
     // Every step wrote its status event and its audit row, in order.
@@ -160,7 +162,7 @@ it('takes an order from draft to collected', function () {
     expect(array_column($order['history'], 'status'))->toBe(['draft', 'pending_approval', 'partially_approved', 'scheduled', 'in_progress', 'closed'])
         ->and(array_column($order['approval_log'], 'action'))->toBe(['sent_for_approval', 'declined', 'approved'])
         ->and(asSystem(fn () => AuditLog::query()->where('entity_id', $id)->orderBy('occurred_at')->orderBy('id')->pluck('action')->all()))
-        ->toBe(['created', 'sent_for_approval', 'lines_decided', 'scheduled', 'started', 'work_recorded', 'closed', 'collected']);
+        ->toBe(['created', 'sent_for_approval', 'lines_decided', 'scheduled', 'started', 'work_recorded', 'closed', 'released']);
 });
 
 it('auto-approves inside the band, numbered all the same', function () {

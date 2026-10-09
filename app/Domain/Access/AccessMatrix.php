@@ -18,19 +18,24 @@ namespace App\Domain\Access;
  *  - `inventory:view` for every staff role and `inventory:manage` for
  *    provider_admin and branch_manager (the shop's own stock room; never a
  *    portal role);
- *  - the two new staff roles, branch_manager and cashier.
+ *  - the two new staff roles, branch_manager and cashier;
+ *  - billing (Phase 7): `billing:view` for every staff role but the
+ *    technician, and for the portal's fleet manager, purchasing officer and
+ *    viewer (their own account's invoices only, by scope); `billing:manage`
+ *    for provider_admin, branch_manager, service_advisor and cashier;
+ *    `billing:void` for provider_admin and branch_manager.
  */
 final class AccessMatrix
 {
     private const array GRANTS = [
-        'viewer' => [],
+        'viewer' => ['billing:view'],
         'technician' => [
             'vehicle:update',
             'workorder:update',
             'workorder:complete',
             'document:upload',
         ],
-        'purchasing_officer' => ['workorder:approve', 'po:issue', 'document:upload'],
+        'purchasing_officer' => ['workorder:approve', 'po:issue', 'document:upload', 'billing:view'],
         'operations' => [
             'vehicle:update',
             'vehicle:manage',
@@ -54,6 +59,7 @@ final class AccessMatrix
             'document:delete',
             'settings:manage',
             'customer:manage',
+            'billing:view',
         ],
 
         // ------------------------------------------------------------ staff
@@ -72,8 +78,10 @@ final class AccessMatrix
             'document:upload',
             'customer:manage',
             'inventory:view',
+            'billing:view',
+            'billing:manage',
         ],
-        'cashier' => ['customer:manage', 'inventory:view'],
+        'cashier' => ['customer:manage', 'inventory:view', 'billing:view', 'billing:manage'],
         // Everything but organization:manage, applied only to the branches the
         // manager is pinned to (branch_user).
         'branch_manager' => [
@@ -91,6 +99,9 @@ final class AccessMatrix
             'customer:manage',
             'inventory:view',
             'inventory:manage',
+            'billing:view',
+            'billing:manage',
+            'billing:void',
         ],
         'provider_admin' => [
             'vehicle:update',
@@ -108,6 +119,9 @@ final class AccessMatrix
             'organization:manage',
             'inventory:view',
             'inventory:manage',
+            'billing:view',
+            'billing:manage',
+            'billing:void',
         ],
     ];
 

@@ -36,6 +36,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $brand_color
  * @property array<string, string>|null $theme_tokens
  * @property string $status
+ * @property string|null $registered_name
+ * @property string|null $business_style
+ * @property string|null $invoice_header
+ * @property string|null $invoice_footer
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
  */

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Actions\WorkOrders;
 
+use App\Actions\Billing\CreditLimit;
+use App\Domain\Receivables\CreditPosition;
 use App\Domain\WorkOrders\WorkOrderReference;
 use App\Domain\WorkOrders\WorkOrderStatus;
 use App\Exceptions\ConflictException;
@@ -18,6 +20,9 @@ use Illuminate\Support\Facades\DB;
  * createDraft: a new order in `draft`, unnumbered (a draft that never leaves
  * the shop burns no number). Lines are priced here; the order is stamped with
  * the vehicle's current owner and keeps it.
+ *
+ * Phase 7: an account already over its credit limit still gets the work; the
+ * override is logged on the order (CreditLimit) and `lastCreditWarning` says so.
  */
 final class CreateWorkOrder
 {
@@ -27,7 +32,11 @@ final class CreateWorkOrder
         private readonly LineWriter $lines,
         private readonly ApprovalSettingsResolver $settings,
         private readonly WorkOrderBranch $branches,
+        private readonly CreditLimit $credit,
     ) {}
+
+    /** Set by the last `handle()`: the account's position when it was over its credit limit. */
+    public ?CreditPosition $lastCreditWarning = null;
 
     /**
      * @param  array<string, mixed>  $data  validated header fields (SaveWorkOrderRequest)
@@ -36,6 +45,7 @@ final class CreateWorkOrder
     public function handle(Vehicle $vehicle, array $data, array $lines = []): WorkOrder
     {
         $context = $this->tenancy->require();
+        $this->lastCreditWarning = null;
 
         return DB::transaction(function () use ($context, $vehicle, $data, $lines): WorkOrder {
             $locked = Vehicle::query()->lockForUpdate()->findOrFail($vehicle->id);
@@ -69,6 +79,7 @@ final class CreateWorkOrder
             $this->lines->replaceTasks($order, is_array($data['task_ids'] ?? null) ? array_values(array_filter($data['task_ids'], 'is_string')) : []);
             $this->journal->event($order, WorkOrderStatus::Draft, $now);
             $this->journal->audit($order, 'created', null);
+            $this->lastCreditWarning = $this->credit->checkNewWork($account, $order);
 
             return $order;
         });

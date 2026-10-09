@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\Analytics\AnalyticsQueries;
+use App\Actions\Billing\CreditLimit;
 use App\Actions\Fleet\FleetQueries;
 use App\Actions\WorkOrders\AutoScheduleWorkOrders;
 use App\Actions\WorkOrders\CompleteWorkOrder;
@@ -81,7 +82,9 @@ final class WorkOrderController
      * when it is sent for approval. Lines carry quantities and rates; the
      * server prices them (any cost or total sent is ignored). Staff raise it
      * in a branch (`branch_id`, else X-Branch-Id, else their only branch); a
-     * suspended account takes no new work (403 account_suspended).
+     * suspended account takes no new work (403 account_suspended). An account
+     * over its credit limit still gets the work: the response adds
+     * `warnings: [{code: credit_limit_exceeded, …}]` and the override is logged.
      */
     public function store(SaveWorkOrderRequest $request, FleetQueries $fleet, WorkOrderQueries $orders, CreateWorkOrder $create): JsonResponse
     {
@@ -92,8 +95,12 @@ final class WorkOrderController
         Gate::authorize('createWorkFor', $account);
 
         $order = $create->handle($vehicle, $data, $request->lines());
+        $resource = new WorkOrderResource($orders->view($order));
+        if ($create->lastCreditWarning !== null) {
+            $resource->additional(['warnings' => [CreditLimit::warning($create->lastCreditWarning)]]);
+        }
 
-        return (new WorkOrderResource($orders->view($order)))->response()->setStatusCode(201);
+        return $resource->response()->setStatusCode(201);
     }
 
     /**

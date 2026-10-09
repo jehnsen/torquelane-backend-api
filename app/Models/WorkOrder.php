@@ -51,6 +51,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable|null $completed_on
  * @property CarbonImmutable|null $collected_at
  * @property string|null $collected_by
+ * @property CarbonImmutable|null $released_at
+ * @property string|null $released_by
  * @property string|null $created_by
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
@@ -61,6 +63,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read Collection<int, ApprovalLogEntry> $approvalLog
  * @property-read Vehicle $vehicle
  * @property-read CustomerAccount $customerAccount
+ * @property-read Collection<int, InvoiceWorkOrder> $invoiceLinks
  */
 final class WorkOrder extends Model
 {
@@ -92,6 +95,7 @@ final class WorkOrder extends Model
             'approval_wait_hours' => DecimalCast::class,
             'completed_on' => 'immutable_date',
             'collected_at' => 'immutable_datetime',
+            'released_at' => 'immutable_datetime',
         ];
     }
 
@@ -168,5 +172,22 @@ final class WorkOrder extends Model
     public function customerAccount(): BelongsTo
     {
         return $this->belongsTo(CustomerAccount::class);
+    }
+
+    /**
+     * The invoices that have carried this order (Phase 7); at most one stands
+     * (`released_at` null), the rest were voided.
+     *
+     * @return HasMany<InvoiceWorkOrder, $this>
+     */
+    public function invoiceLinks(): HasMany
+    {
+        return $this->hasMany(InvoiceWorkOrder::class)->orderBy('created_at')->orderBy('id');
+    }
+
+    /** The standing invoice link, if any (relation loaded). */
+    public function standingInvoiceLink(): ?InvoiceWorkOrder
+    {
+        return $this->invoiceLinks->first(fn (InvoiceWorkOrder $link): bool => $link->released_at === null);
     }
 }

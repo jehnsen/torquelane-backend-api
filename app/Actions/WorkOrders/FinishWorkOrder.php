@@ -12,7 +12,13 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 /**
- * markCollected (revenue is recognised here, not at close) and cancel.
+ * markCollected and cancel.
+ *
+ * Phase 7: "collected" at the counter means the vehicle was handed back; it
+ * stamps `released_at` / `released_by`. Revenue is no longer recognised here:
+ * `collected_at` is stamped when the order's invoice is PAID
+ * (InvoiceSettlement), so handing a fleet vehicle back on account no longer
+ * marks its job completed.
  */
 final class FinishWorkOrder
 {
@@ -39,13 +45,13 @@ final class FinishWorkOrder
     {
         return DB::transaction(function () use ($order): WorkOrder {
             $locked = $this->journal->lock($order);
-            if ($locked->status !== WorkOrderStatus::Closed || $locked->collected_at !== null) {
-                throw new InvalidTransitionException('Only a closed job that has not been collected can be collected.');
+            if ($locked->status !== WorkOrderStatus::Closed || $locked->released_at !== null) {
+                throw new InvalidTransitionException('Only a closed job whose vehicle has not been handed back can be collected.');
             }
             $before = WorkOrderJournal::snapshot($locked);
 
-            $locked->forceFill(['collected_at' => CarbonImmutable::now(), 'collected_by' => $this->journal->actor()->id])->save();
-            $this->journal->audit($locked, 'collected', $before);
+            $locked->forceFill(['released_at' => CarbonImmutable::now(), 'released_by' => $this->journal->actor()->id])->save();
+            $this->journal->audit($locked, 'released', $before);
 
             return $locked;
         });

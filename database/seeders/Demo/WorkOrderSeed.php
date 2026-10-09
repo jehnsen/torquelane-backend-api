@@ -94,6 +94,9 @@ final class WorkOrderSeed
                 'completed_on' => $o['completedOn'] ?? null,
                 'collected_at' => $o['collectedAt'] ?? null,
                 'collected_by' => $collectedBy,
+                // Before invoicing (Phase 7), collecting a job was also handing the vehicle back.
+                'released_at' => $o['collectedAt'] ?? null,
+                'released_by' => $collectedBy,
                 'created_at' => $now,
                 'updated_at' => $now,
             ];

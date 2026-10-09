@@ -22,6 +22,7 @@ use App\Models\User;
 use App\Tenancy\TenantManager;
 use Brick\Money\Money;
 use Carbon\CarbonImmutable;
+use Database\Seeders\Demo\BillingSeed;
 use Database\Seeders\Demo\FleetSeed;
 use Database\Seeders\Demo\InventorySeed;
 use Database\Seeders\Demo\PartsSeed;
@@ -50,7 +51,9 @@ use RuntimeException;
  *    and quote prices exclusive of VAT (VAT on top, as ../web bills);
  *  - the fleet (Demo\FleetSeed), then the work orders and approval settings
  *    (Demo\WorkOrderSeed), booked into the repair branch; then the vendors,
- *    each client's own spare parts and its purchase orders (Demo\PartsSeed).
+ *    each client's own spare parts and its purchase orders (Demo\PartsSeed);
+ *    the shop's stock room (Demo\InventorySeed); and receivables: invoices
+ *    and a payment (Demo\BillingSeed, Phase 7).
  *
  * API-only additions, marked below: a branch manager and a cashier demo
  * account, and a small detailing floor at Samahuzai-Biñan.
@@ -196,6 +199,7 @@ final class DemoSeeder extends Seeder
         FleetSeed::linkDocuments($data, $this->ids);
         PartsSeed::run($organization->id, $data, $this->ids);
         InventorySeed::run($organization->id, $this->ids);
+        BillingSeed::run($this->ids);
     }
 
     /**

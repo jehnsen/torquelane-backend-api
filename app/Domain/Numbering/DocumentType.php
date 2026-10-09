@@ -20,6 +20,8 @@ enum DocumentType: string
     case ShopPurchaseOrder = 'shop_purchase_order';
     case StockTransfer = 'stock_transfer';
     case StockCount = 'stock_count';
+    /** Payments received (acknowledgment receipts, Phase 7). `receipt` (OR) is left for an official receipt, should one ever be needed. */
+    case Payment = 'payment';
 
     public function defaultPrefix(): string
     {
@@ -33,6 +35,7 @@ enum DocumentType: string
             self::ShopPurchaseOrder => 'SPO',
             self::StockTransfer => 'TR',
             self::StockCount => 'SC',
+            self::Payment => 'PAY',
         };
     }
 }

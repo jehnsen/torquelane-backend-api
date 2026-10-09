@@ -44,6 +44,10 @@ final class BranchResource extends JsonResource
             'brand_color' => $branch->brand_color,
             'theme_tokens' => $branch->theme_tokens === null ? null : (object) $branch->theme_tokens,
             'status' => $branch->status,
+            'registered_name' => $branch->registered_name,
+            'business_style' => $branch->business_style,
+            'invoice_header' => $branch->invoice_header,
+            'invoice_footer' => $branch->invoice_footer,
             'created_at' => $branch->created_at->toIso8601ZuluString(),
             'updated_at' => $branch->updated_at->toIso8601ZuluString(),
         ];

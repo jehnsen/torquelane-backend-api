@@ -4589,6 +4589,478 @@
                 "security": []
             }
         },
+        "/invoices": {
+            "get": {
+                "operationId": "invoices.index",
+                "description": "`billing:view`. Drafts first, then newest issued. `status`: `draft`,\n`issued`, `partially_paid`, `paid`, `void`, or `open` (issued or\npartially paid) / `overdue` (open and past its due date).",
+                "summary": "List invoices",
+                "tags": [
+                    "Invoice"
+                ],
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "draft",
+                                "issued",
+                                "partially_paid",
+                                "paid",
+                                "void",
+                                "open",
+                                "overdue"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "customer_account_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "branch_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 100
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `InvoiceResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InvoiceCollection"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "invoices.store",
+                "description": "`billing:manage` (staff). Either `work_order_ids`: closed jobs of ONE\naccount and ONE branch, not yet invoiced (each approved line is billed\nat its STORED approved cost: parts and labour as two lines, then each\njob's flat fee); or `customer_account_id` + `lines` (+ `branch_id`) for\na typed-in invoice. Unnumbered until issued. A job already on another\ninvoice is 409.",
+                "summary": "Raise a draft invoice",
+                "tags": [
+                    "Invoice"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SaveInvoiceRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "`InvoiceResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InvoiceResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/invoices/{invoice}": {
+            "get": {
+                "operationId": "invoices.show",
+                "summary": "Show an invoice",
+                "tags": [
+                    "Invoice"
+                ],
+                "parameters": [
+                    {
+                        "name": "invoice",
+                        "in": "path",
+                        "required": true,
+                        "description": "The invoice ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`InvoiceResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InvoiceResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            },
+            "patch": {
+                "operationId": "invoices.update",
+                "description": "`billing:manage`. `notes`; a typed-in invoice's `lines` (the whole\nlist); `discounts` (`line_id`, `discount_cents`) on any draft. Totals\nare recomputed. An issued invoice never changes (409).",
+                "summary": "Edit a draft",
+                "tags": [
+                    "Invoice"
+                ],
+                "parameters": [
+                    {
+                        "name": "invoice",
+                        "in": "path",
+                        "required": true,
+                        "description": "The invoice ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SaveInvoiceRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`InvoiceResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InvoiceResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "invoices.destroy",
+                "description": "`billing:manage`. Only a draft (it has no number); its jobs may be\ninvoiced again. An issued invoice is voided instead.",
+                "summary": "Discard a draft",
+                "tags": [
+                    "Invoice"
+                ],
+                "parameters": [
+                    {
+                        "name": "invoice",
+                        "in": "path",
+                        "required": true,
+                        "description": "The invoice ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            }
+        },
+        "/invoices/{invoice}/issue": {
+            "post": {
+                "operationId": "invoices.issue",
+                "description": "`billing:manage`; requires an `Idempotency-Key`. Numbers the draft from\nthe organization's `invoice` series (`INV-YYYY-NNNN`) in this\ntransaction, freezes who it is from and to and its totals (VAT added or\nextracted per the branch), dates it (today, or an earlier `issue_date`\nthat keeps the series in date order) and sets the due date from the\naccount's payment terms. Queues `invoice.issued`.",
+                "summary": "Issue an invoice",
+                "tags": [
+                    "Invoice"
+                ],
+                "parameters": [
+                    {
+                        "name": "invoice",
+                        "in": "path",
+                        "required": true,
+                        "description": "The invoice ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/IssueInvoiceRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`InvoiceResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InvoiceResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/invoices/{invoice}/void": {
+            "post": {
+                "operationId": "invoices.void",
+                "description": "`billing:void`, with a reason. Only an issued invoice nothing has been\npaid against (void its payments first). It keeps its number; its jobs\nmay be invoiced again. Queues `invoice.voided`.",
+                "summary": "Void an invoice",
+                "tags": [
+                    "Invoice"
+                ],
+                "parameters": [
+                    {
+                        "name": "invoice",
+                        "in": "path",
+                        "required": true,
+                        "description": "The invoice ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/VoidDocumentRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`InvoiceResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InvoiceResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/invoices/{invoice}/pdf": {
+            "get": {
+                "operationId": "invoices.pdf",
+                "description": "The printed invoice (`application/pdf`), behind the same policy as the\ninvoice. A draft prints marked as not issued; a void one, as void.",
+                "summary": "Invoice PDF",
+                "tags": [
+                    "Invoice"
+                ],
+                "parameters": [
+                    {
+                        "name": "invoice",
+                        "in": "path",
+                        "required": true,
+                        "description": "The invoice ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/pdf": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "headers": {
+                            "Content-Disposition": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            }
+        },
         "/items": {
             "get": {
                 "operationId": "items.index",
@@ -5522,6 +5994,396 @@
                 "security": []
             }
         },
+        "/payments": {
+            "get": {
+                "operationId": "payments.index",
+                "description": "`billing:view`. Newest first; `status` `posted` or `void`.",
+                "summary": "List payments",
+                "tags": [
+                    "Payment"
+                ],
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "posted",
+                                "void"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "method",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "cash",
+                                "gcash",
+                                "maya",
+                                "card",
+                                "bank_transfer",
+                                "check"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "customer_account_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "branch_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 100
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `PaymentResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PaymentCollection"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "payments.store",
+                "description": "`billing:manage` (staff); requires an `Idempotency-Key` (a retry\nreplays the first answer, never a second payment). `method` cash,\ngcash, maya, card, bank_transfer or check (all but cash need\n`reference_no`); `amount_cents`; `received_on` (default today, never in\nthe future). `allocations` (`invoice_id`, `amount_cents`) spread it over\nthe account's open invoices; without them it goes to the oldest due\nfirst. What is not allocated is the customer's credit. A fully paid\ninvoice stamps its jobs collected. Queues `payment.received`.",
+                "summary": "Record a payment",
+                "tags": [
+                    "Payment"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RecordPaymentRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "`PaymentResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PaymentResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/payments/{payment}": {
+            "get": {
+                "operationId": "payments.show",
+                "summary": "Show a payment",
+                "tags": [
+                    "Payment"
+                ],
+                "parameters": [
+                    {
+                        "name": "payment",
+                        "in": "path",
+                        "required": true,
+                        "description": "The payment ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`PaymentResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PaymentResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            }
+        },
+        "/payments/{payment}/allocations": {
+            "post": {
+                "operationId": "payments.allocate",
+                "description": "`billing:manage`. Allocates what is left of the payment to open\ninvoices of its account, as `allocations` says, or oldest due first.",
+                "summary": "Apply a payment's credit",
+                "tags": [
+                    "Payment"
+                ],
+                "parameters": [
+                    {
+                        "name": "payment",
+                        "in": "path",
+                        "required": true,
+                        "description": "The payment ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AllocatePaymentRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`PaymentResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PaymentResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/payments/{payment}/void": {
+            "post": {
+                "operationId": "payments.void",
+                "description": "`billing:void`, with a reason. It keeps its number; every invoice it\npaid is owed again (and a job it had settled is no longer collected).",
+                "summary": "Void a payment",
+                "tags": [
+                    "Payment"
+                ],
+                "parameters": [
+                    {
+                        "name": "payment",
+                        "in": "path",
+                        "required": true,
+                        "description": "The payment ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/VoidDocumentRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`PaymentResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PaymentResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/payments/{payment}/pdf": {
+            "get": {
+                "operationId": "payments.pdf",
+                "description": "The printed acknowledgment of the payment (`application/pdf`): what was\nreceived and which invoices it went to. Not an invoice.",
+                "summary": "Acknowledgment receipt PDF",
+                "tags": [
+                    "Payment"
+                ],
+                "parameters": [
+                    {
+                        "name": "payment",
+                        "in": "path",
+                        "required": true,
+                        "description": "The payment ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/pdf": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "headers": {
+                            "Content-Disposition": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            }
+        },
         "/me": {
             "patch": {
                 "operationId": "me.update",
@@ -6130,6 +6992,649 @@
                                     "required": [
                                         "data"
                                     ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/billing/queue": {
+            "get": {
+                "operationId": "billing.queue",
+                "description": "`billing:view` (staff). Closed jobs not yet invoiced, oldest finished\nfirst, in the caller's branches; `customer_account_id` narrows it.",
+                "summary": "Billing queue",
+                "tags": [
+                    "Receivables"
+                ],
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    },
+                    {
+                        "name": "customer_account_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `WorkOrderResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/WorkOrderCollection"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/receivables/aging": {
+            "get": {
+                "operationId": "receivables.aging",
+                "description": "`billing:view` (staff). Each account's open balances as of `as_of`\n(default today), by days past due: current, 1\u201330, 31\u201360, 61\u201390, over\n90; with the account's unallocated credit. A balance as of a past date\ncounts only what was issued, paid and voided by then.",
+                "summary": "Receivables aging",
+                "tags": [
+                    "Receivables"
+                ],
+                "parameters": [
+                    {
+                        "name": "as_of",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "customer_account_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "as_of": {
+                                                    "type": "string"
+                                                },
+                                                "accounts": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "array",
+                                                        "items": {}
+                                                    }
+                                                },
+                                                "totals": {
+                                                    "type": "array",
+                                                    "items": {}
+                                                }
+                                            },
+                                            "required": [
+                                                "as_of",
+                                                "accounts",
+                                                "totals"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/receivables/revenue": {
+            "get": {
+                "operationId": "receivables.revenue",
+                "description": "`billing:view` (staff). Over `from`..`to` (business dates): invoices\nissued and still standing (net sales, VAT, total), and payments received\nand still standing (by method).",
+                "summary": "Revenue: accrual and cash",
+                "tags": [
+                    "Receivables"
+                ],
+                "parameters": [
+                    {
+                        "name": "as_of",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "customer_account_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "from": {
+                                                    "type": "string"
+                                                },
+                                                "to": {
+                                                    "type": "string"
+                                                },
+                                                "accrual": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "invoices": {
+                                                            "type": "integer",
+                                                            "minimum": 0
+                                                        },
+                                                        "net_sales_cents": {
+                                                            "type": "integer"
+                                                        },
+                                                        "vat_cents": {
+                                                            "type": "integer"
+                                                        },
+                                                        "total_cents": {
+                                                            "type": "integer"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "invoices",
+                                                        "net_sales_cents",
+                                                        "vat_cents",
+                                                        "total_cents"
+                                                    ]
+                                                },
+                                                "cash": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "payments": {
+                                                            "type": "integer",
+                                                            "minimum": 0
+                                                        },
+                                                        "received_cents": {
+                                                            "type": "number"
+                                                        },
+                                                        "by_method": {
+                                                            "type": "array",
+                                                            "items": {}
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "payments",
+                                                        "received_cents",
+                                                        "by_method"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "from",
+                                                "to",
+                                                "accrual",
+                                                "cash"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/customer-accounts/{customerAccount}/balance": {
+            "get": {
+                "operationId": "customer-accounts.balance",
+                "description": "`billing:view`. What the account owes on open invoices, what is\noverdue, its unallocated credit, and where it stands against its credit\nlimit (`over_limit` warns; new work is never blocked).",
+                "summary": "Account balance",
+                "tags": [
+                    "Receivables"
+                ],
+                "parameters": [
+                    {
+                        "name": "customerAccount",
+                        "in": "path",
+                        "required": true,
+                        "description": "The customer account ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "customer_account_id": {
+                                                    "type": "string"
+                                                },
+                                                "customer_name": {
+                                                    "type": "string"
+                                                },
+                                                "payment_terms_days": {
+                                                    "type": "integer"
+                                                },
+                                                "credit_limit_cents": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "outstanding_cents": {
+                                                    "type": "integer"
+                                                },
+                                                "overdue_cents": {
+                                                    "type": "integer"
+                                                },
+                                                "credit_cents": {
+                                                    "type": "integer"
+                                                },
+                                                "net_balance_cents": {
+                                                    "type": "integer"
+                                                },
+                                                "available_credit_cents": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "over_limit": {
+                                                    "type": "boolean"
+                                                },
+                                                "open_invoices": {
+                                                    "type": "array",
+                                                    "items": {}
+                                                },
+                                                "next_due_date": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "uninvoiced_jobs": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "customer_account_id",
+                                                "customer_name",
+                                                "payment_terms_days",
+                                                "credit_limit_cents",
+                                                "outstanding_cents",
+                                                "overdue_cents",
+                                                "credit_cents",
+                                                "net_balance_cents",
+                                                "available_credit_cents",
+                                                "over_limit",
+                                                "open_invoices",
+                                                "next_due_date",
+                                                "uninvoiced_jobs"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            }
+        },
+        "/customer-accounts/{customerAccount}/statement": {
+            "get": {
+                "operationId": "customer-accounts.statement",
+                "description": "`billing:view`. Over `from`..`to` (default the last 30 days): the\nbalance brought forward, each invoice, payment and void with the running\nbalance, and the closing balance.",
+                "summary": "Statement of account",
+                "tags": [
+                    "Receivables"
+                ],
+                "parameters": [
+                    {
+                        "name": "customerAccount",
+                        "in": "path",
+                        "required": true,
+                        "description": "The customer account ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "as_of",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "customer_account_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "customer_account_id": {
+                                                    "type": "string"
+                                                },
+                                                "customer_name": {
+                                                    "type": "string"
+                                                },
+                                                "customer_tin": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "customer_address": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "from": {
+                                                    "type": "string"
+                                                },
+                                                "to": {
+                                                    "type": "string"
+                                                },
+                                                "opening_balance_cents": {
+                                                    "type": "integer"
+                                                },
+                                                "total_charges_cents": {
+                                                    "type": "integer"
+                                                },
+                                                "total_credits_cents": {
+                                                    "type": "integer"
+                                                },
+                                                "closing_balance_cents": {
+                                                    "type": "integer"
+                                                },
+                                                "entries": {
+                                                    "type": "array",
+                                                    "items": {}
+                                                }
+                                            },
+                                            "required": [
+                                                "customer_account_id",
+                                                "customer_name",
+                                                "customer_tin",
+                                                "customer_address",
+                                                "from",
+                                                "to",
+                                                "opening_balance_cents",
+                                                "total_charges_cents",
+                                                "total_credits_cents",
+                                                "closing_balance_cents",
+                                                "entries"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/customer-accounts/{customerAccount}/statement/pdf": {
+            "get": {
+                "operationId": "customer-accounts.statement-pdf",
+                "summary": "Statement of account PDF",
+                "tags": [
+                    "Receivables"
+                ],
+                "parameters": [
+                    {
+                        "name": "customerAccount",
+                        "in": "path",
+                        "required": true,
+                        "description": "The customer account ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "as_of",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "customer_account_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/pdf": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "headers": {
+                            "Content-Disposition": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
                                 }
                             }
                         }
@@ -10943,7 +12448,7 @@
             },
             "post": {
                 "operationId": "work-orders.store",
-                "description": "`workorder:create`. Starts as an unnumbered draft \u2014 the number is issued\nwhen it is sent for approval. Lines carry quantities and rates; the\nserver prices them (any cost or total sent is ignored). Staff raise it\nin a branch (`branch_id`, else X-Branch-Id, else their only branch); a\nsuspended account takes no new work (403 account_suspended).",
+                "description": "`workorder:create`. Starts as an unnumbered draft \u2014 the number is issued\nwhen it is sent for approval. Lines carry quantities and rates; the\nserver prices them (any cost or total sent is ignored). Staff raise it\nin a branch (`branch_id`, else X-Branch-Id, else their only branch); a\nsuspended account takes no new work (403 account_suspended). An account\nover its credit limit still gets the work: the response adds\n`warnings: [{code: credit_limit_exceeded, \u2026}]` and the override is logged.",
                 "summary": "Raise a work order (draft)",
                 "tags": [
                     "WorkOrder"
@@ -10968,10 +12473,64 @@
                                     "properties": {
                                         "data": {
                                             "$ref": "#/components/schemas/WorkOrderResource"
+                                        },
+                                        "warnings": {
+                                            "type": "array",
+                                            "prefixItems": [
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "code": {
+                                                            "type": "string",
+                                                            "const": "credit_limit_exceeded"
+                                                        },
+                                                        "message": {
+                                                            "type": "string"
+                                                        },
+                                                        "details": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "credit_limit_cents": {
+                                                                    "type": [
+                                                                        "integer",
+                                                                        "null"
+                                                                    ]
+                                                                },
+                                                                "outstanding_cents": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "credit_cents": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "available_credit_cents": {
+                                                                    "type": [
+                                                                        "integer",
+                                                                        "null"
+                                                                    ]
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "credit_limit_cents",
+                                                                "outstanding_cents",
+                                                                "credit_cents",
+                                                                "available_credit_cents"
+                                                            ]
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "code",
+                                                        "message",
+                                                        "details"
+                                                    ]
+                                                }
+                                            ],
+                                            "minItems": 1,
+                                            "maxItems": 1
                                         }
                                     },
                                     "required": [
-                                        "data"
+                                        "data",
+                                        "warnings"
                                     ]
                                 }
                             }
@@ -11993,6 +13552,36 @@
                 "items": {},
                 "title": "AlertsResource"
             },
+            "AllocatePaymentRequest": {
+                "type": "object",
+                "description": "Applying a payment's credit: the invoices and amounts, or nothing (oldest due first).",
+                "properties": {
+                    "allocations": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "invoice_id": {
+                                    "type": "string"
+                                },
+                                "amount_cents": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                }
+                            },
+                            "required": [
+                                "invoice_id",
+                                "amount_cents"
+                            ]
+                        },
+                        "maxItems": 100
+                    }
+                },
+                "title": "AllocatePaymentRequest"
+            },
             "AutoScheduleRequest": {
                 "type": "object",
                 "properties": {
@@ -12146,6 +13735,30 @@
                     "status": {
                         "type": "string"
                     },
+                    "registered_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "business_style": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "invoice_header": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "invoice_footer": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
                     "created_at": {
                         "type": "string"
                     },
@@ -12172,6 +13785,10 @@
                     "brand_color",
                     "theme_tokens",
                     "status",
+                    "registered_name",
+                    "business_style",
+                    "invoice_header",
+                    "invoice_footer",
                     "created_at",
                     "updated_at"
                 ],
@@ -13603,6 +15220,301 @@
                 ],
                 "title": "InvitationResource"
             },
+            "InvoiceCollection": {
+                "type": "array",
+                "items": {
+                    "$ref": "#/components/schemas/InvoiceResource"
+                },
+                "title": "InvoiceCollection"
+            },
+            "InvoiceResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "number": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "status_label": {
+                        "type": "string",
+                        "enum": [
+                            "Draft",
+                            "Issued",
+                            "Partially paid",
+                            "Paid",
+                            "Void"
+                        ]
+                    },
+                    "source": {
+                        "type": "string"
+                    },
+                    "branch_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "customer_account_id": {
+                        "type": "string"
+                    },
+                    "customer_name": {
+                        "type": "string"
+                    },
+                    "issue_date": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "due_date": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "payment_terms_days": {
+                        "type": "integer"
+                    },
+                    "days_overdue": {
+                        "type": "integer"
+                    },
+                    "buyer": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string"
+                            },
+                            "tin": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "address": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "name",
+                            "tin",
+                            "address"
+                        ]
+                    },
+                    "seller": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string"
+                            },
+                            "business_style": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "tin": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "branch_code": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "address": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "vat_registered": {
+                                "type": "boolean"
+                            },
+                            "header": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "footer": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "name",
+                            "business_style",
+                            "tin",
+                            "branch_code",
+                            "address",
+                            "vat_registered",
+                            "header",
+                            "footer"
+                        ]
+                    },
+                    "prices_include_vat": {
+                        "type": "boolean"
+                    },
+                    "vat_rate_pct": {
+                        "type": "string"
+                    },
+                    "non_vat_notice": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "The wording a non-VAT branch's invoice must carry; null for a VAT-registered branch.",
+                        "enum": [
+                            "THIS DOCUMENT IS NOT VALID FOR CLAIM OF INPUT TAX.",
+                            null
+                        ]
+                    },
+                    "totals": {
+                        "type": "array",
+                        "items": {}
+                    },
+                    "paid_cents": {
+                        "type": "integer"
+                    },
+                    "balance_cents": {
+                        "type": "integer"
+                    },
+                    "notes": {
+                        "type": "string"
+                    },
+                    "lines": {
+                        "type": "array",
+                        "items": {}
+                    },
+                    "work_orders": {
+                        "type": "array",
+                        "items": {}
+                    },
+                    "payments": {
+                        "type": "array",
+                        "items": {}
+                    },
+                    "created_by_name": {
+                        "type": "string"
+                    },
+                    "issued_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "issued_by_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "voided_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "voided_by_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "void_reason": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "can_edit": {
+                        "type": "string"
+                    },
+                    "can_issue": {
+                        "type": "string"
+                    },
+                    "can_void": {
+                        "type": "string"
+                    },
+                    "can_record_payment": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "number",
+                    "status",
+                    "status_label",
+                    "source",
+                    "branch_id",
+                    "customer_account_id",
+                    "customer_name",
+                    "issue_date",
+                    "due_date",
+                    "payment_terms_days",
+                    "days_overdue",
+                    "buyer",
+                    "seller",
+                    "prices_include_vat",
+                    "vat_rate_pct",
+                    "non_vat_notice",
+                    "totals",
+                    "paid_cents",
+                    "balance_cents",
+                    "notes",
+                    "lines",
+                    "work_orders",
+                    "payments",
+                    "created_by_name",
+                    "issued_at",
+                    "issued_by_name",
+                    "voided_at",
+                    "voided_by_name",
+                    "void_reason",
+                    "can_edit",
+                    "can_issue",
+                    "can_void",
+                    "can_record_payment",
+                    "created_at",
+                    "updated_at"
+                ],
+                "title": "InvoiceResource"
+            },
+            "IssueInvoiceRequest": {
+                "type": "object",
+                "description": "Issuing: optionally an earlier business date (never in the future, never behind the series).",
+                "properties": {
+                    "issue_date": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date"
+                    }
+                },
+                "title": "IssueInvoiceRequest"
+            },
             "ItemCollection": {
                 "type": "array",
                 "items": {
@@ -14311,6 +16223,133 @@
                 ],
                 "title": "PartsSource"
             },
+            "PaymentCollection": {
+                "type": "array",
+                "items": {
+                    "$ref": "#/components/schemas/PaymentResource"
+                },
+                "title": "PaymentCollection"
+            },
+            "PaymentResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "number": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "method": {
+                        "type": "string"
+                    },
+                    "method_label": {
+                        "type": "string",
+                        "enum": [
+                            "Cash",
+                            "GCash",
+                            "Maya",
+                            "Card",
+                            "Bank transfer",
+                            "Check"
+                        ]
+                    },
+                    "reference_no": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "amount_cents": {
+                        "type": "integer"
+                    },
+                    "allocated_cents": {
+                        "type": "integer"
+                    },
+                    "unallocated_cents": {
+                        "type": "integer"
+                    },
+                    "received_on": {
+                        "type": "string"
+                    },
+                    "received_by_name": {
+                        "type": "string"
+                    },
+                    "branch_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "customer_account_id": {
+                        "type": "string"
+                    },
+                    "customer_name": {
+                        "type": "string"
+                    },
+                    "notes": {
+                        "type": "string"
+                    },
+                    "allocations": {
+                        "type": "array",
+                        "items": {}
+                    },
+                    "voided_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "voided_by_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "void_reason": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "can_allocate": {
+                        "type": "string"
+                    },
+                    "can_void": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "number",
+                    "status",
+                    "method",
+                    "method_label",
+                    "reference_no",
+                    "amount_cents",
+                    "allocated_cents",
+                    "unallocated_cents",
+                    "received_on",
+                    "received_by_name",
+                    "branch_id",
+                    "customer_account_id",
+                    "customer_name",
+                    "notes",
+                    "allocations",
+                    "voided_at",
+                    "voided_by_name",
+                    "void_reason",
+                    "can_allocate",
+                    "can_void",
+                    "created_at"
+                ],
+                "title": "PaymentResource"
+            },
             "PurchaseOrderCollection": {
                 "type": "array",
                 "items": {
@@ -14624,6 +16663,84 @@
                 ],
                 "title": "RecordOpeningStockRequest"
             },
+            "RecordPaymentRequest": {
+                "type": "object",
+                "description": "A payment received: the account, the branch receiving it, the method (a\nreference number unless cash), the amount in centavos, the business date it\ncame in, and optionally how to spread it (else oldest due first).",
+                "properties": {
+                    "customer_account_id": {
+                        "type": "string"
+                    },
+                    "branch_id": {
+                        "type": "string"
+                    },
+                    "method": {
+                        "type": "string",
+                        "enum": [
+                            "cash",
+                            "gcash",
+                            "maya",
+                            "card",
+                            "bank_transfer",
+                            "check"
+                        ]
+                    },
+                    "reference_no": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 64
+                    },
+                    "amount_cents": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100000000000
+                    },
+                    "received_on": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date"
+                    },
+                    "notes": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 2000
+                    },
+                    "allocations": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "invoice_id": {
+                                    "type": "string"
+                                },
+                                "amount_cents": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                }
+                            },
+                            "required": [
+                                "invoice_id",
+                                "amount_cents"
+                            ]
+                        },
+                        "maxItems": 100
+                    }
+                },
+                "required": [
+                    "customer_account_id",
+                    "method",
+                    "amount_cents"
+                ],
+                "title": "RecordPaymentRequest"
+            },
             "RecordReadingRequest": {
                 "type": "object",
                 "properties": {
@@ -14932,6 +17049,35 @@
                             "allow_and_flag",
                             "block"
                         ]
+                    },
+                    "registered_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "What this branch's invoices print (Phase 7): its BIR-registered name and\nbusiness style, and header / footer text worded by its accountant.",
+                        "maxLength": 255
+                    },
+                    "business_style": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    },
+                    "invoice_header": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 1000
+                    },
+                    "invoice_footer": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 2000
                     },
                     "logo_url": {
                         "type": [
@@ -15289,6 +17435,106 @@
                     "unit_cost_cents"
                 ],
                 "title": "SaveFleetPartRequest"
+            },
+            "SaveInvoiceRequest": {
+                "type": "object",
+                "description": "Raising a draft (POST): `work_order_ids` (closed jobs of one account), or\na typed-in invoice (`customer_account_id`, `branch_id`, `lines`). Editing a\ndraft (PATCH): `notes`, a typed-in invoice's `lines`, and `discounts` on any.\nLines carry quantities and prices; totals are the server's.",
+                "properties": {
+                    "work_order_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "minItems": 1,
+                        "maxItems": 50,
+                        "uniqueItems": true
+                    },
+                    "customer_account_id": {
+                        "type": "string"
+                    },
+                    "branch_id": {
+                        "type": "string"
+                    },
+                    "notes": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 2000
+                    },
+                    "lines": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "description": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 500
+                                },
+                                "quantity": {
+                                    "type": "number"
+                                },
+                                "unit_price_cents": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 100000000000
+                                },
+                                "discount_cents": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                },
+                                "tax_class": {
+                                    "type": "string",
+                                    "enum": [
+                                        "vatable",
+                                        "vat_exempt",
+                                        "zero_rated"
+                                    ]
+                                },
+                                "item_id": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "service_task_id": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                }
+                            },
+                            "required": [
+                                "description",
+                                "quantity",
+                                "unit_price_cents"
+                            ]
+                        },
+                        "minItems": 1,
+                        "maxItems": 100
+                    },
+                    "discounts": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "line_id": {
+                                    "type": "string"
+                                },
+                                "discount_cents": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                }
+                            },
+                            "required": [
+                                "line_id",
+                                "discount_cents"
+                            ]
+                        }
+                    }
+                },
+                "title": "SaveInvoiceRequest"
             },
             "SaveItemBranchSettingsRequest": {
                 "type": "object",
@@ -17555,6 +19801,21 @@
                 ],
                 "title": "VendorResource"
             },
+            "VoidDocumentRequest": {
+                "type": "object",
+                "description": "Voiding an invoice or a payment: the reason is required and kept on the document.",
+                "properties": {
+                    "reason": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 500
+                    }
+                },
+                "required": [
+                    "reason"
+                ],
+                "title": "VoidDocumentRequest"
+            },
             "VoidReadingRequest": {
                 "type": "object",
                 "properties": {
@@ -17962,6 +20223,36 @@
                         "type": [
                             "string",
                             "null"
+                        ],
+                        "description": "Settled: stamped when its invoice is paid (Phase 7); before invoicing, when it was collected."
+                    },
+                    "released_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "The vehicle handed back at the counter (Phase 7)."
+                    },
+                    "invoice": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "number": {
+                                "type": "string"
+                            },
+                            "status": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "number",
+                            "status"
                         ]
                     },
                     "created_at": {
@@ -18011,6 +20302,8 @@
                     "approval_log",
                     "completed_on",
                     "collected_at",
+                    "released_at",
+                    "invoice",
                     "created_at",
                     "updated_at"
                 ],

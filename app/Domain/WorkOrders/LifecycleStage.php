@@ -12,6 +12,8 @@ enum LifecycleStage: string
     case Approved = 'approved';
     case InProgress = 'in_progress';
     case ReadyForBilling = 'ready_for_billing';
+    /** Phase 7: on a standing invoice that is not yet paid. */
+    case Invoiced = 'invoiced';
     case Completed = 'completed';
     case Declined = 'declined';
     case Cancelled = 'cancelled';
@@ -24,6 +26,7 @@ enum LifecycleStage: string
             self::Approved => 'Approved',
             self::InProgress => 'In progress',
             self::ReadyForBilling => 'Ready for billing',
+            self::Invoiced => 'Invoiced',
             self::Completed => 'Completed',
             self::Declined => 'Declined',
             self::Cancelled => 'Cancelled',

@@ -528,6 +528,8 @@ final class RepairPort
             self::str($o['technician'] ?? ''),
             is_string($o['pendingApprovalEnteredAt'] ?? null) ? self::instant($o['pendingApprovalEnteredAt']) : null,
             is_int($o['approvalWaitHours'] ?? null) || is_float($o['approvalWaitHours'] ?? null) ? $o['approvalWaitHours'] : null,
+            // ../web's collection was the hand-back too (Phase 7 splits them).
+            is_string($o['collectedAt'] ?? null) ? self::instant($o['collectedAt']) : null,
         );
         self::remember($job, $order);
 

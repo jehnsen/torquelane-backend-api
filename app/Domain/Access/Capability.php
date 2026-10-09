@@ -34,6 +34,12 @@ enum Capability: string
     case InventoryView = 'inventory:view';
     /** Set up items, receive goods, count, adjust, transfer, raise purchase orders (staff only). */
     case InventoryManage = 'inventory:manage';
+    /** See invoices, payments, balances and statements (portal: their own account's; staff: aging and revenue too). */
+    case BillingView = 'billing:view';
+    /** Raise and issue invoices, record and allocate payments (staff only). */
+    case BillingManage = 'billing:manage';
+    /** Void an issued invoice or a payment (staff only). */
+    case BillingVoid = 'billing:void';
 
     /** Shown in denial reasons. The ported labels are verbatim from the frontend. */
     public function label(): string
@@ -54,6 +60,9 @@ enum Capability: string
             self::OrganizationManage => 'Manage the organization',
             self::InventoryView => 'View the shop inventory',
             self::InventoryManage => 'Manage the shop inventory',
+            self::BillingView => 'View invoices and payments',
+            self::BillingManage => 'Invoice and record payments',
+            self::BillingVoid => 'Void invoices and payments',
         };
     }
 
@@ -61,7 +70,8 @@ enum Capability: string
     public function isApiOnly(): bool
     {
         return match ($this) {
-            self::CustomerManage, self::OrganizationManage, self::InventoryView, self::InventoryManage => true,
+            self::CustomerManage, self::OrganizationManage, self::InventoryView, self::InventoryManage,
+            self::BillingView, self::BillingManage, self::BillingVoid => true,
             default => false,
         };
     }

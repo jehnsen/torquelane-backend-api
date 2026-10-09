@@ -90,6 +90,12 @@ final class TenantIsolationSuite
         'stock_count_lines' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'stock_count' => 'stock_count_id'],
         'stock_transfers' => ['org' => 'organization_id', 'account' => null, 'branch' => 'from_branch_id', 'branch2' => 'to_branch_id'],
         'stock_transfer_lines' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'stock_transfer' => 'stock_transfer_id'],
+        // Phase 7: order-to-cash. Invoices and payments belong to their account AND their branch.
+        'invoices' => ['org' => 'organization_id', 'account' => 'customer_account_id', 'branch' => 'branch_id'],
+        'invoice_lines' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'invoice' => 'invoice_id'],
+        'invoice_work_orders' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'invoice' => 'invoice_id'],
+        'payments' => ['org' => 'organization_id', 'account' => 'customer_account_id', 'branch' => 'branch_id'],
+        'payment_allocations' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'payment' => 'payment_id'],
     ];
 
     /**
@@ -105,13 +111,14 @@ final class TenantIsolationSuite
         'customer_accounts', 'contacts', 'consents', 'users', 'invitations', 'vehicles', 'meter_readings', 'maintenance_states', 'documents',
         'work_orders', 'work_order_lines', 'work_order_tasks', 'work_order_parts', 'work_order_events', 'approval_log',
         'fleet_parts', 'fleet_part_usages', 'purchase_orders', 'purchase_order_lines', 'purchase_order_events',
+        'invoices', 'invoice_lines', 'invoice_work_orders', 'payments', 'payment_allocations',
     ];
 
     /** Organization-wide records a portal user may see (the catalogue they are measured against). */
     private const array ORGANIZATION_WIDE = ['organizations', 'service_tasks'];
 
     /** Child tables whose owner is their parent row's (column alias → parent). */
-    private const array PARENTS = ['vehicle', 'work_order', 'fleet_part', 'purchase_order', 'shop_purchase_order', 'goods_receipt', 'stock_count', 'stock_transfer'];
+    private const array PARENTS = ['vehicle', 'work_order', 'fleet_part', 'purchase_order', 'shop_purchase_order', 'goods_receipt', 'stock_count', 'stock_transfer', 'invoice', 'payment'];
 
     /** @var array<string, array{org: string, account: string|null, branch: string|null, branches: list<string>, table: string, parents: array<string, string>}> */
     private array $rows = [];

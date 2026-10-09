@@ -11,6 +11,7 @@ use App\Domain\Approvals\Approvals;
 use App\Domain\Approvals\LineApprovalStatus;
 use App\Domain\Billing\Billing;
 use App\Domain\Billing\BillingTotals;
+use App\Domain\Invoicing\InvoiceStatus;
 use App\Domain\Shared\BusinessHours;
 use App\Domain\Shared\Num;
 use App\Domain\WorkOrders\WorkOrderMachine;
@@ -58,6 +59,11 @@ final class WorkOrderResource extends JsonResource
             $order->loadMissing('lines.item');
         }
         $stockCosts = $staff ? app(JobStockCosts::class)->forOrder($order) : null;
+        // The invoice carrying it (Phase 7); a draft is the shop's working paper, not shown to the portal.
+        $invoice = $order->standingInvoiceLink()?->invoice;
+        if ($invoice !== null && ! $staff && $invoice->status === InvoiceStatus::Draft) {
+            $invoice = null;
+        }
         $waiting = $order->status === WorkOrderStatus::PendingApproval && $order->pending_approval_entered_at !== null
             ? BusinessHours::between($order->pending_approval_entered_at, CarbonImmutable::now())
             : null;
@@ -69,7 +75,7 @@ final class WorkOrderResource extends JsonResource
             'title' => $order->title,
             'type' => $order->type,
             'status' => $order->status->value,
-            'lifecycle_stage' => WorkOrderMachine::lifecycleStage($order->status, $order->collected_at !== null)->value,
+            'lifecycle_stage' => WorkOrderMachine::billingStage($order->status, $invoice !== null && $invoice->status->isStanding(), $order->collected_at !== null)->value,
             'next_statuses' => array_map(fn ($s): string => $s->value, WorkOrderMachine::nextStatuses($order->status)),
             'priority' => $order->priority,
             'customer_account_id' => $order->customer_account_id,
@@ -164,7 +170,15 @@ final class WorkOrderResource extends JsonResource
                 'amount_at_time_cents' => $e->amount_at_time_cents,
             ])->all()),
             'completed_on' => $order->completed_on?->toDateString(),
+            // Settled: stamped when its invoice is paid (Phase 7); before invoicing, when it was collected.
             'collected_at' => $order->collected_at?->toIso8601ZuluString(),
+            // The vehicle handed back at the counter (Phase 7).
+            'released_at' => $order->released_at?->toIso8601ZuluString(),
+            'invoice' => $invoice === null ? null : [
+                'id' => $invoice->id,
+                'number' => $invoice->number,
+                'status' => $invoice->status->value,
+            ],
             'created_at' => $order->created_at->toIso8601ZuluString(),
             'updated_at' => $order->updated_at->toIso8601ZuluString(),
         ];
