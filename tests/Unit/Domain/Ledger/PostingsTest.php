@@ -163,6 +163,9 @@ dataset('stock moves', fn (): array => [
     'parts issued, rounding' => [LedgerEvent::StockIssue, -44_999, 45_000],
     'parts returned' => [LedgerEvent::StockReturn, 45_000, 45_000],
     'consumed' => [LedgerEvent::StockConsumption, -2_500, 2_500],
+    'parts used on equipment' => [LedgerEvent::StockMaintenance, -51_500, 51_500],
+    'parts used on equipment, rounding' => [LedgerEvent::StockMaintenance, -51_499, 51_500],
+    'parts returned from equipment' => [LedgerEvent::StockMaintenanceReturn, 51_500, 51_500],
     'count gain' => [LedgerEvent::StockAdjustment, 9_000, 9_000],
     'count loss' => [LedgerEvent::StockAdjustment, -9_000, 9_000],
     'count loss, rounding' => [LedgerEvent::StockAdjustment, -9_001, 9_000],
@@ -185,6 +188,18 @@ it('receives into Inventory against GR/IR, and issues parts to the cost of sales
     expect(byRule(Postings::postingsFor(stockFacts(LedgerEvent::StockIssue, -6_000, 6_000, ItemType::Part))))->toEqual([RuleKey::CogsParts->value => 6_000, RuleKey::Inventory->value => -6_000]);
     expect(byRule(Postings::postingsFor(stockFacts(LedgerEvent::StockIssue, -6_000, 6_000, ItemType::Consumable))))->toEqual([RuleKey::CogsConsumables->value => 6_000, RuleKey::Inventory->value => -6_000]);
     expect(byRule(Postings::postingsFor(stockFacts(LedgerEvent::StockIssue, -6_000, 6_000, ItemType::Ingredient))))->toEqual([RuleKey::CogsCafe->value => 6_000, RuleKey::Inventory->value => -6_000]);
+});
+
+it('books parts used to service a tool to Equipment Repairs & Maintenance, whatever the item, and takes them back when returned', function () {
+    foreach ([ItemType::Part, ItemType::Consumable, ItemType::Ingredient] as $type) {
+        expect(byRule(Postings::postingsFor(stockFacts(LedgerEvent::StockMaintenance, -6_000, 6_000, $type))))->toEqual([RuleKey::EquipmentRepairs->value => 6_000, RuleKey::Inventory->value => -6_000]);
+    }
+    expect(byRule(Postings::postingsFor(stockFacts(LedgerEvent::StockMaintenanceReturn, 6_000, 6_000))))->toEqual([RuleKey::Inventory->value => 6_000, RuleKey::EquipmentRepairs->value => -6_000]);
+
+    // The stock move says which it is: anything out of an equipment service entry, anything back in.
+    expect(StockFacts::eventFor(MoveType::Consumption, StockSource::EquipmentMaintenance, false))->toBe(LedgerEvent::StockMaintenance)
+        ->and(StockFacts::eventFor(MoveType::Return, StockSource::EquipmentMaintenance, true))->toBe(LedgerEvent::StockMaintenanceReturn)
+        ->and(StockFacts::eventFor(MoveType::Consumption, StockSource::DetailingBooking, false))->toBe(LedgerEvent::StockConsumption);
 });
 
 it('shows average-cost rounding as its own visible line, never hidden', function () {

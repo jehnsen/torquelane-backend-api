@@ -40,6 +40,10 @@ final readonly class StockFacts implements PostingFacts
     /** Which ledger event a move is. A transfer is not here: its two moves are one entry (TransferFacts). */
     public static function eventFor(MoveType $type, StockSource $source, bool $inbound): LedgerEvent
     {
+        if ($source === StockSource::EquipmentMaintenance) {
+            return $inbound ? LedgerEvent::StockMaintenanceReturn : LedgerEvent::StockMaintenance;
+        }
+
         return match ($type) {
             MoveType::Opening => LedgerEvent::StockOpening,
             MoveType::Receipt => LedgerEvent::StockReceipt,

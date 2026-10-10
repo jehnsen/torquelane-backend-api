@@ -17,6 +17,7 @@ use App\Domain\Shared\BusinessCalendar;
 use App\Domain\Shared\Calendar;
 use App\Models\CustomerAccount;
 use App\Models\DetailingBooking;
+use App\Models\EquipmentMaintenanceLog;
 use App\Models\GoodsReceipt;
 use App\Models\Item;
 use App\Models\ItemBranchSetting;
@@ -266,6 +267,12 @@ final class InventoryQueries
             if ($order instanceof WorkOrder) {
                 $references[StockSource::WorkOrderLine->value.':'.$line->id] = ['reference' => $order->reference, 'id' => $order->id];
             }
+        }
+
+        // A service entry has no number: its tool's name, and the tool to open.
+        $logs = EquipmentMaintenanceLog::query()->whereIn('id', $byType[StockSource::EquipmentMaintenance->value] ?? [])->with('equipment')->get();
+        foreach ($logs as $log) {
+            $references[StockSource::EquipmentMaintenance->value.':'.$log->id] = ['reference' => $log->equipment->name, 'id' => $log->equipment_id];
         }
 
         foreach ($moves as $move) {

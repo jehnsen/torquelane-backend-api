@@ -106,3 +106,27 @@ it('counts business hours, Mon–Fri 08:00–18:00 Manila', function () {
     expect(BusinessHours::between($friday, $monday))->toBe(2.5)
         ->and(BusinessHours::between($monday, $friday))->toBe(0);
 });
+
+it('counts a calendar interval in days as well as months, and never both', function () use ($thresholds) {
+    $last = new LastService(d('2026-01-01'), ['hours' => 0]);
+    $slow = ['hours' => new MeterState(MeterKind::Hours, 10, d('2026-02-01'), 0.5)];
+
+    // 100 h at half an hour a day is 200 days out; the 90-day limit comes first.
+    $byDays = IntervalEngine::evaluate(new PlanItem(['hours' => 100], null, 90), $last, $slow, $thresholds, d('2026-02-01'));
+    expect($byDays->governedBy)->toBe('time')
+        ->and(Calendar::toDate($byDays->calendarDueOn))->toBe('2026-04-01')
+        ->and($byDays->daysRemaining)->toBe(59);
+
+    // The days limit alone, and a stationary meter that leaves it to the calendar.
+    $daysOnly = IntervalEngine::evaluate(new PlanItem([], null, 30), $last, [], $thresholds, d('2026-02-05'));
+    $stationary = IntervalEngine::evaluate(new PlanItem(['hours' => 100], null, 30), $last, ['hours' => new MeterState(MeterKind::Hours, 0, d('2026-01-01'), 0)], $thresholds, d('2026-01-10'));
+    expect($daysOnly->status)->toBe(IntervalBand::Overdue)
+        ->and($daysOnly->daysRemaining)->toBe(-5)
+        ->and($stationary->governedBy)->toBe('time')
+        ->and(Calendar::toDate($stationary->projectedDue))->toBe('2026-01-31');
+
+    expect((new PlanItem([], 6))->calendarLimit(d('2026-01-31'))?->format('Y-m-d'))->toBe('2026-07-31')
+        ->and((new PlanItem(['hours' => 1], null))->calendarLimit(d('2026-01-31')))->toBeNull()
+        ->and(fn () => new PlanItem([], 6, 180))->toThrow(InvalidArgumentException::class)
+        ->and(fn () => new PlanItem([], null, null))->toThrow(InvalidArgumentException::class);
+});

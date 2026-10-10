@@ -328,17 +328,20 @@ is a recording of the source's engine; `tests/Unit/Domain/Equipment` holds the
 port to it. Module-gated and staff-only: `equipment:view` reads,
 `equipment:manage` writes. The **Phase 10** column is what
 `tests/Feature/Equipment` drives; the screens were built, type-checked and
-compiled but not yet driven in a browser.
+compiled but not yet driven in a browser. The service plan runs on the Phase 2
+maintenance engine (which limit trips first, and where each falls due); the
+bands, forecast, life, reliability and health are the source's formulas.
 
 | Screen / action | Endpoint(s) | Side | Status | Notes | Phase 10 |
 |---|---|---|---|---|---|
-| `/shop/equipment`: the board and the floor in numbers | `GET /equipment` | staff | done | Was `buildEquipmentReport` / `summarizeFleet` in the source's browser. | tested |
+| `/shop/equipment`: the health board and the floor in numbers | `GET /equipment` | staff | done | Was `buildEquipmentReport` / `summarizeFleet` in the source's browser. | tested |
 | `/shop/equipment`: lists, labels and category presets for the form | `GET /equipment/options` | staff | done | Was constants in `equipmentUtils.js`. | tested |
-| `/shop/equipment`: register and edit a tool | `POST /equipment`, `PUT /equipment/{equipment}`, `DELETE /equipment/{equipment}` | staff | done | Was `upsertEquipment` / `deleteEquipment`. A tool with a history is retired, not deleted (409). | tested |
+| `/shop/equipment/register`: the asset register; register and edit a tool | `GET /equipment`, `POST /equipment`, `PUT /equipment/{equipment}`, `DELETE /equipment/{equipment}` | staff | done | Was `upsertEquipment` / `deleteEquipment`. A tool with a history is retired, not deleted (409). `meter_type` `cups` meters café gear in cups. | tested |
 | `/shop/equipment/[id]`: one tool, its usage log and service history | `GET /equipment/{equipment}` | staff | done | | tested |
 | Tool: change status | `POST /equipment/{equipment}/status` | staff | done | Was `updateEquipmentStatus`. | tested |
 | Tool: log usage, remove an entry | `POST /equipment/{equipment}/usage-logs`, `DELETE /equipment/{equipment}/usage-logs/{usage_log}` | staff | done | Was `logEquipmentUsage`. | tested |
-| Tool: log a service, remove an entry | `POST /equipment/{equipment}/maintenance-logs`, `DELETE /equipment/{equipment}/maintenance-logs/{maintenance_log}` | staff | done | Was `logEquipmentService`. The meter snapshot is the API's, not the form's. | tested |
+| Tool: log a service, remove an entry | `POST /equipment/{equipment}/maintenance-logs`, `DELETE /equipment/{equipment}/maintenance-logs/{maintenance_log}` | staff | done | Was `logEquipmentService`. The meter snapshot is the API's, not the form's. `issued_parts` take parts from the branch's store (409 `insufficient_stock` where the branch blocks negatives) and post to Equipment Repairs & Maintenance; removing the entry puts them back. The item picker reads `GET /items`. | tested |
+| Equipment alerts in the bell | `GET /alerts` (+ read / dismiss / restore) | staff | done | New kinds `equipment_service_due_soon`, `equipment_service_overdue`, `equipment_replace_soon`, `equipment_end_of_life`; `href` is the tool's page. | tested |
 | `/shop/equipment/profiles`: which packages put hours on which tools | `GET /equipment/profiles`, `PUT /equipment/profiles/{detailing_package}` | staff | done | Was `setServiceEquipmentProfile`. | tested |
 
 ## What moved from the browser to the server

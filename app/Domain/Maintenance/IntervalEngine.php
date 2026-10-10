@@ -13,7 +13,8 @@ use DateTimeImmutable;
  * Generalises ../web/lib/interval-status.ts `computeIntervalStatus` (one km
  * meter + a calendar interval) to any number of meters; with exactly that
  * shape it gives the frontend's results bit for bit (golden-tested through
- * App\Domain\Fleet\IntervalStatus).
+ * App\Domain\Fleet\IntervalStatus). A tool's service plan runs through it
+ * too (App\Domain\Equipment\ServicePlan): hours, a count, and days.
  *
  * The item falls due on whichever limit arrives FIRST. To compare a meter
  * limit with a calendar limit both are expressed as dates measured from the
@@ -37,9 +38,7 @@ final class IntervalEngine
         DueSoonThresholds $thresholds,
         DateTimeImmutable $today,
     ): IntervalOutcome {
-        $calendarDueOn = $plan->calendarMonths === null
-            ? null
-            : Calendar::addMonths($last->doneOn, $plan->calendarMonths);
+        $calendarDueOn = $plan->calendarLimit($last->doneOn);
 
         $projections = [];
         foreach ($plan->meterIntervals as $kind => $interval) {
@@ -47,7 +46,7 @@ final class IntervalEngine
             if ($meter === null) {
                 continue;
             }
-            $projections[$kind] = self::project($meter, $interval, $last->meterValues[$kind] ?? 0, $last->doneOn, $plan->calendarMonths, $today);
+            $projections[$kind] = self::project($meter, $interval, $last->meterValues[$kind] ?? 0, $last->doneOn, $plan, $today);
         }
 
         // Earliest limit governs; ties to the earlier-listed one.
@@ -97,7 +96,7 @@ final class IntervalEngine
         float|int $interval,
         float|int $lastValue,
         DateTimeImmutable $doneOn,
-        ?int $calendarMonths,
+        PlanItem $plan,
         DateTimeImmutable $today,
     ): MeterProjection {
         $dueAt = $lastValue + $interval;
@@ -109,7 +108,7 @@ final class IntervalEngine
             $dueOn = Calendar::addDays($doneOn, (int) JsMath::round($interval / $rate));
         } else {
             // Far enough out that the calendar limit always wins the comparison.
-            $dueOn = $calendarMonths === null ? null : Calendar::addMonths($doneOn, $calendarMonths * 100);
+            $dueOn = $plan->calendarLimit($doneOn, 100);
         }
 
         // Readings are not always taken today: roll the meter forward so limits

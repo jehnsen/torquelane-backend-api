@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Actions\Fleet;
 
+use App\Actions\Equipment\EquipmentQueries;
 use App\Actions\WorkOrders\ApprovalSettingsResolver;
+use App\Domain\Access\Capability;
 use App\Domain\Alerts\Alerts;
 use App\Domain\Alerts\AlertView;
+use App\Domain\Alerts\EquipmentAlertFacts;
 use App\Domain\Alerts\WorkOrderAlertFacts;
 use App\Domain\Documents\DocumentFacts;
 use App\Domain\Fleet\Compliance;
@@ -54,6 +57,7 @@ final class FleetQueries
         private readonly TenantManager $tenancy,
         private readonly ModuleGate $modules,
         private readonly ApprovalSettingsResolver $settings,
+        private readonly EquipmentQueries $equipment,
     ) {}
 
     /**
@@ -268,7 +272,7 @@ final class FleetQueries
             ? $this->settings->forAccount(CustomerAccount::query()->findOrFail($accountId), null)
             : $this->settings->forBranch($context->selectedBranchId);
 
-        $alerts = Alerts::build($health, $repair ? $this->workOrderAlertFacts() : [], $this->documentFacts(), $settings->slaHours, $this->today());
+        $alerts = Alerts::build($health, $repair ? $this->workOrderAlertFacts() : [], $this->documentFacts(), $settings->slaHours, $this->today(), $this->equipmentAlertFacts());
 
         $read = [];
         $dismissed = [];
@@ -283,6 +287,23 @@ final class FleetQueries
         }
 
         return Alerts::view($alerts, $read, $dismissed);
+    }
+
+    /**
+     * Tools the caller watches: staff who may read the equipment monitor, in
+     * the branches they are looking at where the `equipment` module is on.
+     *
+     * @return list<EquipmentAlertFacts>
+     */
+    private function equipmentAlertFacts(): array
+    {
+        $context = $this->tenancy->require();
+        if (! $context->isStaff() || ! $context->can(Capability::EquipmentView)) {
+            return [];
+        }
+        $branches = array_values(array_intersect($context->branchFilter(), $this->modules->branchesWith(Module::Equipment)));
+
+        return $branches === [] ? [] : $this->equipment->alertFacts($branches);
     }
 
     /**

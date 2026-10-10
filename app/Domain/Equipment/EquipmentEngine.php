@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Equipment;
 
 use App\Domain\Billing\Billing;
+use App\Domain\Maintenance\MeterKind;
 use App\Domain\Shared\JsMath;
 use Brick\Math\BigDecimal;
 use Brick\Math\BigRational;
@@ -18,10 +19,15 @@ use Brick\Math\BigRational;
  * COMPLETED job, plus its usage log. Back-date a booking, delete a log entry
  * or re-open a job and every figure re-settles by itself.
  *
- *  - Preventive maintenance has three triggers (runtime hours, job cycles,
- *    calendar days), each a ratio of what was used since the last service over
- *    its interval. The highest BINDS. Under 80% is `ok`, from 80% `due_soon`,
- *    from 100% `overdue`. A tool with no interval is not tracked.
+ *  - Preventive maintenance has three limits (runtime hours, a count of job
+ *    cycles or cups, calendar days), each a ratio of what was used since the
+ *    last service over its interval. The furthest along sets the band: under
+ *    80% is `ok`, from 80% `due_soon`, from 100% `overdue`. A tool with no
+ *    interval is not tracked.
+ *  - Which limit trips FIRST (`binding`), and the reading or date each falls
+ *    due at, come from the Phase 2 maintenance engine through `ServicePlan`.
+ *    At the tool's pace since its last service that is the limit furthest
+ *    along, as in the source.
  *  - "Since the last service" counts usage strictly after `last_service_at`
  *    (never serviced = from the beginning). Days run from the last service,
  *    else the purchase date, else the day the tool was registered.
@@ -42,7 +48,7 @@ use Brick\Math\BigRational;
  *
  * @phpstan-type Report array{
  *     lifetime: array{hours: float, cycles: int, jobs: int},
- *     service: array{level: string, progress: float, binding: string, triggers: list<array{key: string, unit: string, used: float, interval: float, ratio: float, remaining: float}>, hours_since: float, cycles_since: int, days_since: float}|null,
+ *     service: array{level: string, progress: float, binding: string, triggers: list<array{key: string, unit: string, used: float, interval: float, ratio: float, remaining: float, due_at: float|null, due_on_ms: int|null}>, hours_since: float, cycles_since: int, days_since: float}|null,
  *     life: array{life: float, used: float, remaining: float, ratio: float, level: string}|null,
  *     forecast: array{days: float, at_ms: int, rate: float|null}|null,
  *     reliability: array{services: int, repairs: int, downtime_hours: float, maintenance_cost_cents: int, total_cost_cents: int, mtbf_hours: float|null, availability_pct: float, cost_per_hour_cents: int|null, last_serviced_at_ms: int|null},
@@ -135,7 +141,7 @@ final class EquipmentEngine
      * Where the tool sits in its service interval; null when no interval is set.
      *
      * @param  list<UsageEvent>  $usage
-     * @return array{level: string, progress: float, binding: string, triggers: list<array{key: string, unit: string, used: float, interval: float, ratio: float, remaining: float}>, hours_since: float, cycles_since: int, days_since: float}|null
+     * @return array{level: string, progress: float, binding: string, triggers: list<array{key: string, unit: string, used: float, interval: float, ratio: float, remaining: float, due_at: float|null, due_on_ms: int|null}>, hours_since: float, cycles_since: int, days_since: float}|null
      */
     public static function serviceStatus(ToolFacts $tool, array $usage, int $nowMs): ?array
     {
@@ -146,31 +152,44 @@ final class EquipmentEngine
 
         $triggers = [];
         if ($tool->serviceIntervalHours !== null && $tool->serviceIntervalHours > 0) {
-            $triggers[] = self::trigger('hours', 'h', $used['hours'], $tool->serviceIntervalHours);
+            $triggers[] = self::trigger(MeterKind::Hours->value, 'h', $used['hours'], $tool->serviceIntervalHours);
         }
         if ($tool->serviceIntervalCycles !== null && $tool->serviceIntervalCycles > 0) {
-            $triggers[] = self::trigger('cycles', 'jobs', (float) $used['cycles'], (float) $tool->serviceIntervalCycles);
+            $triggers[] = self::trigger($tool->countKind->value, $tool->countKind === MeterKind::Cups ? 'cups' : 'jobs', (float) $used['cycles'], (float) $tool->serviceIntervalCycles);
         }
         if ($tool->serviceIntervalDays !== null && $tool->serviceIntervalDays > 0) {
-            $triggers[] = self::trigger('days', 'days', $daysSince, (float) $tool->serviceIntervalDays);
+            $triggers[] = self::trigger(ServicePlan::DAYS, 'days', $daysSince, (float) $tool->serviceIntervalDays);
         }
         if ($triggers === []) {
             return null;
         }
 
-        // The first of equals binds: a later trigger must be strictly further along.
-        $binding = $triggers[0];
+        // The furthest along sets the band: any limit reached is overdue, whichever trips first.
+        $furthest = $triggers[0];
         foreach ($triggers as $trigger) {
-            if ($trigger['ratio'] > $binding['ratio']) {
-                $binding = $trigger;
+            if ($trigger['ratio'] > $furthest['ratio']) {
+                $furthest = $trigger;
             }
         }
-        $progress = $binding['ratio'];
+        $progress = $furthest['ratio'];
+
+        // Which limit trips first is the maintenance engine's call. Where it
+        // names none (nothing has moved and no calendar limit is set), the
+        // furthest along stands, the first of equals.
+        $plan = ServicePlan::evaluate($tool, self::lifetime($tool, $usage), $used, $daysSince, $anchor, $nowMs);
+        $due = [];
+        foreach ($plan['limits'] ?? [] as $limit) {
+            $due[$limit['key']] = $limit;
+        }
+        foreach ($triggers as $index => $trigger) {
+            $triggers[$index]['due_at'] = $due[$trigger['key']]['due_at'] ?? null;
+            $triggers[$index]['due_on_ms'] = $due[$trigger['key']]['due_on_ms'] ?? null;
+        }
 
         return [
             'level' => $progress >= 1 ? 'overdue' : ($progress >= self::DUE_SOON_RATIO ? 'due_soon' : 'ok'),
             'progress' => $progress,
-            'binding' => $binding['key'],
+            'binding' => $plan['governed_by'] ?? $furthest['key'],
             'triggers' => $triggers,
             'hours_since' => $used['hours'],
             'cycles_since' => $used['cycles'],
@@ -200,12 +219,12 @@ final class EquipmentEngine
                 $remaining = $trigger['remaining'];
             }
         }
-        if ($service['binding'] === 'days') {
+        if ($service['binding'] === ServicePlan::DAYS) {
             return ['days' => $remaining, 'at_ms' => (int) ($nowMs + $remaining * self::DAY_MS), 'rate' => 1.0];
         }
 
         $recent = self::usage($usage, $nowMs - self::FORECAST_WINDOW_DAYS * self::DAY_MS);
-        $rate = ($service['binding'] === 'hours' ? $recent['hours'] : (float) $recent['cycles']) / self::FORECAST_WINDOW_DAYS;
+        $rate = ($service['binding'] === MeterKind::Hours->value ? $recent['hours'] : (float) $recent['cycles']) / self::FORECAST_WINDOW_DAYS;
         if ($rate <= 0) {
             return null;
         }
@@ -356,11 +375,11 @@ final class EquipmentEngine
     }
 
     /**
-     * @return array{key: string, unit: string, used: float, interval: float, ratio: float, remaining: float}
+     * @return array{key: string, unit: string, used: float, interval: float, ratio: float, remaining: float, due_at: float|null, due_on_ms: int|null}
      */
     private static function trigger(string $key, string $unit, float $used, float $interval): array
     {
-        return ['key' => $key, 'unit' => $unit, 'used' => $used, 'interval' => $interval, 'ratio' => $used / $interval, 'remaining' => $interval - $used];
+        return ['key' => $key, 'unit' => $unit, 'used' => $used, 'interval' => $interval, 'ratio' => $used / $interval, 'remaining' => $interval - $used, 'due_at' => null, 'due_on_ms' => null];
     }
 
     private static function clamp(float $value, float $low, float $high): float

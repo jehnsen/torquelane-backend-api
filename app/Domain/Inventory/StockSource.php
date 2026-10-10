@@ -14,4 +14,6 @@ enum StockSource: string
     case StockTransfer = 'stock_transfer';
     /** A detailing job's package materials, consumed when it completed (Phase 9). */
     case DetailingBooking = 'detailing_booking';
+    /** Parts a tool's service entry took from stock (Phase 10). */
+    case EquipmentMaintenance = 'equipment_maintenance';
 }

@@ -10,7 +10,7 @@ final readonly class Alert
     public function __construct(
         /** Deterministic: read/dismiss state is keyed on it. */
         public string $id,
-        /** pms_overdue | pms_due_soon | work_order_overdue | approval_sla_breach | document_expiry | driver_licence_expiry */
+        /** pms_overdue | pms_due_soon | work_order_overdue | approval_sla_breach | document_expiry | driver_licence_expiry | equipment_service_overdue | equipment_service_due_soon | equipment_end_of_life | equipment_replace_soon */
         public string $kind,
         /** critical | warning | info */
         public string $severity,

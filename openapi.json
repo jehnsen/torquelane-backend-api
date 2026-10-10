@@ -8085,6 +8085,31 @@
                         }
                     },
                     {
+                        "name": "issued_parts",
+                        "in": "query",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "item_id": {
+                                        "type": "string"
+                                    },
+                                    "quantity": {
+                                        "type": "number",
+                                        "pattern": "^\\d+(\\.\\d{1,3})?$",
+                                        "maximum": 1000000
+                                    }
+                                },
+                                "required": [
+                                    "item_id",
+                                    "quantity"
+                                ]
+                            }
+                        },
+                        "x-deepObject-style": "qs"
+                    },
+                    {
                         "name": "lines",
                         "in": "query",
                         "schema": {
@@ -8473,6 +8498,28 @@
                                                                 "service_interval_days",
                                                                 "maintenance_task"
                                                             ]
+                                                        },
+                                                        "cafe": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "meter_type": {
+                                                                    "type": "string",
+                                                                    "const": "cups"
+                                                                },
+                                                                "service_interval_cycles": {
+                                                                    "type": "integer",
+                                                                    "const": 5000
+                                                                },
+                                                                "maintenance_task": {
+                                                                    "type": "string",
+                                                                    "const": "Descale and backflush"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "meter_type",
+                                                                "service_interval_cycles",
+                                                                "maintenance_task"
+                                                            ]
                                                         }
                                                     },
                                                     "required": [
@@ -8482,7 +8529,8 @@
                                                         "coating",
                                                         "air",
                                                         "measurement",
-                                                        "facility"
+                                                        "facility",
+                                                        "cafe"
                                                     ]
                                                 },
                                                 "thresholds": {
@@ -8712,6 +8760,31 @@
                         "schema": {
                             "type": "boolean"
                         }
+                    },
+                    {
+                        "name": "issued_parts",
+                        "in": "query",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "item_id": {
+                                        "type": "string"
+                                    },
+                                    "quantity": {
+                                        "type": "number",
+                                        "pattern": "^\\d+(\\.\\d{1,3})?$",
+                                        "maximum": 1000000
+                                    }
+                                },
+                                "required": [
+                                    "item_id",
+                                    "quantity"
+                                ]
+                            }
+                        },
+                        "x-deepObject-style": "qs"
                     },
                     {
                         "name": "lines",
@@ -10933,7 +11006,9 @@
                                 "stock_return",
                                 "stock_consumption",
                                 "stock_adjustment",
-                                "stock_transfer"
+                                "stock_transfer",
+                                "stock_maintenance",
+                                "stock_maintenance_return"
                             ]
                         }
                     },
@@ -20966,7 +21041,7 @@
                         "type": "array",
                         "items": {
                             "type": "string",
-                            "pattern": "^(pms|wo|approval-sla|doc|licence):[0-9a-z]{26}(:[0-9a-z]{26})?$",
+                            "pattern": "^((pms|wo|approval-sla|doc|licence):[0-9a-z]{26}(:[0-9a-z]{26})?|equipment:[0-9a-z]{26}:(service|life))$",
                             "maxLength": 200
                         },
                         "minItems": 1,
@@ -23432,6 +23507,14 @@
                     "meter_type": {
                         "type": "string"
                     },
+                    "count_unit": {
+                        "type": "string",
+                        "description": "What the count meter counts: `cups` for the espresso machine, else job `cycles`.",
+                        "enum": [
+                            "cups",
+                            "cycles"
+                        ]
+                    },
                     "baseline_hours": {
                         "type": "string"
                     },
@@ -23491,7 +23574,7 @@
                             },
                             "service": {
                                 "type": "null",
-                                "description": "Null = no interval set: the tool is not tracked."
+                                "description": "Null = no interval set: the tool is not tracked. `binding` is the\nlimit that trips first; each trigger says the reading (`due_at`)\nor the Manila date (`due_on`) it falls due at."
                             },
                             "forecast": {
                                 "type": [
@@ -23596,6 +23679,7 @@
                     "warranty_until",
                     "expected_life_hours",
                     "meter_type",
+                    "count_unit",
                     "baseline_hours",
                     "baseline_cycles",
                     "service_interval_hours",
@@ -23725,6 +23809,28 @@
                     },
                     "resets_service": {
                         "type": "boolean"
+                    },
+                    "issued_parts": {
+                        "type": "array",
+                        "description": "Parts the service took from the branch's store.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "item_id": {
+                                    "type": "string"
+                                },
+                                "quantity": {
+                                    "type": "number",
+                                    "pattern": "^\\d+(\\.\\d{1,3})?$",
+                                    "maximum": 1000000
+                                }
+                            },
+                            "required": [
+                                "item_id",
+                                "quantity"
+                            ]
+                        },
+                        "maxItems": 50
                     },
                     "lines": {
                         "type": "array",
@@ -24835,7 +24941,9 @@
                             "Parts returned from a job",
                             "Stock consumed",
                             "Stock adjustment",
-                            "Stock transfer"
+                            "Stock transfer",
+                            "Parts used on equipment",
+                            "Parts returned from equipment"
                         ]
                     },
                     "is_reversal": {
@@ -27036,6 +27144,7 @@
                             "air",
                             "measurement",
                             "facility",
+                            "cafe",
                             "other"
                         ]
                     },
@@ -27117,6 +27226,7 @@
                         "enum": [
                             "hours",
                             "cycles",
+                            "cups",
                             "days"
                         ]
                     },
@@ -28872,14 +28982,15 @@
             },
             "StockSource": {
                 "type": "string",
-                "description": "What produced a stock move.\n| |\n|---|\n| `manual` <br/>  |\n| `goods_receipt` <br/>  |\n| `work_order_line` <br/>  |\n| `stock_count` <br/>  |\n| `stock_transfer` <br/>  |\n| `detailing_booking` <br/> A detailing job's package materials, consumed when it completed (Phase 9). |",
+                "description": "What produced a stock move.\n| |\n|---|\n| `manual` <br/>  |\n| `goods_receipt` <br/>  |\n| `work_order_line` <br/>  |\n| `stock_count` <br/>  |\n| `stock_transfer` <br/>  |\n| `detailing_booking` <br/> A detailing job's package materials, consumed when it completed (Phase 9). |\n| `equipment_maintenance` <br/> Parts a tool's service entry took from stock (Phase 10). |",
                 "enum": [
                     "manual",
                     "goods_receipt",
                     "work_order_line",
                     "stock_count",
                     "stock_transfer",
-                    "detailing_booking"
+                    "detailing_booking",
+                    "equipment_maintenance"
                 ],
                 "title": "StockSource"
             },

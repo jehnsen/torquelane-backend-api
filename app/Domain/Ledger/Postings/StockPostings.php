@@ -18,6 +18,8 @@ use InvalidArgumentException;
  *  - receipt voided:   Dr GR/IR Clearing / Cr Inventory
  *  - parts issued:     Dr COGS (by item type) / Cr Inventory
  *  - parts returned:   Dr Inventory / Cr COGS
+ *  - parts used to service a tool:  Dr Equipment Repairs & Maintenance / Cr Inventory
+ *    (and the reverse when the service entry is removed)
  *  - count variance:   Dr Inventory / Cr Inventory Adjustments (a gain), or the reverse
  *  - opening balance:  Dr Inventory / Cr Opening Balance Equity
  *  - transfer:         Dr Inventory (destination branch) / Cr Inventory (source branch)
@@ -48,6 +50,8 @@ final class StockPostings
             LedgerEvent::StockReceiptReturn => PostingLine::debit(RuleKey::GoodsReceivedClearing, $value, $branch, memo: $memo),
             LedgerEvent::StockIssue, LedgerEvent::StockConsumption => PostingLine::debit(self::costOf($facts->itemType), $value, $branch, memo: $memo),
             LedgerEvent::StockReturn => PostingLine::credit(self::costOf($facts->itemType), $value, $branch, memo: $memo),
+            LedgerEvent::StockMaintenance => PostingLine::debit(RuleKey::EquipmentRepairs, $value, $branch, memo: $memo),
+            LedgerEvent::StockMaintenanceReturn => PostingLine::credit(RuleKey::EquipmentRepairs, $value, $branch, memo: $memo),
             LedgerEvent::StockAdjustment => $delta >= 0
                 ? PostingLine::credit(RuleKey::InventoryAdjustments, $delta, $branch, memo: $memo)
                 : PostingLine::debit(RuleKey::InventoryAdjustments, -$delta, $branch, memo: $memo),

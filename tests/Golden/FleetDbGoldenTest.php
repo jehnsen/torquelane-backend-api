@@ -129,7 +129,10 @@ it('derives the alerts the frontend derived, per scope', function (string $sweep
         'days_remaining' => $alert['daysRemaining'],
     ], $fixture));
 
-    $actual = array_map(fn (array $alert): array => array_diff_key($alert, ['read' => true, 'dismissed' => true]), $this->getJson('/api/v1/alerts')->assertOk()->json('data'));
+    // Equipment alerts (Phase 10) are not in ../web's recording; tests/Feature/Equipment holds them.
+    // They join a stable sort, so the alerts the frontend derived keep their order around them.
+    $fromTheFleet = array_values(array_filter($this->getJson('/api/v1/alerts')->assertOk()->json('data'), fn (array $alert): bool => ! str_starts_with($alert['id'], 'equipment:')));
+    $actual = array_map(fn (array $alert): array => array_diff_key($alert, ['read' => true, 'dismissed' => true]), $fromTheFleet);
 
     expect($expected)->not->toBeEmpty()
         ->and($actual)->toBe($expected);

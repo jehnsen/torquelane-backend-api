@@ -41,6 +41,10 @@ final class EquipmentWriteRequest extends ApiRequest
             'parts' => ['sometimes', 'nullable', 'string', 'max:1000'],
             'notes' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'resets_service' => ['sometimes', 'boolean'],
+            // Parts the service took from the branch's store.
+            'issued_parts' => ['sometimes', 'array', 'max:50'],
+            'issued_parts.*.item_id' => ['required', 'string', 'ulid'],
+            'issued_parts.*.quantity' => ['required', 'numeric', 'gt:0', 'max:1000000', self::DECIMAL],
             // A package's equipment profile: the whole list.
             'lines' => ['sometimes', 'array', 'max:100'],
             'lines.*.equipment_id' => ['required', 'string', 'ulid'],
@@ -73,7 +77,7 @@ final class EquipmentWriteRequest extends ApiRequest
     }
 
     /**
-     * @return array{kind: string, performed_at: string|null, performed_by: string|null, cost_cents: int, downtime_hours: string|null, parts: string|null, notes: string|null, resets_service: bool}
+     * @return array{kind: string, performed_at: string|null, performed_by: string|null, cost_cents: int, downtime_hours: string|null, parts: string|null, notes: string|null, resets_service: bool, issued_parts: list<array{item_id: string, quantity: string}>}
      */
     public function service(): array
     {
@@ -86,6 +90,10 @@ final class EquipmentWriteRequest extends ApiRequest
             'parts' => Input::text($this->validated('parts')),
             'notes' => Input::text($this->validated('notes')),
             'resets_service' => ! $this->has('resets_service') || $this->boolean('resets_service'),
+            'issued_parts' => array_map(fn (array $row): array => [
+                'item_id' => Input::id($row['item_id'] ?? ''),
+                'quantity' => Input::string($row['quantity'] ?? '0'),
+            ], Input::rows($this->validated('issued_parts'))),
         ];
     }
 

@@ -7,7 +7,7 @@ namespace App\Http\Requests;
 final class AlertInteractionRequest extends ApiRequest
 {
     /** The deterministic alert id formats (App\Domain\Alerts\Alerts). */
-    public const string ALERT_ID = '/^(pms|wo|approval-sla|doc|licence):[0-9a-z]{26}(:[0-9a-z]{26})?$/';
+    public const string ALERT_ID = '/^((pms|wo|approval-sla|doc|licence):[0-9a-z]{26}(:[0-9a-z]{26})?|equipment:[0-9a-z]{26}:(service|life))$/';
 
     /**
      * @return array<string, list<mixed>>

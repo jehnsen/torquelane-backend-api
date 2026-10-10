@@ -383,7 +383,7 @@ Override keys are converted from pesos/camelCase to centavos/snake_case.
 |---|---|
 | `vehicles` | Owner `customer_account_id` (the CURRENT owner; composite FK), `plate_number` + `plate_normalized` (upper case, no spaces/dashes; unique per organization among unarchived vehicles), `vin` + `vin_normalized` (likewise), class, fuel, `size_class` (`small`/`medium`/`large`/`xl`, for detailing pricing), status `active`/`in_service`/`down`, assignment, acquisition and expiry dates, `archived_at`. Never deleted: DELETE archives and frees the plate. **No odometer column.** |
 | `vehicle_ownerships` | History: vehicle, account, `from_date`, `to_date` (null = current; one current per vehicle, partial unique index). |
-| `meter_readings` | **Append-only.** Polymorphic asset (`asset_type` = `vehicle` now, equipment in Phase 10) plus a typed FK per asset kind (`vehicle_id`, CHECKed equal to `asset_id`) so the database still guarantees the asset. `meter_kind` `km`/`hours`/`cycles`/`cups`, `value` numeric(14,3), `read_on`, `source`, `recorded_by`. Corrections are VOID rows (`voids_reading_id`, no value, unique per voided reading). |
+| `meter_readings` | **Append-only.** Polymorphic asset (`asset_type` = `vehicle`; Phase 10's equipment meters are derived and are NOT stored here) plus a typed FK per asset kind (`vehicle_id`, CHECKed equal to `asset_id`) so the database still guarantees the asset. `meter_kind` `km`/`hours`/`cycles`/`cups`, `value` numeric(14,3), `read_on`, `source`, `recorded_by`. Corrections are VOID rows (`voids_reading_id`, no value, unique per voided reading). |
 | `service_tasks` | Organization-wide PMS catalogue: `code` (slug, unique per organization), name, category, `interval_km`, `interval_months`, `estimated_cost_cents`, `estimated_hours`, `critical`, `is_active`, `position` (catalogue order). |
 | `maintenance_states` | Per asset × task: `meter_kind`, `last_done_value`, `last_done_on` (replaces ../web's `task_state` jsonb). Same polymorphic + typed-FK shape. |
 | `documents` | `customer_account_id` = the account the document was FILED UNDER (for a vehicle: its owner at upload), optional `vehicle_id`, `kind` (CHECK), name, mime, size, `storage_path` (null for imported paper records), `expires_on` (CHECK: renewal kinds only), reference/issued/issuer/notes, `uploaded_by` + `uploaded_by_name`, `uploaded_on`. |
@@ -391,7 +391,9 @@ Override keys are converted from pesos/camelCase to centavos/snake_case.
 
 ### The maintenance engine
 
-- **`App\Domain\Maintenance` is generic** (Phase 10 reuses it for equipment):
+- **`App\Domain\Maintenance` is generic** (Phase 10 runs equipment on it,
+  through `App\Domain\Equipment\ServicePlan`; a `PlanItem`'s calendar interval
+  is in months, or in days for a tool):
   an asset has meters (`MeterState`: kind, value, read on, daily rate); a
   `PlanItem` has per-meter intervals and/or a calendar interval; a
   `LastService` anchors them. `IntervalEngine::evaluate` projects each meter
@@ -468,7 +470,8 @@ per scope = buildAlerts sweeps (work-order alerts included since Phase 3).
   insurance, emission test, LTFRB franchise, warranty: ../web's
   EXPIRING_KINDS); compliance counts the five roadworthiness kinds.
 - **Alerts** are derived on read (`FleetQueries::alerts`, vehicles in
-  creation order so ties match ../web). Read/dismiss/restore write the
+  creation order so ties match ../web; equipment alerts join them since
+  Phase 10). Read/dismiss/restore write the
   caller's row in their scope bucket (`TenantScope::key()`); dismissing does
   not mark read.
 
@@ -999,6 +1002,8 @@ is written) or, in a reversal, by id.
 | goods receipt voided | GR/IR Clearing (at the receipt's cost) | Inventory |
 | parts issued to a job / consumed | COGS – Parts / Consumables / Café by item type | Inventory |
 | parts returned | Inventory | COGS |
+| parts used to service a tool (Phase 10) | Equipment Repairs & Maintenance | Inventory |
+| those parts returned (the service entry removed) | Inventory | Equipment Repairs & Maintenance |
 | count variance | Inventory ⇄ Inventory Adjustments | |
 | opening balance | Inventory | Opening Balance Equity |
 | transfer (one entry per line) | Inventory (destination branch) | Inventory (source branch): **no P&L effect** |
@@ -1263,24 +1268,27 @@ stock and no money, so the earlier phases' pinned figures are unchanged.
 
 ## Equipment monitoring (Phase 10)
 
-No brief was supplied for this phase; its scope was taken from what this file
-already committed to ("equipment in Phase 10") and from the source. The
-source's detailing-equipment register and monitor (`/admin/equipment`,
-`src/utils/equipmentUtils.js`, the `shop_equipment` tables) ported as the
-`equipment` module for **Samahuzai-Biñan**. Its engine had no tests, so the
-port is held to a recording of it: `tests/Golden/fixtures/detailing/equipment.json`
-(101 tools in 46 situations, recorded with `capture/capture-equipment.mjs`),
-replayed by `tests/Unit/Domain/Equipment/EquipmentCharacterizationTest`.
-Staff-only and module-gated (`EquipmentPolicy`: side, scope 404, module 403
+Equipment runs on the Phase 2 maintenance engine: a tool is an asset with
+meters (a polisher has an `hours` meter, the espresso machine a `cups` meter),
+its service intervals are one `PlanItem`, and `IntervalEngine` says which limit
+trips first. The source's detailing-equipment register and monitor
+(`/admin/equipment`, `src/utils/equipmentUtils.js`, the `shop_equipment`
+tables) is ported as the `equipment` module for **Samahuzai-Biñan**. The
+source's formulas had no tests, so the port is held to a recording of them:
+`tests/Golden/fixtures/detailing/equipment.json` (101 tools in 46 situations,
+recorded with `capture/capture-equipment.mjs`), replayed by
+`tests/Unit/Domain/Equipment/EquipmentCharacterizationTest`. Staff-only and
+module-gated (`EquipmentPolicy`: side, scope 404, module 403
 `module_disabled`, capability).
 
 ### Tables (Phase 10)
 
 | Table | Notes |
 |---|---|
-| `equipment` | A branch's tool (the source's `shop_equipment`): name (unique per branch, any case), category, brand, model, serial, `bay_id`, status, condition, purchase date / cost / warranty, `meter_type`, `baseline_hours` + `baseline_cycles` (what was on the clock when registered), `service_interval_hours` / `_cycles` / `_days` (any or all), `last_service_at`, `expected_life_hours`, `maintenance_task`. **No meter column.** |
+| `equipment` | A branch's tool (the source's `shop_equipment`): name (unique per branch, any case), category, brand, model, serial, `bay_id`, status, condition, purchase date / cost / warranty, `meter_type` (`hours`, `cycles`, `cups`, `days`; `cups` makes the count meter count cups, not jobs), `baseline_hours` + `baseline_cycles` (what was on the clock when registered), `service_interval_hours` / `_cycles` / `_days` (any or all), `last_service_at`, `expected_life_hours`, `maintenance_task`. **No meter column.** |
 | `equipment_usage_logs` | Runtime the booking sheet never saw: hours and/or cycles (not neither, CHECK), `used_at`, optional `detailing_booking_id`. Removable, as in the source. |
-| `equipment_maintenance_logs` | The service history: kind (`preventive`, `repair`, `inspection`, `calibration`, `part_replacement`), `performed_at`, `performed_by`, `cost_cents`, `downtime_hours`, parts, notes, the meters as they read when logged (`meter_hours`, `meter_cycles`, set by the API), `resets_service`. Removable. |
+| `equipment_maintenance_logs` | The service history: kind (`preventive`, `repair`, `inspection`, `calibration`, `part_replacement`), `performed_at`, `performed_by`, `cost_cents`, `downtime_hours`, parts, notes, the meters as they read when logged (`meter_hours`, `meter_cycles`, set by the API), `resets_service`, `cost_cents` (what was paid for the work) and `parts_cost_cents` (what the parts taken from stock were worth). Removable; removing puts the parts back. |
+| `equipment_maintenance_parts` | A part a service entry took from stock: `maintenance_log_id` (cascade), `item_id` (once per entry), `quantity` (> 0), `unit_cost_cents` and `value_cents` as it left the shelf, `stock_move_id`. |
 | `equipment_package_profiles` | The source's `service_equipment`: (detailing package, tool) → `hours_per_job`, once per pair, both of the same branch (composite FKs). |
 
 ### The engine (`App\Domain\Equipment\EquipmentEngine`, pure)
@@ -1290,12 +1298,24 @@ Staff-only and module-gated (`EquipmentPolicy`: side, scope 404, module 403
   to + Σ usage log; cycles = baseline + those jobs + logged cycles. A tool
   mapped to no package never ages from bookings. Re-open a job, remove a log
   entry or change a profile and every figure re-settles.
-- **Preventive maintenance**: three triggers (hours, cycles, days), each `used
-  since the last service ÷ interval`; the highest binds (the first of equals).
-  Under 80% `ok`, from 80% `due_soon`, from 100% `overdue`; no interval = not
-  tracked (`service` null). Usage counts strictly after `last_service_at`; days
-  run from the last service, else the purchase date (its UTC midnight, as the
-  source read a date), else the day the tool was registered.
+- **The service plan runs on the maintenance engine** (`ServicePlan`, the
+  equipment counterpart of `Fleet\IntervalStatus`). The tool's intervals are
+  one `PlanItem` (an interval per meter: `hours`, and `cycles` or `cups`; a
+  calendar interval in DAYS, which `PlanItem` learned in this phase), anchored
+  by a `LastService` at the last service (else the purchase date, its UTC
+  midnight as the source read a date, else the day the tool was registered).
+  `IntervalEngine` names the limit that trips FIRST (`binding`) and the
+  reading each meter limit falls due at (`due_at`); the calendar limit's date
+  is `due_on`. A derived meter has no readings to average, so its daily rate
+  is what the tool has done since the anchor (used ÷ days since); at that pace
+  the first limit to trip is the one furthest along, which is the source's
+  "highest ratio binds" (the recording agrees on every tool that has moved).
+  Where the engine names no limit (nothing has moved and no calendar interval
+  is set) the furthest along stands, the first of equals.
+- **Service status bands** are the source's: each limit is `used since the
+  last service ÷ interval`; the furthest along sets the band. Under 80% `ok`,
+  from 80% `due_soon`, from 100% `overdue`; no interval = not tracked
+  (`service` null). Usage counts strictly after `last_service_at`.
 - **Forecast**: the binding trigger's remainder ÷ the burn rate of the last 30
   days; none for an idle tool; today for an overdue one; a days trigger simply
   counts down.
@@ -1316,6 +1336,29 @@ Staff-only and module-gated (`EquipmentPolicy`: side, scope 404, module 403
 `ManageEquipment` is the one writer (save, status, usage, service, profile);
 logging a service with `resets_service` (the default; off for a clean
 inspection) stamps `last_service_at` with when the work was done.
+
+**A service entry can issue parts from stock** (`issued_parts`: item and
+quantity, each item once). They leave the branch's store through
+`PostStockMove` as `consumption` moves with source `equipment_maintenance`
+(the entry's id), at the average cost, dated when the entry is saved. The
+ledger books them **Dr Equipment Repairs & Maintenance / Cr Inventory**
+(`LedgerEvent::StockMaintenance`, whatever the item's type: an expense, not a
+cost of sales). Removing the entry returns them at the cost they left at
+(`return` moves, `StockMaintenanceReturn`: Dr Inventory / Cr Equipment
+Repairs). `parts_cost_cents` is their value; a tool's maintenance cost and
+total cost of ownership are `cost_cents + parts_cost_cents`. A branch that
+blocks negative stock refuses an issue it cannot cover (409
+`insufficient_stock`) and nothing of the entry is kept.
+
+**Equipment alerts join `GET /alerts`** (`Alerts::build`'s sixth argument,
+fed by `EquipmentQueries::alertFacts`): a tool due or overdue for service
+(`equipment:<tool>:service`, `equipment_service_due_soon` warning /
+`equipment_service_overdue` critical) and one near or past its rated life
+(`equipment:<tool>:life`, `equipment_replace_soon` warning /
+`equipment_end_of_life` critical), linking to `/shop/equipment/<tool>`. Only
+for staff with `equipment:view`, in the branches they are looking at where the
+module is on; a retired or inactive tool raises none. Read, dismiss and
+restore work on them as on any alert.
 `EquipmentQueries` evaluates a branch's whole floor together: its completed
 bookings are read once and matched to each tool through its profiles.
 `EquipmentVocabulary` holds the source's lists, labels and category presets
@@ -1330,14 +1373,20 @@ a portal role. Under `/equipment`: `GET /` (the board and `summary`), `POST /`,
 `GET|PUT|DELETE /{equipment}`, `POST /{equipment}/status`,
 `POST /{equipment}/usage-logs` (+ `DELETE …/{usage_log}`),
 `POST /{equipment}/maintenance-logs` (+ `DELETE …/{maintenance_log}`).
+A tool's response carries `count_unit` (`cycles` or `cups`), each service
+limit's `due_at` / `due_on`, and each service entry's `issued_parts`,
+`parts_cost_cents` and `total_cost_cents`.
 
 ### Demo data (Phase 10)
 
 `EquipmentSeed`: the source's own 22 tools at Samahuzai-Biñan with their rated
-intervals and service tasks; package profiles for nine of them; and the air
+intervals and service tasks; package profiles for nine of them; the air
 compressor with 420 h on the clock, bought for ₱85,000, serviced 60 days ago
-(₱1,850, 2.5 h down) and a 6.5 h run logged last week. Rows in new tables
-only: no earlier phase's figure moves.
+(₱1,850, 2.5 h down) and a 6.5 h run logged last week; and the lounge's
+**Espresso Machine**, metered in cups (5,000 between descales, 4,150 logged),
+which is due soon and so raises the demo's one equipment alert. Rows in new
+tables only; nothing is issued from stock and nothing posts: no earlier
+phase's figure moves.
 
 ## Rules that bite
 
@@ -1605,10 +1654,28 @@ only: no earlier phase's figure moves.
   date and the health score are derived by `EquipmentEngine` on read. The only
   stored clock is `last_service_at`, and only `ManageEquipment::logService`
   moves it.
-- **Equipment does not use `meter_readings` or the generic interval engine.**
-  The source derives usage from the booking sheet and a log of deltas, not from
-  absolute readings; porting it onto `IntervalEngine` would have changed its
-  behaviour. `meter_readings` is still vehicles only.
+- **Equipment runs on `IntervalEngine` but not on `meter_readings`.** A tool's
+  meters are derived (the booking sheet and a log of deltas), handed to the
+  engine as `MeterState`s read "now"; nothing is appended to `meter_readings`,
+  which is still vehicles only. The engine decides which limit trips first
+  and where each falls due; the BAND is the source's 80% / 100% rule on the
+  limit furthest along, not `IntervalOutcome::status` (which rounds the meter
+  to a whole unit, right for kilometres and wrong for 12.5 hours).
+- **`PlanItem` counts its calendar interval in months or in days, never
+  both.** Vehicles pass months, equipment passes days (third argument).
+- **A cups tool keeps its cups in the `cycles` columns** (`baseline_cycles`,
+  `service_interval_cycles`, a usage entry's `cycles`). `meter_type = 'cups'`
+  is what makes the engine call that meter `cups`; do not add a second column.
+- **Parts for a tool's service are an expense, not a cost of sales.** The
+  stock move's SOURCE decides (`StockFacts::eventFor`): anything out of an
+  `equipment_maintenance` entry debits Equipment Repairs & Maintenance,
+  whatever the item's type. Do not route it through `StockIssue`.
+- **What was paid for a service (`cost_cents`) posts nothing.** There is no
+  vendor bill or cash-out document yet to credit; only parts from stock reach
+  the books. The figure still counts in the tool's cost of ownership.
+- **Removing a service entry that issued parts moves stock.** It returns them
+  and reverses the expense in the same transaction; the stock moves keep the
+  removed entry's id as their source.
 - **Removing a service entry does not move `last_service_at` back** (the
   source's behaviour, kept): correct the clock by logging the right service.
 - **An exact quotient must stay a float in a ported float rule.** PHP's `/`
@@ -1707,7 +1774,7 @@ audit rows). Fill in the rest from the phase plan.
 - [x] **7**: Order-to-cash (invoices with VAT and BIR snapshots, payments and allocations, receivables: aging, statements, credit limit; PDFs; billing events)
 - [x] **8**: General ledger (chart of accounts, posting rules, balanced append-only journal posted in the event's transaction, monthly periods and the close checklist, reports, journal export, backfill)
 - [x] **9**: Detailing (the Samahuzai app ported as the `detailing` module: per-branch menu priced per size, the booking engine with its source characterization, job card, inspection with damage map and photos, materials consumed from stock, booking → invoice and counter checkout, after-commit broadcast with display tokens, public booking)
-- [x] **10**: Equipment monitoring (the source's detailing-equipment register and monitor as the `equipment` module: tools, usage and service logs, package profiles, the derived engine with its source characterization). *No brief was supplied; scope inferred, see Phase 10 status.*
+- [x] **10**: Equipment monitoring on the Phase 2 maintenance engine (the source's detailing-equipment register and monitor as the `equipment` module: tools, usage and service logs, package profiles; derived meters; the source's formulas with their characterization; parts from stock on a service entry, posted to Equipment Repairs & Maintenance; equipment alerts on `GET /alerts`).
 - [ ] **11**: *(title not provided)*
 - [ ] **12**: *(title not provided)*
 - [ ] **13**: *(title not provided)*
@@ -1851,27 +1918,50 @@ capabilities as tabled above; recurring schedules are stored preferences only,
 as in the source; the source's VIP perks (10% off, coffee), testimonials, coffee
 POS and equipment monitoring are out of this phase's scope and were not ported.
 
-Phase 10 status: done locally (gates green: Pest 1,396 tests, Larastan max,
+Phase 10 status: done locally (gates green: Pest 1,409 tests, Larastan max,
 Pint, `openapi.json` regenerated; isolation, parity and both characterization
-suites pass). **No Phase 10 brief was supplied**; the user said to continue, so
-the scope was inferred and is for review: equipment monitoring, because this
-file already said equipment arrives in Phase 10, ported from the source's
-`/admin/equipment`. Not done: the screens were type-checked, linted and built
-but not driven in a browser; no Playwright coverage. Decisions taken here, for
-review: the source's engine was ported as it is rather than onto
-`App\Domain\Maintenance` / `meter_readings` (which this file had anticipated
-reusing), because the source derives usage from completed bookings and a usage
-log and stores no reading; tools belong to a branch and are mapped to detailing
-PACKAGES (the source mapped them to its per-size service rows); `equipment:view`
-for every staff role and `equipment:manage` for provider admin and branch
-manager; a tool with a history is retired, not deleted (the source cascaded the
-delete); the meter snapshot on a service entry is taken by the API (the source
-took it from the form); maintenance cost is recorded on the entry but posts
-nothing to the books (there is still no vendor bill or cash-out document to
-balance an Equipment Repairs entry against); a purchase date anchors the days
-trigger at its UTC midnight, as the source did; the source's 10 open hours a
-day for utilisation is kept although the booking grid here opens at 8:00; the
-café's espresso-machine maintenance (cups sold since the last service) is NOT
-ported: it needs the café POS, which no phase has built; the "usage hours per
-job" flat rate the source retired is not carried over.
+suites pass). The phase was first built
+without a brief, on an inferred scope; the brief then arrived and the work was
+brought into line with it: the service plan moved onto `IntervalEngine`, a
+service entry can issue parts and posts to Equipment Repairs & Maintenance,
+equipment alerts joined `GET /alerts`, the espresso machine became an asset
+with a `cups` meter, and the register got its own screen. Not done: the
+screens were type-checked, linted and built but not driven in a browser; no
+Playwright coverage.
 
+**One conflict in the brief, reported (R13) and resolved as follows, for
+review.** The brief asks both that "plan items use the engine's first-to-trip
+logic" and that the ported formulas (service status bands and the 30-day
+forecast among them) match the JS. The two are not the same rule: the engine
+projects every limit onto the calendar and takes the earliest date; the JS
+takes the highest used ÷ interval ratio. Fed the tool's pace since its last
+service, the engine picks the limit furthest along, which is the JS's answer,
+and the recording agrees on all 88 recorded tools that have moved (the other
+two have used nothing and have no calendar limit; the engine names no limit
+there and the JS's first-of-equals stands). So: **which limit trips first, and
+where each falls due, is the engine's; the band, the progress, the forecast and
+every other figure are the source's formulas, matched to the recording.** The
+two can still part in one case the recording does not contain: two limits that
+project to the same calendar day (within half a day of each other). The engine
+then takes the earlier-listed one where the JS takes the one a hair further
+along, and the forecast follows it. `IntervalOutcome::status` is not used for
+the band, because the engine rounds a meter to a whole unit.
+
+Other decisions taken here, for review: tools belong to a branch and are
+mapped to detailing PACKAGES (the source mapped them to its per-size service
+rows); `equipment:view` for every staff role and `equipment:manage` for
+provider admin and branch manager, which also covers issuing parts to a
+service entry (no `inventory:manage` needed); a tool with a history is
+retired, not deleted (the source cascaded the delete); the meter snapshot on a
+service entry is taken by the API (the source took it from the form); parts
+issued to a service are dated when the entry is saved, not when the work was
+done, so a back-dated entry never posts into a closed month; what was PAID
+for a service posts nothing (there is still no vendor bill or cash-out document
+to credit), only parts from stock do; removing a service entry returns its
+parts and reverses the expense; the espresso machine's cups are LOGGED (the
+source counted them from café POS orders, and no phase has built that POS), in
+the same columns as job cycles; equipment alerts cover service due / overdue
+and rated life, not "down for repair"; a purchase date anchors the days limit
+at its UTC midnight, as the source did; the source's 10 open hours a day for
+utilisation is kept although the booking grid here opens at 8:00; the "usage
+hours per job" flat rate the source retired is not carried over.

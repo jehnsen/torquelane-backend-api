@@ -19,6 +19,7 @@ final class EquipmentVocabulary
         'air' => 'Compressed Air',
         'measurement' => 'Measurement & Light',
         'facility' => 'Facility & Support',
+        'cafe' => 'Café',
         'other' => 'Other',
     ];
 
@@ -32,7 +33,7 @@ final class EquipmentVocabulary
 
     public const array CONDITIONS = ['excellent' => 'Excellent', 'good' => 'Good', 'fair' => 'Fair', 'poor' => 'Poor'];
 
-    public const array METER_TYPES = ['hours' => 'Runtime hours', 'cycles' => 'Job cycles', 'days' => 'Calendar days'];
+    public const array METER_TYPES = ['hours' => 'Runtime hours', 'cycles' => 'Job cycles', 'cups' => 'Cups served', 'days' => 'Calendar days'];
 
     public const array MAINTENANCE_KINDS = [
         'preventive' => 'Preventive service',
@@ -55,6 +56,8 @@ final class EquipmentVocabulary
         'air' => ['meter_type' => 'hours', 'service_interval_hours' => '500', 'expected_life_hours' => '8000', 'maintenance_task' => 'Oil change, drain tank, replace air filter'],
         'measurement' => ['meter_type' => 'days', 'service_interval_days' => 365, 'maintenance_task' => 'Annual factory calibration'],
         'facility' => ['meter_type' => 'days', 'service_interval_days' => 180, 'maintenance_task' => 'Safety + wear inspection'],
+        // The source scheduled its espresso machine by cups served: descaling every 5,000.
+        'cafe' => ['meter_type' => 'cups', 'service_interval_cycles' => 5000, 'maintenance_task' => 'Descale and backflush'],
     ];
 
     /**

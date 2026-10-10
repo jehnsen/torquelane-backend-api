@@ -17,8 +17,10 @@ use RuntimeException;
 /**
  * Equipment at Samahuzai-Biñan (Phase 10): the source's own register of the
  * 22 tools a detailing floor runs, each with its rated interval and service
- * task; which packages put hours on a handful of them; and a little history
- * (one service, one logged run) so the monitor has something to show.
+ * task, and the lounge's espresso machine, metered in cups; which packages
+ * put hours on a handful of them; and a little history (one service, one
+ * logged run, the machine's cup counter) so the monitor has something to
+ * show. Nothing here takes stock or posts to the books.
  *
  * Ids: `equipment:<slug>`.
  */
@@ -52,6 +54,8 @@ final class EquipmentSeed
         ['vehicle-lift', 'Two-Post Vehicle Lift', 'facility', null, 'cycles', null, 250, null, null, 'Cable tension + lock engagement check (annual safety cert)'],
         ['bay-lighting', 'LED Bay Lighting Rig', 'facility', null, 'days', null, null, 180, '30000', 'Fixture clean - driver + wiring check'],
         ['detailing-cart', 'Detailing Cart & Bucket System', 'facility', null, 'days', null, null, 90, null, 'Caster / wheel check - grit guard clean'],
+        // The lounge's machine wears in cups, not hours: the source descaled it every 5,000.
+        ['espresso-machine', 'Espresso Machine', 'cafe', null, 'cups', null, 5000, null, null, 'Descale and backflush'],
     ];
 
     /** package slug → [tool slug => hours one completed job puts on it] */
@@ -112,6 +116,11 @@ final class EquipmentSeed
                 'parts' => 'Compressor oil, intake air filter',
             ]);
             $manage->logUsage($compressor, ['hours' => '6.5', 'cycles' => 0, 'used_at' => $now->subDays(7)->toIso8601String(), 'note' => 'Tyre shop next door borrowed the line']);
+
+            // No café till feeds the cup counter yet, so cups are logged: 4,150 of 5,000 since the last descale.
+            $espresso = Equipment::query()->findOrFail($ids['equipment:espresso-machine']);
+            $manage->logUsage($espresso, ['cycles' => 2_650, 'used_at' => $now->subDays(21)->toIso8601String(), 'note' => 'Cup counter, first three weeks']);
+            $manage->logUsage($espresso, ['cycles' => 1_500, 'used_at' => $now->subDays(2)->toIso8601String(), 'note' => 'Cup counter']);
         });
     }
 }

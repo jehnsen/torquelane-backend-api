@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 namespace App\Domain\Equipment;
 
+use App\Domain\Maintenance\MeterKind;
+
 /**
  * What the engine needs to know about one tool. Instants are milliseconds
  * since the epoch, as the source's JavaScript held them; a purchase DATE is
  * that day's UTC midnight, which is how the source read a date-only string.
+ *
+ * `countKind` is what the tool's count meter counts: `cycles` (jobs) for a
+ * detailing tool, `cups` for the espresso machine.
  */
 final readonly class ToolFacts
 {
@@ -26,5 +31,6 @@ final readonly class ToolFacts
         public ?int $purchaseDateMs,
         public ?int $createdAtMs,
         public ?float $expectedLifeHours,
+        public MeterKind $countKind = MeterKind::Cycles,
     ) {}
 }

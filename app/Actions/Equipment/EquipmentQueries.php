@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Actions\Equipment;
 
+use App\Domain\Alerts\EquipmentAlertFacts;
 use App\Domain\Detailing\BookingStatus;
 use App\Domain\Equipment\EquipmentEngine;
 use App\Domain\Equipment\ServiceEvent;
 use App\Domain\Equipment\ToolFacts;
 use App\Domain\Equipment\UsageEvent;
+use App\Domain\Maintenance\MeterKind;
 use App\Models\Branch;
 use App\Models\DetailingBooking;
 use App\Models\Equipment;
@@ -86,6 +88,40 @@ final class EquipmentQueries
     }
 
     /**
+     * What the alert rules read: every tool in service of the given branches,
+     * with where it sits in its plan and its rated life. A retired or inactive
+     * tool raises nothing.
+     *
+     * @param  list<string>  $branchIds
+     * @return list<EquipmentAlertFacts>
+     */
+    public function alertFacts(array $branchIds): array
+    {
+        $facts = [];
+        foreach (Branch::query()->whereIn('id', $branchIds)->orderBy('id')->get() as $branch) {
+            $tools = Equipment::query()->where('branch_id', $branch->id)->where('is_active', true)->where('status', '!=', 'retired')->orderBy('position')->orderBy('name')->get();
+            $reports = $this->reports($branch, $tools);
+            foreach ($tools as $tool) {
+                $report = $reports[$tool->id];
+                $facts[] = new EquipmentAlertFacts(
+                    $tool->id,
+                    $tool->name,
+                    $tool->maintenance_task,
+                    $report['service']['level'] ?? null,
+                    $report['service']['progress'] ?? 0.0,
+                    $report['service']['binding'] ?? null,
+                    $report['forecast']['days'] ?? null,
+                    $report['life']['level'] ?? null,
+                    $report['life']['used'] ?? 0.0,
+                    $report['life']['life'] ?? 0.0,
+                );
+            }
+        }
+
+        return $facts;
+    }
+
+    /**
      * @param  Collection<int, Equipment>  $tools
      * @return array<string, Report>
      */
@@ -116,7 +152,7 @@ final class EquipmentQueries
         }
         $services = [];
         foreach (EquipmentMaintenanceLog::query()->whereIn('equipment_id', $ids)->orderBy('performed_at')->orderBy('id')->get() as $log) {
-            $services[$log->equipment_id][] = new ServiceEvent($log->kind, $log->cost_cents, $log->downtime_hours->toFloat(), $log->performed_at->getTimestampMs());
+            $services[$log->equipment_id][] = new ServiceEvent($log->kind, $log->totalCostCents(), $log->downtime_hours->toFloat(), $log->performed_at->getTimestampMs());
         }
 
         $reports = [];
@@ -153,6 +189,7 @@ final class EquipmentQueries
             $tool->purchase_date === null ? null : CarbonImmutable::parse($tool->purchase_date->toDateString().'T00:00:00Z')->getTimestampMs(),
             $tool->created_at->getTimestampMs(),
             $tool->expected_life_hours?->toFloat(),
+            $tool->meter_type === MeterKind::Cups->value ? MeterKind::Cups : MeterKind::Cycles,
         );
     }
 }

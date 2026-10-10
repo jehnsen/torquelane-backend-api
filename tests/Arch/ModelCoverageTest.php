@@ -47,6 +47,7 @@ const MODEL_TENANCY = [
     // Phase 10: equipment monitoring.
     'App\Models\Equipment' => ['tenant', ''],
     'App\Models\EquipmentMaintenanceLog' => ['tenant', ''],
+    'App\Models\EquipmentMaintenancePart' => ['tenant', ''],
     'App\Models\EquipmentPackageProfile' => ['tenant', ''],
     'App\Models\EquipmentUsageLog' => ['tenant', ''],
     'App\Models\Document' => ['tenant', ''],

@@ -29,6 +29,10 @@ enum LedgerEvent: string
     case StockConsumption = 'stock_consumption';
     case StockAdjustment = 'stock_adjustment';
     case StockTransfer = 'stock_transfer';
+    /** Parts taken from stock to service a tool: an expense, not a cost of sales. */
+    case StockMaintenance = 'stock_maintenance';
+    /** Those parts put back, because the service entry was removed. */
+    case StockMaintenanceReturn = 'stock_maintenance_return';
 
     public function label(): string
     {
@@ -47,6 +51,8 @@ enum LedgerEvent: string
             self::StockConsumption => 'Stock consumed',
             self::StockAdjustment => 'Stock adjustment',
             self::StockTransfer => 'Stock transfer',
+            self::StockMaintenance => 'Parts used on equipment',
+            self::StockMaintenanceReturn => 'Parts returned from equipment',
         };
     }
 

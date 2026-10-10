@@ -20,6 +20,8 @@ use App\Domain\Ledger\Postings\TransferFacts;
 use App\Domain\Shared\Calendar;
 use App\Exceptions\ConflictException;
 use App\Models\DetailingBooking;
+use App\Models\Equipment;
+use App\Models\EquipmentMaintenanceLog;
 use App\Models\GoodsReceipt;
 use App\Models\GoodsReceiptLine;
 use App\Models\Invoice;
@@ -217,6 +219,8 @@ final class LedgerPostings
             StockSource::StockTransfer => Cell::string(StockTransfer::query()->whereKey($id)->value('reference')),
             StockSource::WorkOrderLine => Cell::string(WorkOrder::query()->whereKey(Cell::string(WorkOrderLine::query()->whereKey($id)->value('work_order_id')))->value('reference')),
             StockSource::DetailingBooking => Cell::string(DetailingBooking::query()->whereKey($id)->value('reference')),
+            // A service entry has no number: the tool it was for.
+            StockSource::EquipmentMaintenance => Cell::string(Equipment::query()->whereKey(Cell::string(EquipmentMaintenanceLog::query()->whereKey($id)->value('equipment_id')))->value('name')),
             StockSource::Manual => '',
         };
     }

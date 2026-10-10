@@ -5,6 +5,12 @@ declare(strict_types=1);
 namespace App\Actions\Equipment;
 
 use App\Actions\Audit\AuditTrail;
+use App\Actions\Inventory\PostStockMove;
+use App\Actions\Inventory\StockLocations;
+use App\Domain\Equipment\EquipmentVocabulary;
+use App\Domain\Inventory\MoveRequest;
+use App\Domain\Inventory\MoveType;
+use App\Domain\Inventory\StockSource;
 use App\Exceptions\ConflictException;
 use App\Models\Bay;
 use App\Models\Branch;
@@ -12,8 +18,10 @@ use App\Models\DetailingBooking;
 use App\Models\DetailingPackage;
 use App\Models\Equipment;
 use App\Models\EquipmentMaintenanceLog;
+use App\Models\EquipmentMaintenancePart;
 use App\Models\EquipmentPackageProfile;
 use App\Models\EquipmentUsageLog;
+use App\Models\Item;
 use App\Models\User;
 use App\Tenancy\TenantManager;
 use Brick\Math\BigDecimal;
@@ -28,6 +36,10 @@ use Illuminate\Validation\ValidationException;
  *
  * Nothing here writes a meter. A usage entry and a service entry are facts on
  * record; the monitor derives every figure from them when it is read.
+ *
+ * A service entry may take parts from the branch's store. They leave through
+ * the stock ledger (R7), which books them to Equipment Repairs & Maintenance;
+ * removing the entry puts them back the same way.
  */
 final class ManageEquipment
 {
@@ -35,6 +47,8 @@ final class ManageEquipment
         private readonly AuditTrail $audit,
         private readonly TenantManager $tenancy,
         private readonly EquipmentQueries $queries,
+        private readonly PostStockMove $ledger,
+        private readonly StockLocations $locations,
     ) {}
 
     /**
@@ -154,7 +168,11 @@ final class ManageEquipment
      * `last_service_at` with when the work was done. The tool's derived meters
      * as they read now are kept with the entry.
      *
-     * @param  array{kind?: string, performed_at?: string|null, performed_by?: string|null, cost_cents?: int, downtime_hours?: string|null, parts?: string|null, notes?: string|null, resets_service?: bool}  $data
+     * `issued_parts` are taken from the branch's store as the entry is saved:
+     * one `consumption` move each, at the average cost, dated now (stock
+     * leaves the shelf when it is recorded, whenever the work was done).
+     *
+     * @param  array{kind?: string, performed_at?: string|null, performed_by?: string|null, cost_cents?: int, downtime_hours?: string|null, parts?: string|null, notes?: string|null, resets_service?: bool, issued_parts?: list<array{item_id: string, quantity: string}>}  $data
      */
     public function logService(Equipment $tool, array $data): EquipmentMaintenanceLog
     {
@@ -162,19 +180,32 @@ final class ManageEquipment
         if ($performedAt->isFuture()) {
             throw ValidationException::withMessages(['performed_at' => 'A service is logged once it has been done.']);
         }
+        $issued = $data['issued_parts'] ?? [];
+        $seen = [];
+        foreach ($issued as $index => $part) {
+            if (isset($seen[$part['item_id']])) {
+                throw ValidationException::withMessages(["issued_parts.{$index}.item_id" => 'That item is listed twice.']);
+            }
+            $seen[$part['item_id']] = true;
+            $item = Item::query()->find($part['item_id']);
+            if (! $item instanceof Item || ! $item->is_stocked) {
+                throw ValidationException::withMessages(["issued_parts.{$index}.item_id" => 'Pick an item the stock room keeps.']);
+            }
+        }
 
-        return DB::transaction(function () use ($tool, $data, $performedAt): EquipmentMaintenanceLog {
+        return DB::transaction(function () use ($tool, $data, $performedAt, $issued): EquipmentMaintenanceLog {
             $locked = Equipment::query()->lockForUpdate()->findOrFail($tool->id);
             $meters = $this->queries->lifetime($locked);
             $actor = $this->actor();
             $resets = $data['resets_service'] ?? true;
+            $kind = $data['kind'] ?? 'preventive';
 
             $log = new EquipmentMaintenanceLog;
             $log->forceFill([
                 'organization_id' => $locked->organization_id,
                 'branch_id' => $locked->branch_id,
                 'equipment_id' => $locked->id,
-                'kind' => $data['kind'] ?? 'preventive',
+                'kind' => $kind,
                 'performed_at' => $performedAt,
                 'performed_by' => self::text($data['performed_by'] ?? null),
                 'cost_cents' => $data['cost_cents'] ?? 0,
@@ -187,6 +218,34 @@ final class ManageEquipment
                 'recorded_by' => $actor->id,
                 'recorded_by_name' => $actor->name,
             ])->save();
+
+            if ($issued !== []) {
+                $location = $this->locations->storeOf($locked->branch_id);
+                $this->ledger->lock(array_map(fn (array $part): array => ['location' => $location, 'item_id' => $part['item_id']], $issued));
+                $partsCost = 0;
+                foreach ($issued as $part) {
+                    $move = $this->ledger->handle(
+                        $location,
+                        $part['item_id'],
+                        new MoveRequest(MoveType::Consumption, BigDecimal::of($part['quantity'])->negated()),
+                        StockSource::EquipmentMaintenance,
+                        $log->id,
+                        sprintf('%s: %s', $locked->name, EquipmentVocabulary::MAINTENANCE_KINDS[$kind] ?? $kind),
+                    );
+                    $value = $move->valueCents();
+                    (new EquipmentMaintenancePart)->forceFill([
+                        'organization_id' => $locked->organization_id,
+                        'maintenance_log_id' => $log->id,
+                        'item_id' => $part['item_id'],
+                        'quantity' => $move->quantity->abs(),
+                        'unit_cost_cents' => $move->unit_cost_cents,
+                        'value_cents' => $value,
+                        'stock_move_id' => $move->id,
+                    ])->save();
+                    $partsCost += $value;
+                }
+                $log->forceFill(['parts_cost_cents' => $partsCost])->save();
+            }
             $this->audit->record($log, 'logged', null, AuditTrail::snapshot($log));
 
             if ($resets) {
@@ -199,12 +258,33 @@ final class ManageEquipment
         });
     }
 
-    /** As in the source, removing a service entry leaves the tool's service clock where that entry set it. */
+    /**
+     * As in the source, removing a service entry leaves the tool's service
+     * clock where that entry set it. The parts it took go back on the shelf
+     * at what they left at, and the books take the expense back.
+     */
     public function deleteService(EquipmentMaintenanceLog $log): void
     {
         DB::transaction(function () use ($log): void {
-            $this->audit->record($log, 'deleted', AuditTrail::snapshot($log), null);
-            $log->delete();
+            $locked = EquipmentMaintenanceLog::query()->lockForUpdate()->findOrFail($log->id);
+            $parts = $locked->issuedParts()->get();
+            if ($parts->isNotEmpty()) {
+                $tool = Equipment::query()->findOrFail($locked->equipment_id);
+                $location = $this->locations->storeOf($locked->branch_id);
+                $this->ledger->lock(array_values($parts->map(fn (EquipmentMaintenancePart $part): array => ['location' => $location, 'item_id' => $part->item_id])->all()));
+                foreach ($parts as $part) {
+                    $this->ledger->handle(
+                        $location,
+                        $part->item_id,
+                        new MoveRequest(MoveType::Return, $part->quantity, $part->unit_cost_cents),
+                        StockSource::EquipmentMaintenance,
+                        $locked->id,
+                        "{$tool->name}: service entry removed",
+                    );
+                }
+            }
+            $this->audit->record($locked, 'deleted', AuditTrail::snapshot($locked), null);
+            $locked->delete();
         });
     }
 
