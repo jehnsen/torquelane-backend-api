@@ -28,6 +28,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string|null $work_order_line_id
  * @property string|null $item_id
  * @property string|null $service_task_id
+ * @property string|null $detailing_booking_id
  * @property BigDecimal $quantity
  * @property int $unit_price_cents
  * @property int $discount_cents
@@ -67,6 +68,7 @@ final class InvoiceLine extends Model
             $this->work_order_line_id,
             $this->item_id,
             $this->service_task_id,
+            $this->detailing_booking_id,
         );
     }
 }

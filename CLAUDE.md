@@ -1092,6 +1092,253 @@ seeded invoices, the part payment, the opening stock, the receipt, the transfer
 and the count each post as they happen (the chart installs on the first). On the
 seeded activity the trial balance balances and all five close checks pass.
 
+## Detailing (Phase 9)
+
+The Samahuzai detailing app (`detailing-app_v2`, in production on Supabase;
+on this machine at `~/Projects/Freelance Projects/detailing-shop-booking-app`,
+the briefs' `../legacy`) ported as the `detailing` module, for
+**Samahuzai-Biñan** (the brief's `{{DETAILING_BRANCH}}`: the seeded detailing
+branch). Its behaviour is the spec. It had no tests, so the port is held to
+**recordings of the source itself**: `tests/Golden/fixtures/detailing/`
+(`planner.json` from its JavaScript, `engine.json` from its SQL run in a scratch
+Postgres; `capture/README.md` says how, and which definition of each redefined
+function was used). `tests/Unit/Domain/Detailing/*CharacterizationTest` replays
+them through the pure rules, `tests/Feature/Detailing/EngineCharacterizationTest`
+through the Actions on real Postgres.
+
+The source was one shop. Here everything is a branch's own: its menu, pool,
+bookings, blocked slots and wall screens. Detailing is **staff-only and
+module-gated** (`DetailingPolicy`: side, then scope 404, then module 403
+`module_disabled`, then capability), plus two doors with no user: the public
+booking page and the shop monitor's display token.
+
+| Source | Here |
+|---|---|
+| `members`, `member_cars`, `cars` | individual `customer_accounts` + `vehicles` (`size_class`). A booking carries its own `size_class` and may have no vehicle row (a public booking only has what the customer typed). |
+| `detailers` | `technicians` with skill `detailer` |
+| `service_areas` | `bays` (still informational, as in the source: a bay holds no capacity) |
+| `settings` singleton | `detailing_settings`, one row per branch |
+| `services` (a row per size, the size in its name), `service_categories`, `addon_catalog` | `detailing_packages` / `detailing_categories` / `detailing_addons`, each package and add-on ONE row with a price per size class |
+| `bookings`, `booking_day_slots`, `booking_status_logs`, `blocked_slots`, `recurring_schedules`, `car_condition_logs` | `detailing_bookings`, `detailing_booking_slots`, `detailing_booking_status_logs`, `detailing_blocked_slots`, `detailing_recurring_schedules`, `detailing_inspections` |
+
+### Tables (Phase 9)
+
+| Table | Notes |
+|---|---|
+| `detailing_settings` | One per branch (a branch with none works on the defaults): `detailer_pool_size`, `default_detailers_per_booking` (≤ pool, CHECK), `closing_minutes`, `public_booking_enabled` + `public_booking_notice`, `inspection_required`, `size_multipliers` (jsonb: how much of a package's materials each size uses). |
+| `detailing_categories`, `detailing_packages`, `detailing_addons` | Branch-owned menu; names unique per branch whatever their case. A package: `duration_text` (free text, read by `ServiceDuration`), `inclusions` (the job card's checklist), `min_detailers`, `applies_to`, `is_active`, `position`. |
+| `detailing_package_prices`, `detailing_addon_prices` | One row per (package or add-on, size class). A size with no row is not offered. A package price may carry its own `duration_text`. |
+| `detailing_package_materials` | The bill of materials: a stocked `items` row and what a MEDIUM vehicle uses; `scales_with_size`. |
+| `detailing_bookings` | The booking and its job card. Snapshots of what was booked (package name, price, duration, size, minimum); `scheduled_date` + `start_minutes` as ASKED; `detailers_count` (heads reserved); `bay_id`; `checklist` (jsonb); `started_at` / `completed_at`; inspection override; `qc_*`; `materials_consumed_at` + `materials_cost_cents`; `public_token_hash`. Reference from the `detailing_booking` series (`BK-`). Never deleted. |
+| `detailing_booking_slots` | Every (date, slot) a booking occupies: the authority for capacity and detailer conflicts across days. `slot` is minutes since midnight on the 30-minute grid (CHECK). `released` rows count for nothing. |
+| `detailing_booking_detailers` | The named detailers, in order; a technician of the booking's own branch (composite FK). |
+| `detailing_booking_addons` | A booking's extras: from the list at that size's price, or typed in. |
+| `detailing_booking_status_logs` | **Append-only.** One row per status change, plus one with no `from_status` for the booking being made (the source wrote none). |
+| `detailing_blocked_slots` | A (branch, date, slot) closed to new bookings, once. |
+| `detailing_recurring_schedules` | A customer's standing weekly slot. As in the source, a preference: nothing books from it by itself. |
+| `detailing_inspections` | Per (booking, stage `check_in` / `check_out`): ratings out of ten, exterior / interior condition, notes, and `meter_reading_id` (the mileage is a meter reading, never a column). |
+| `detailing_damage_points` | The damage map: a point on the top-down outline in thousandths (`x_permille`, `y_permille`), a kind and a note. |
+| `detailing_inspection_photos` | A before / after photo: a `documents` row on the private disk, of the same account (composite FK). |
+| `detailing_display_tokens` | A wall screen's credential: `token_hash` (SHA-256; the token is shown once), `token_hint`, `last_used_at`, `revoked_at`. |
+| `invoice_bookings` | The claim an invoice has on a booking, like `invoice_work_orders`: at most one STANDING link per booking (partial unique index); a void releases it. |
+
+Also added (R10: new migrations only): `technicians` unique on `(id, branch_id)`
+and `(id, organization_id)`; `documents` unique on `(id, customer_account_id)`;
+`invoice_lines.detailing_booking_id`; and the CHECKs widened for the
+`detailing_booking` series, the `detailing_booking` stock source, the `detailing`
+invoice source and the `detailing` / `addon` line kinds.
+
+### The booking engine (`App\Domain\Detailing`, `App\Actions\Detailing`)
+
+- **The grid** (`SlotGrid`): 30-minute slots, 8:00 AM to 9:00 PM, no slot in
+  the lunch hour. Closing (per branch, 5:00 PM by default) caps where a day's
+  work may start; the grid runs later on purpose.
+- **Durations** (`ServiceDuration`): the source's free text, parsed the same
+  way: "45 min", "1.5 hrs", "1 hr 30 min", "1:30"; a range takes its upper
+  bound; a bare number is hours; a day is eight working hours. Sub-slot
+  durations round UP; nothing is zero slots.
+- **Sequential day-fill** (`DayPlanner`): day 1 from the slot NEAREST the
+  start (ties forward: 10:44 → 10:30, 10:45 → 11:00) to closing; the rest rolls
+  to the next day from opening; the last day may be partial. A start at or
+  after closing begins the next morning. Every day counts, Sundays included.
+  The source's 60-pass guard is kept (a job too long for a very short day is
+  cut short, as there).
+- **Capacity** (`BookingCapacity::admit`, the source's `add_booking`): heads
+  wanted = max(asked or the branch default, detailers named, package minimum);
+  the tightest slot of the plan must have the minimum free (else 409 `full`);
+  the reservation is trimmed to what is free; a named detailer already on
+  another job in any slot is 409 `detailer_conflict` (names alphabetical);
+  names beyond the heads are dropped. Sums read `detailers_count`, never the
+  number of names.
+- **Reassigning** (`BookingCapacity::reassign`, `update_booking_detailers`):
+  across the booking's WHOLE span, its own released slots included; the heads
+  then follow the names. The minimum is the package's as it stands now.
+- **Status** (`ChangeBookingStatus`, `update_booking_status`): any status may
+  follow any other. `started_at` is stamped the first time work starts;
+  `completed_at` each time it completes and cleared on a re-open. Completing
+  releases the slots from the 30-minute bucket of the completion onward
+  (`SlotRelease`); re-opening takes every slot back.
+- **Concurrency**: `pg_advisory_xact_lock` per (branch, date), for every date
+  the booking touches, in date order, inside the transaction
+  (`DetailingJournal::lockDates`), plus a row lock on a booking being changed.
+  `BookingConcurrencyTest` races real processes: with the lock, exactly the
+  pool gets in; without it, the test fails.
+- **Blocked slots**: the source checked them in the browser only. Here
+  `TakeBooking` refuses a plan that touches one (409 `blocked`).
+
+### The job card, the bill and the two doors
+
+- **Inspection** (`RecordInspection`): one per stage; saving a stage again
+  replaces it and its damage map. The mileage goes through `RecordReading`
+  (an implausible one is 422 until `confirm_mileage`). Work may not start
+  before the check-in inspection unless the branch does not require one or the
+  move carries `inspection_override_reason` (409 `inspection_required`).
+- **Materials** (`ConsumeMaterials`, `Materials`): on completion, one
+  `consumption` stock move per line of the package's bill of materials, the
+  quantity × the branch's factor for the size class (half-up to 3 decimals),
+  source `detailing_booking`, through `PostStockMove` (so the ledger books the
+  consumables cost). Once per booking. `materials_cost_cents` is the book value
+  that left the shelf; `margin` on the resource is price + extras less that.
+- **Sign-off** (`ManageJobCard::signOff`): `detailing:qc`, on a completed job,
+  never by a user who is one of the booking's named detailers (403). A
+  re-open clears it.
+- **Billing** (`BillBooking`, `ManageInvoices::fromBooking`): a completed AND
+  signed-off booking becomes an invoice of source `detailing`: the package line
+  (kind `detailing`) and each extra (kind `addon`), both credited to
+  `sales.detailing`. A booking on a standing invoice no longer changes.
+  **Counter checkout** = raise (or pick up) the invoice, issue it and record
+  the payment against it in ONE transaction; `Idempotency-Key` required.
+- **Realtime**: `DetailingBookingChanged` (`ShouldBroadcast` +
+  `ShouldDispatchAfterCommit`) on `private-detailing.branch.{id}` as
+  `booking.changed`, carrying ids only. Channel authorisation is this API's
+  own (`POST /broadcasting/auth` for a staff session, `POST
+  /display/broadcasting/auth` for a display token), signed the Pusher way, so
+  it is the same on any Pusher-protocol server. **`laravel/reverb` is NOT
+  installed**: see Phase 9 status. Until it is, `GET /detailing/realtime`
+  answers `enabled: false` and the screens poll (`poll_seconds`).
+- **Display tokens** (`display` middleware): `X-Display-Token` reads ONE
+  branch's monitor (`GET /display/detailing/monitor`), nothing else, until
+  revoked. No session, no cookie.
+- **Public booking** (`PublicBooking`, system context `public booking`):
+  `GET /public/detailing/{branchSlug}` (name, theme tokens, menu, whether
+  booking is on and its notice), `…/availability`, `POST …/bookings`
+  (`throttle:public-booking`; `CaptchaVerifier`, off until
+  `services.captcha.driver` is set), `GET /public/detailing/bookings/{token}`.
+  A request lands `pending` for an account found by email in the organization
+  or opened as an individual with `service_records` consent (channel `portal`:
+  the customer's own decision, made online). Emails
+  (`DetailingBookingNotification`): "received" on a public booking, "confirmed"
+  when staff confirm, as in the source.
+
+### Capabilities (Phase 9, API only, never a portal role)
+
+| Capability | Granted to |
+|---|---|
+| `detailing:view` | every staff role |
+| `detailing:book` (take, edit, confirm, cancel, name detailers, extras, invoice, check out: the source's "admin" tier) | provider_admin, branch_manager, service_advisor, cashier |
+| `detailing:work` (inspect, start, checklist, complete) | provider_admin, branch_manager, service_advisor, provider_technician |
+| `detailing:qc` (sign off) | provider_admin, branch_manager, service_advisor |
+| `detailing:manage` (menu, prices, materials, settings, blocked slots, display tokens: the source's "super admin" tier) | provider_admin, branch_manager |
+
+### Endpoints (Phase 9)
+
+Staff, under `/detailing`: `catalogue`, `duration`, `catalogue/order`,
+`packages`, `categories`, `addons`, `settings`, `blocked-slots`,
+`display-tokens`, `recurring-schedules`, `schedule`, `monitor`, `availability`,
+`realtime`, `bookings` (+ `/status`, `/detailers`, `/addons`, `/checklist`,
+`/sign-off`, `/inspections` (+ `/photos`), `/invoice`, `/checkout`).
+`POST /broadcasting/auth`. No session: `/display/*`, `/public/detailing/*`.
+`docs/frontend-parity.md` maps each screen.
+
+### Demo data (Phase 9)
+
+`DetailingSeed`: Samahuzai-Biñan's settings (pool 2, closing 5:00 PM, online
+booking on, inspection required), its theme tokens (obsidian and gold,
+Cormorant Garamond over DM Sans; the branch's `brand_color` is left alone), the
+source's six packages priced per size with materials over the two detailing
+consumables, four add-ons, and three Actimed bookings that have not started
+(BK-2026-0001 confirmed this morning, -0002 pending this afternoon and rolling
+into tomorrow, -0003 a two-day coating the day after tomorrow). It moves no
+stock and no money, so the earlier phases' pinned figures are unchanged.
+
+## Equipment monitoring (Phase 10)
+
+No brief was supplied for this phase; its scope was taken from what this file
+already committed to ("equipment in Phase 10") and from the source. The
+source's detailing-equipment register and monitor (`/admin/equipment`,
+`src/utils/equipmentUtils.js`, the `shop_equipment` tables) ported as the
+`equipment` module for **Samahuzai-Biñan**. Its engine had no tests, so the
+port is held to a recording of it: `tests/Golden/fixtures/detailing/equipment.json`
+(101 tools in 46 situations, recorded with `capture/capture-equipment.mjs`),
+replayed by `tests/Unit/Domain/Equipment/EquipmentCharacterizationTest`.
+Staff-only and module-gated (`EquipmentPolicy`: side, scope 404, module 403
+`module_disabled`, capability).
+
+### Tables (Phase 10)
+
+| Table | Notes |
+|---|---|
+| `equipment` | A branch's tool (the source's `shop_equipment`): name (unique per branch, any case), category, brand, model, serial, `bay_id`, status, condition, purchase date / cost / warranty, `meter_type`, `baseline_hours` + `baseline_cycles` (what was on the clock when registered), `service_interval_hours` / `_cycles` / `_days` (any or all), `last_service_at`, `expected_life_hours`, `maintenance_task`. **No meter column.** |
+| `equipment_usage_logs` | Runtime the booking sheet never saw: hours and/or cycles (not neither, CHECK), `used_at`, optional `detailing_booking_id`. Removable, as in the source. |
+| `equipment_maintenance_logs` | The service history: kind (`preventive`, `repair`, `inspection`, `calibration`, `part_replacement`), `performed_at`, `performed_by`, `cost_cents`, `downtime_hours`, parts, notes, the meters as they read when logged (`meter_hours`, `meter_cycles`, set by the API), `resets_service`. Removable. |
+| `equipment_package_profiles` | The source's `service_equipment`: (detailing package, tool) → `hours_per_job`, once per pair, both of the same branch (composite FKs). |
+
+### The engine (`App\Domain\Equipment\EquipmentEngine`, pure)
+
+- **Meters are derived, never stored**: lifetime hours = baseline + Σ profile
+  hours over COMPLETED detailing bookings of the packages the tool is mapped
+  to + Σ usage log; cycles = baseline + those jobs + logged cycles. A tool
+  mapped to no package never ages from bookings. Re-open a job, remove a log
+  entry or change a profile and every figure re-settles.
+- **Preventive maintenance**: three triggers (hours, cycles, days), each `used
+  since the last service ÷ interval`; the highest binds (the first of equals).
+  Under 80% `ok`, from 80% `due_soon`, from 100% `overdue`; no interval = not
+  tracked (`service` null). Usage counts strictly after `last_service_at`; days
+  run from the last service, else the purchase date (its UTC midnight, as the
+  source read a date), else the day the tool was registered.
+- **Forecast**: the binding trigger's remainder ÷ the burn rate of the last 30
+  days; none for an idle tool; today for an overdue one; a days trigger simply
+  counts down.
+- **Life**: runtime ÷ rated life: under 70% healthy, under 90% aging, under
+  100% replace soon, then end of life.
+- **Reliability**: MTBF = runtime ÷ repairs; availability = runtime ÷ (runtime
+  + downtime); total cost = purchase + maintenance; cost per hour = that ÷
+  runtime (exact, rounded once to a centavo).
+- **Utilisation**: hours in the last 30 days ÷ (30 × 10 open hours).
+- **Health**: 100 − (35 × service progress + 15 × the part past 100% + 25 ×
+  life used + condition 0/5/15/25 + status 0/0/10/20/35), rounded as
+  JavaScript rounds (`JsMath`), clamped 0–100: 80 good, 60 fair, 40 poor, else
+  critical.
+- Hours, ratios and days are floats computed in the source's order (the
+  recording is matched to the last bit; `fdiv` where a quotient may be exact);
+  money is whole centavos.
+
+`ManageEquipment` is the one writer (save, status, usage, service, profile);
+logging a service with `resets_service` (the default; off for a clean
+inspection) stamps `last_service_at` with when the work was done.
+`EquipmentQueries` evaluates a branch's whole floor together: its completed
+bookings are read once and matched to each tool through its profiles.
+`EquipmentVocabulary` holds the source's lists, labels and category presets
+(`GET /equipment/options`).
+
+### Capabilities and endpoints (Phase 10)
+
+`equipment:view` for every staff role; `equipment:manage` for provider_admin
+and branch_manager (the source kept the whole page to its super admin). Never
+a portal role. Under `/equipment`: `GET /` (the board and `summary`), `POST /`,
+`GET /options`, `GET /profiles`, `PUT /profiles/{detailing_package}`,
+`GET|PUT|DELETE /{equipment}`, `POST /{equipment}/status`,
+`POST /{equipment}/usage-logs` (+ `DELETE …/{usage_log}`),
+`POST /{equipment}/maintenance-logs` (+ `DELETE …/{maintenance_log}`).
+
+### Demo data (Phase 10)
+
+`EquipmentSeed`: the source's own 22 tools at Samahuzai-Biñan with their rated
+intervals and service tasks; package profiles for nine of them; and the air
+compressor with 420 h on the clock, bought for ₱85,000, serviced 60 days ago
+(₱1,850, 2.5 h down) and a 6.5 h run logged last week. Rows in new tables
+only: no earlier phase's figure moves.
+
 ## Rules that bite
 
 - **Tests use `RefreshApiDatabase`, never `DatabaseTruncation`.** The
@@ -1320,6 +1567,59 @@ seeded activity the trial balance balances and all five close checks pass.
   the document is dated; close months in a test with `POST /ledger/periods/close`
   in order, after everything it checks is posted.
 
+- **Never set a booking's `status`, stamps or a slot's `released` directly.**
+  `ChangeBookingStatus` does all three with the log row; the source's
+  behaviour is replayed against it step by step.
+- **Re-opening or un-cancelling a booking does not re-check capacity** (the
+  source's behaviour, kept and recorded): the slots it takes back may put a
+  slot over the pool. New bookings are still refused there.
+- **A booking's date and time are what was ASKED; its slots are where it
+  sits.** A start at or after closing sits on the next day. Screens read
+  `days` / `first_day`, and the monitor finds a booking by its slots too.
+- **Capacity sums `detailers_count`**, never the named detailers: a booking
+  with nobody named still holds its heads.
+- **The detailing characterization fixtures are recordings of the SOURCE.**
+  Never regenerate them from this API (`UPDATE_GOLDEN` does not apply): re-record
+  with `tests/Golden/fixtures/detailing/capture/` against the source, or
+  against `pg_get_functiondef` output if the live database turns out to differ.
+- **`migration_latest.sql` in the source is not the latest.** The last
+  definitions in apply order are in its `migrations.sql` (= `schema.sql`).
+- **Detailing has no portal side.** A booking names a customer account but is
+  the shop's record: its tables are not `ACCOUNT_OWNED` in the isolation suite,
+  and `detailing_booking_id` on an invoice line is blank for a portal session.
+- **A public or display route runs in a named system context** (`public
+  booking`, `display token`, `shop monitor display`): every query there names
+  its branch or organization itself, and every model it saves is given its
+  `organization_id` explicitly. Load relations INSIDE the context.
+- **Resolve the branch after refusing the side.** `DetailingBranches::resolve`
+  refuses a portal session (403) before it says anything about branches.
+- **A detailing demo or test that completes a job moves stock and may post to
+  the books.** Keep such bookings out of `DetailingSeed`, or every pinned stock
+  and ledger figure of the earlier phases moves.
+- **`composer openapi` reads column types from the connected database.** Export
+  against a migrated one (`DB_DATABASE=torquelane_testing php -d memory_limit=1G
+  artisan scramble:export --path=openapi.json`), or the new models are typed
+  from nothing.
+
+- **Never store a tool's meter.** Runtime, cycles, "since service", the due
+  date and the health score are derived by `EquipmentEngine` on read. The only
+  stored clock is `last_service_at`, and only `ManageEquipment::logService`
+  moves it.
+- **Equipment does not use `meter_readings` or the generic interval engine.**
+  The source derives usage from the booking sheet and a log of deltas, not from
+  absolute readings; porting it onto `IntervalEngine` would have changed its
+  behaviour. `meter_readings` is still vehicles only.
+- **Removing a service entry does not move `last_service_at` back** (the
+  source's behaviour, kept): correct the clock by logging the right service.
+- **An exact quotient must stay a float in a ported float rule.** PHP's `/`
+  returns an int when the division is exact; the source's does not. Use
+  `fdiv` (or a float operand) where the result is compared or serialised.
+- **A branch's equipment board reads every completed booking of the branch.**
+  Fine for a detailing floor; if a branch's history grows large, bound the read
+  by the oldest `last_service_at` and keep a lifetime total another way.
+- **A JSON response writes `3.0` as `3`.** A feature test comparing a float
+  read back from the API uses `toEqual`, not `toBe`.
+
 ## Running it
 
 Prerequisites: PHP 8.4 with `pdo_pgsql` (plus `mbstring`, `intl`, `bcmath`,
@@ -1406,8 +1706,8 @@ audit rows). Fill in the rest from the phase plan.
 - [x] **6**: Shop inventory (items, branch stock, the append-only stock ledger, receiving against purchase orders, work-order issues, counts, transfers, reorder)
 - [x] **7**: Order-to-cash (invoices with VAT and BIR snapshots, payments and allocations, receivables: aging, statements, credit limit; PDFs; billing events)
 - [x] **8**: General ledger (chart of accounts, posting rules, balanced append-only journal posted in the event's transaction, monthly periods and the close checklist, reports, journal export, backfill)
-- [ ] **9**: *(title not provided)*
-- [ ] **10**: *(title not provided)*
+- [x] **9**: Detailing (the Samahuzai app ported as the `detailing` module: per-branch menu priced per size, the booking engine with its source characterization, job card, inspection with damage map and photos, materials consumed from stock, booking → invoice and counter checkout, after-commit broadcast with display tokens, public booking)
+- [x] **10**: Equipment monitoring (the source's detailing-equipment register and monitor as the `equipment` module: tools, usage and service logs, package profiles, the derived engine with its source characterization). *No brief was supplied; scope inferred, see Phase 10 status.*
 - [ ] **11**: *(title not provided)*
 - [ ] **12**: *(title not provided)*
 - [ ] **13**: *(title not provided)*
@@ -1518,3 +1818,60 @@ limited, while `ledger:view` is also a branch manager's, within their branches;
 a payment or invoice dated into a closed month is refused rather than moved; the
 Xero and QuickBooks layouts follow their published templates and need the
 accountant's confirmation (see the TODO in the Phase 8 section).
+
+Phase 9 status: done locally except the realtime transport. Gates green (Pest
+1,345 tests at the time, Larastan max, Pint, `openapi.json` regenerated; isolation, parity
+and the characterization suites pass). **Stopped and reported (R13):
+`laravel/reverb` does not install without downgrading Guzzle 8 → 7** (and
+`guzzlehttp/psr7` 3 → 2, `promises` 3 → 2) across the whole API, because
+Reverb and the Pusher client it broadcasts through require `guzzlehttp/psr7
+^2.6`. That is the user's call, so `composer.json` is untouched. **Decision taken with the user (2026-10-10): do not install Reverb yet.** The screens poll until it is. Everything
+around the transport is built and tested: the after-commit broadcast event,
+channel authorisation for staff and for display tokens, the display endpoint,
+the frontend's Echo listener with its polling fallback. To finish:
+`composer require laravel/reverb -W`, run the full suite, then set
+`BROADCAST_CONNECTION=reverb` and the `REVERB_*` keys (`config/broadcasting.php`).
+Not done: the frontend screens were type-checked, linted and built but not
+driven in a browser against a live API; there is no Playwright coverage yet.
+Decisions taken here, for review: `{{DETAILING_BRANCH}}` read as
+Samahuzai-Biñan; the source's overbooking on re-open is KEPT (it is the
+recorded behaviour) rather than fixed; blocked slots are enforced by the API
+(the source checked them in the browser only); a log row is written when a
+booking is made (the source wrote none); bookings are never deleted (the source
+let a super admin delete one); the package minimum for a reassignment is read
+from the package as it stands (the source took it from the browser); a start
+must be confirmed by an inspection or an override reason, and a bill needs a
+sign-off (both new, switchable or bypassable as described); materials are
+consumed once per booking and not returned on a re-open; bays stay
+informational; the booking series is organization-wide (`BK-`); public bookings
+attach to an existing account by email alone and record consent on the `portal`
+channel; a public booking creates no vehicle row; a branch slug shared by two
+organizations' detailing branches resolves to neither; `detailing:*`
+capabilities as tabled above; recurring schedules are stored preferences only,
+as in the source; the source's VIP perks (10% off, coffee), testimonials, coffee
+POS and equipment monitoring are out of this phase's scope and were not ported.
+
+Phase 10 status: done locally (gates green: Pest 1,396 tests, Larastan max,
+Pint, `openapi.json` regenerated; isolation, parity and both characterization
+suites pass). **No Phase 10 brief was supplied**; the user said to continue, so
+the scope was inferred and is for review: equipment monitoring, because this
+file already said equipment arrives in Phase 10, ported from the source's
+`/admin/equipment`. Not done: the screens were type-checked, linted and built
+but not driven in a browser; no Playwright coverage. Decisions taken here, for
+review: the source's engine was ported as it is rather than onto
+`App\Domain\Maintenance` / `meter_readings` (which this file had anticipated
+reusing), because the source derives usage from completed bookings and a usage
+log and stores no reading; tools belong to a branch and are mapped to detailing
+PACKAGES (the source mapped them to its per-size service rows); `equipment:view`
+for every staff role and `equipment:manage` for provider admin and branch
+manager; a tool with a history is retired, not deleted (the source cascaded the
+delete); the meter snapshot on a service entry is taken by the API (the source
+took it from the form); maintenance cost is recorded on the entry but posts
+nothing to the books (there is still no vendor bill or cash-out document to
+balance an Equipment Repairs entry against); a purchase date anchors the days
+trigger at its UTC midnight, as the source did; the source's 10 open hours a
+day for utilisation is kept although the booking grid here opens at 8:00; the
+café's espresso-machine maintenance (cups sold since the last service) is NOT
+ported: it needs the café POS, which no phase has built; the "usage hours per
+job" flat rate the source retired is not carried over.
+

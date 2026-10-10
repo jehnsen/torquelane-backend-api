@@ -86,6 +86,12 @@ function parityPlaceholders(World $world, string $document): array
         'payment' => $world->id('payment:actimed-partial'),
         'account' => (string) Account::query()->where('organization_id', $world->id('prov-mekanikomore'))->where('code', '1100')->value('id'),
         'journal_entry' => (string) JournalEntry::query()->where('organization_id', $world->id('prov-mekanikomore'))->orderBy('id')->value('id'),
+        // Phase 9: detailing lives at the detailing branch.
+        'detailing_booking' => $world->id('detailing:booking:morning'),
+        'detailing_package' => $world->id('detailing:package:essential'),
+        'detailing_category' => $world->id('detailing:category:exterior'),
+        'detailing_addon' => $world->id('detailing:addon:engine-bay'),
+        'equipment' => $world->id('equipment:air-compressor'),
     ]);
 }
 

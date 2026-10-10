@@ -16,6 +16,7 @@ use App\Domain\Inventory\StoredOrderStatus;
 use App\Domain\Shared\BusinessCalendar;
 use App\Domain\Shared\Calendar;
 use App\Models\CustomerAccount;
+use App\Models\DetailingBooking;
 use App\Models\GoodsReceipt;
 use App\Models\Item;
 use App\Models\ItemBranchSetting;
@@ -252,6 +253,7 @@ final class InventoryQueries
             StockSource::GoodsReceipt->value => GoodsReceipt::class,
             StockSource::StockTransfer->value => StockTransfer::class,
             StockSource::StockCount->value => StockCount::class,
+            StockSource::DetailingBooking->value => DetailingBooking::class,
         ] as $type => $model) {
             foreach ($model::query()->whereIn('id', $byType[$type] ?? [])->get(['id', 'reference']) as $document) {
                 $references[$type.':'.$document->id] = ['reference' => $document->reference, 'id' => $document->id];

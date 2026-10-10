@@ -100,5 +100,14 @@ class AppServiceProvider extends ServiceProvider
             Limit::perMinute(3)->by('reset:'.mb_strtolower($request->string('email')->toString()).'|'.$request->ip()),
             Limit::perMinute(10)->by('reset-ip:'.$request->ip()),
         ]);
+
+        // The public booking page: reads are cheap but unauthenticated; a booking writes and sends mail.
+        RateLimiter::for('public', fn (Request $request): Limit => Limit::perMinute(60)->by('public:'.$request->ip()));
+        RateLimiter::for('public-booking', fn (Request $request): array => [
+            Limit::perMinute(5)->by('book:'.$request->ip()),
+            Limit::perHour(10)->by('book-email:'.mb_strtolower($request->string('email')->toString()).'|'.$request->ip()),
+        ]);
+        // A wall screen polls and re-authorises its socket; generous, but bounded per token.
+        RateLimiter::for('display', fn (Request $request): Limit => Limit::perMinute(120)->by('display:'.hash('sha256', (string) $request->header('X-Display-Token')).'|'.$request->ip()));
     }
 }

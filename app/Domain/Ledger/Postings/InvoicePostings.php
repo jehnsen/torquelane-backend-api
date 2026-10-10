@@ -133,6 +133,7 @@ final class InvoicePostings
             InvoiceLineKind::Labour => RuleKey::SalesLabour,
             InvoiceLineKind::Fee => RuleKey::SalesFees,
             InvoiceLineKind::Manual => RuleKey::SalesManual,
+            InvoiceLineKind::Detailing, InvoiceLineKind::Addon => RuleKey::SalesDetailing,
         };
     }
 }

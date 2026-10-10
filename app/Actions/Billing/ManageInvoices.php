@@ -25,7 +25,9 @@ use App\Exceptions\ConflictException;
 use App\Exceptions\InvalidTransitionException;
 use App\Models\Branch;
 use App\Models\CustomerAccount;
+use App\Models\DetailingBooking;
 use App\Models\Invoice;
+use App\Models\InvoiceBooking;
 use App\Models\InvoiceLine;
 use App\Models\InvoiceWorkOrder;
 use App\Models\Item;
@@ -118,6 +120,53 @@ final class ManageInvoices
     }
 
     /**
+     * A draft for ONE completed detailing booking (Phase 9): the package at the
+     * price it was booked at, then each of its extras. Like a job, a booking
+     * is invoiced once: the draft claims it (the caller holds its row lock; the
+     * database's partial unique index is the backstop), and only a void or a
+     * discarded draft lets it go. Nothing the client sends prices a line.
+     *
+     * @param  DetailingBooking  $booking  locked by the caller, with `addons` loaded
+     */
+    public function fromBooking(DetailingBooking $booking, string $notes = ''): Invoice
+    {
+        try {
+            return DB::transaction(function () use ($booking, $notes): Invoice {
+                $branch = Branch::query()->findOrFail($booking->branch_id);
+                $account = CustomerAccount::query()->findOrFail($booking->customer_account_id);
+
+                $lines = [new InvoiceLineDraft(
+                    InvoiceLineKind::Detailing,
+                    sprintf('%s (%s) — %s', $booking->package_name, $booking->size_class->label(), $booking->reference),
+                    '1',
+                    $booking->package_price_cents,
+                    detailingBookingId: $booking->id,
+                )];
+                foreach ($booking->addons as $addon) {
+                    $lines[] = new InvoiceLineDraft(InvoiceLineKind::Addon, $addon->name, (string) $addon->quantity, $addon->unit_price_cents, detailingBookingId: $booking->id);
+                }
+
+                $invoice = $this->draft($branch, $account, InvoiceSource::Detailing, $lines, $notes);
+                $link = new InvoiceBooking;
+                $link->forceFill([
+                    'organization_id' => $invoice->organization_id,
+                    'invoice_id' => $invoice->id,
+                    'customer_account_id' => $account->id,
+                    'booking_id' => $booking->id,
+                ])->save();
+                $this->journal->auditInvoice($invoice, 'created', null);
+
+                return $invoice;
+            });
+        } catch (QueryException $e) {
+            if ($e->getCode() === '23505' && str_contains($e->getMessage(), 'invoice_bookings_standing_unique')) {
+                throw new ConflictException("{$booking->reference} is already on an invoice.");
+            }
+            throw $e;
+        }
+    }
+
+    /**
      * A typed-in draft: an account, the branch billing it, and its lines.
      *
      * @param  list<array<string, mixed>>  $lines  validated rows (description, quantity, unit_price_cents, discount_cents?, tax_class?, item_id?, service_task_id?)
@@ -150,7 +199,9 @@ final class ManageInvoices
 
             if (isset($data['lines'])) {
                 if ($locked->source !== InvoiceSource::Manual) {
-                    throw ValidationException::withMessages(['lines' => 'An invoice raised from work orders bills their approved lines; only discounts may change.']);
+                    throw ValidationException::withMessages(['lines' => $locked->source === InvoiceSource::Detailing
+                        ? 'An invoice raised from a detailing booking bills its package and extras; only discounts may change.'
+                        : 'An invoice raised from work orders bills their approved lines; only discounts may change.']);
                 }
                 $lines = $this->manualLines($data['lines']);
                 $ids = [];
@@ -186,6 +237,7 @@ final class ManageInvoices
             $this->journal->auditInvoice($locked, 'discarded', $before);
             InvoiceLine::query()->where('invoice_id', $locked->id)->delete();
             InvoiceWorkOrder::query()->where('invoice_id', $locked->id)->delete();
+            InvoiceBooking::query()->where('invoice_id', $locked->id)->delete();
             $locked->delete();
         });
     }
@@ -254,6 +306,7 @@ final class ManageInvoices
                 'void_reason' => $reason,
             ])->save();
             InvoiceWorkOrder::query()->where('invoice_id', $locked->id)->whereNull('released_at')->update(['released_at' => $now]);
+            InvoiceBooking::query()->where('invoice_id', $locked->id)->whereNull('released_at')->update(['released_at' => $now]);
             $this->postings->invoiceVoided($locked, $reason);
 
             $this->journal->auditInvoice($locked, 'voided', $before);
@@ -355,6 +408,7 @@ final class ManageInvoices
                 'work_order_line_id' => $draft->workOrderLineId,
                 'item_id' => $draft->itemId,
                 'service_task_id' => $draft->serviceTaskId,
+                'detailing_booking_id' => $draft->detailingBookingId,
                 'quantity' => $draft->quantity,
                 'unit_price_cents' => $draft->unitPriceCents,
                 'discount_cents' => $draft->discountCents,

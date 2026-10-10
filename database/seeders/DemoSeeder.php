@@ -23,6 +23,8 @@ use App\Tenancy\TenantManager;
 use Brick\Money\Money;
 use Carbon\CarbonImmutable;
 use Database\Seeders\Demo\BillingSeed;
+use Database\Seeders\Demo\DetailingSeed;
+use Database\Seeders\Demo\EquipmentSeed;
 use Database\Seeders\Demo\FleetSeed;
 use Database\Seeders\Demo\InventorySeed;
 use Database\Seeders\Demo\PartsSeed;
@@ -200,6 +202,8 @@ final class DemoSeeder extends Seeder
         PartsSeed::run($organization->id, $data, $this->ids);
         InventorySeed::run($organization->id, $this->ids);
         BillingSeed::run($this->ids);
+        DetailingSeed::run($this->ids);
+        EquipmentSeed::run($this->ids);
     }
 
     /**

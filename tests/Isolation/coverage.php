@@ -20,6 +20,13 @@ $isolated = ['isolation' => TenantIsolationSuite::class];
 return [
     'api/v1/health' => ['public' => 'Database and queue status for uptime monitors; no tenant data.'],
     'api/v1/sanctum/csrf-cookie' => ['public' => 'Sets the XSRF-TOKEN cookie for SPA login; no body, no tenant data.'],
+    // Phase 9: a detailing branch's public booking page. What a branch publishes about itself (name, look, menu,
+    // free starts), and a booking read back by the unguessable token in its confirmation link.
+    'api/v1/public/detailing/{branchSlug}' => ['public' => 'A branch\'s public booking page: its name, theme and active menu; no customer or staff data (PublicAndDisplayTest).'],
+    'api/v1/public/detailing/{branchSlug}/availability' => ['public' => 'Which starts are free on a day, with no detail of who is booked (PublicAndDisplayTest).'],
+    'api/v1/public/detailing/bookings/{token}' => ['public' => 'One booking\'s confirmation by its 160-bit token (only its SHA-256 is stored); its own reference, package and times (PublicAndDisplayTest).'],
+    'api/v1/display/detailing/monitor' => ['public' => 'No session: a per-branch display token (X-Display-Token, revocable) is the credential, and it reads that branch\'s monitor only (PublicAndDisplayTest).'],
+
     'api/v1/document-files/{document}' => ['public' => 'Signed 60-second URL issued after the document policy check; the signature is the credential (tested in DocumentTest).'],
 
     'api/v1/me' => $isolated,
@@ -132,4 +139,24 @@ return [
     'api/v1/ledger/reports/profit-and-loss' => $isolated,
     'api/v1/ledger/reports/balance-sheet' => $isolated,
     'api/v1/ledger/reports/daily-sales' => $isolated,
+
+    // Phase 9: detailing. Staff-only, branch-owned, behind the `detailing` module.
+    'api/v1/detailing/catalogue' => $isolated,
+    'api/v1/detailing/duration' => $isolated,
+    'api/v1/detailing/settings' => $isolated,
+    'api/v1/detailing/display-tokens' => $isolated,
+    'api/v1/detailing/recurring-schedules' => $isolated,
+    'api/v1/detailing/schedule' => $isolated,
+    'api/v1/detailing/monitor' => $isolated,
+    'api/v1/detailing/availability' => $isolated,
+    'api/v1/detailing/realtime' => $isolated,
+    'api/v1/detailing/bookings' => $isolated,
+    'api/v1/detailing/bookings/{detailing_booking}' => $isolated,
+    'api/v1/detailing/bookings/{detailing_booking}/inspections' => $isolated,
+
+    // Phase 10: equipment monitoring. Staff-only, branch-owned, behind the `equipment` module.
+    'api/v1/equipment' => $isolated,
+    'api/v1/equipment/options' => $isolated,
+    'api/v1/equipment/profiles' => $isolated,
+    'api/v1/equipment/{equipment}' => $isolated,
 ];

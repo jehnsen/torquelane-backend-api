@@ -17,8 +17,14 @@ use App\Http\Controllers\Api\V1\ConsentController;
 use App\Http\Controllers\Api\V1\ContactController;
 use App\Http\Controllers\Api\V1\CustomerAccountController;
 use App\Http\Controllers\Api\V1\DemandForecastController;
+use App\Http\Controllers\Api\V1\DetailingBoardController;
+use App\Http\Controllers\Api\V1\DetailingBookingController;
+use App\Http\Controllers\Api\V1\DetailingCatalogueController;
+use App\Http\Controllers\Api\V1\DetailingSettingsController;
+use App\Http\Controllers\Api\V1\DisplayController;
 use App\Http\Controllers\Api\V1\DocumentController;
 use App\Http\Controllers\Api\V1\DocumentFileController;
+use App\Http\Controllers\Api\V1\EquipmentController;
 use App\Http\Controllers\Api\V1\FleetPartController;
 use App\Http\Controllers\Api\V1\FleetSummaryController;
 use App\Http\Controllers\Api\V1\GoodsReceiptController;
@@ -34,6 +40,7 @@ use App\Http\Controllers\Api\V1\OrganizationController;
 use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\PeriodController;
 use App\Http\Controllers\Api\V1\ProfileController;
+use App\Http\Controllers\Api\V1\PublicBookingController;
 use App\Http\Controllers\Api\V1\PurchaseOrderController;
 use App\Http\Controllers\Api\V1\ReceivablesController;
 use App\Http\Controllers\Api\V1\ServiceTaskController;
@@ -278,6 +285,90 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::get('ledger/reports/profit-and-loss', [LedgerReportController::class, 'profitAndLoss'])->name('ledger.reports.profit-and-loss');
     Route::get('ledger/reports/balance-sheet', [LedgerReportController::class, 'balanceSheet'])->name('ledger.reports.balance-sheet');
     Route::get('ledger/reports/daily-sales', [LedgerReportController::class, 'dailySales'])->name('ledger.reports.daily-sales');
+
+    // Detailing (Phase 9): the `detailing` module, staff only. A branch's menu and settings, its
+    // bookings and job cards, its schedule and shop monitor.
+    Route::prefix('detailing')->name('detailing.')->group(function (): void {
+        Route::get('catalogue', [DetailingCatalogueController::class, 'index'])->name('catalogue');
+        Route::get('duration', [DetailingCatalogueController::class, 'duration'])->name('duration');
+        Route::put('catalogue/order', [DetailingCatalogueController::class, 'reorder'])->name('catalogue.reorder');
+        Route::post('packages', [DetailingCatalogueController::class, 'storePackage'])->middleware('idempotent')->name('packages.store');
+        Route::put('packages/{detailing_package}', [DetailingCatalogueController::class, 'updatePackage'])->name('packages.update');
+        Route::delete('packages/{detailing_package}', [DetailingCatalogueController::class, 'destroyPackage'])->name('packages.destroy');
+        Route::post('categories', [DetailingCatalogueController::class, 'storeCategory'])->middleware('idempotent')->name('categories.store');
+        Route::put('categories/{detailing_category}', [DetailingCatalogueController::class, 'updateCategory'])->name('categories.update');
+        Route::delete('categories/{detailing_category}', [DetailingCatalogueController::class, 'destroyCategory'])->name('categories.destroy');
+        Route::post('addons', [DetailingCatalogueController::class, 'storeAddon'])->middleware('idempotent')->name('addons.store');
+        Route::put('addons/{detailing_addon}', [DetailingCatalogueController::class, 'updateAddon'])->name('addons.update');
+        Route::delete('addons/{detailing_addon}', [DetailingCatalogueController::class, 'destroyAddon'])->name('addons.destroy');
+
+        Route::get('settings', [DetailingSettingsController::class, 'show'])->name('settings.show');
+        Route::put('settings', [DetailingSettingsController::class, 'update'])->name('settings.update');
+        Route::post('blocked-slots', [DetailingSettingsController::class, 'block'])->name('blocked-slots.store');
+        Route::delete('blocked-slots/{blocked_slot}', [DetailingSettingsController::class, 'unblock'])->name('blocked-slots.destroy');
+        Route::get('display-tokens', [DetailingSettingsController::class, 'tokens'])->name('display-tokens.index');
+        Route::post('display-tokens', [DetailingSettingsController::class, 'issueToken'])->name('display-tokens.store');
+        Route::post('display-tokens/{display_token}/revoke', [DetailingSettingsController::class, 'revokeToken'])->name('display-tokens.revoke');
+        Route::get('recurring-schedules', [DetailingSettingsController::class, 'recurring'])->name('recurring.index');
+        Route::post('recurring-schedules', [DetailingSettingsController::class, 'storeRecurring'])->middleware('idempotent')->name('recurring.store');
+        Route::put('recurring-schedules/{recurring_schedule}', [DetailingSettingsController::class, 'updateRecurring'])->name('recurring.update');
+        Route::delete('recurring-schedules/{recurring_schedule}', [DetailingSettingsController::class, 'destroyRecurring'])->name('recurring.destroy');
+
+        Route::get('schedule', [DetailingBoardController::class, 'schedule'])->name('schedule');
+        Route::get('monitor', [DetailingBoardController::class, 'monitor'])->name('monitor');
+        Route::get('availability', [DetailingBoardController::class, 'availability'])->name('availability');
+        Route::get('realtime', [DetailingBoardController::class, 'realtime'])->name('realtime');
+
+        Route::get('bookings', [DetailingBookingController::class, 'index'])->name('bookings.index');
+        Route::post('bookings', [DetailingBookingController::class, 'store'])->middleware('idempotent')->name('bookings.store');
+        Route::get('bookings/{detailing_booking}', [DetailingBookingController::class, 'show'])->name('bookings.show');
+        Route::patch('bookings/{detailing_booking}', [DetailingBookingController::class, 'update'])->name('bookings.update');
+        Route::post('bookings/{detailing_booking}/status', [DetailingBookingController::class, 'status'])->name('bookings.status');
+        Route::put('bookings/{detailing_booking}/detailers', [DetailingBookingController::class, 'detailers'])->name('bookings.detailers');
+        Route::put('bookings/{detailing_booking}/addons', [DetailingBookingController::class, 'addons'])->name('bookings.addons');
+        Route::post('bookings/{detailing_booking}/checklist', [DetailingBookingController::class, 'checklist'])->name('bookings.checklist');
+        Route::post('bookings/{detailing_booking}/sign-off', [DetailingBookingController::class, 'signOff'])->name('bookings.sign-off');
+        Route::get('bookings/{detailing_booking}/inspections', [DetailingBookingController::class, 'inspections'])->name('bookings.inspections.index');
+        Route::post('bookings/{detailing_booking}/inspections', [DetailingBookingController::class, 'inspect'])->name('bookings.inspections.store');
+        Route::post('bookings/{detailing_booking}/inspections/{inspection}/photos', [DetailingBookingController::class, 'addPhoto'])->scopeBindings()->name('bookings.inspections.photos.store');
+        Route::delete('bookings/{detailing_booking}/inspections/{inspection}/photos/{photo}', [DetailingBookingController::class, 'removePhoto'])->scopeBindings()->name('bookings.inspections.photos.destroy');
+        Route::post('bookings/{detailing_booking}/invoice', [DetailingBookingController::class, 'invoice'])->middleware('idempotent')->name('bookings.invoice');
+        Route::post('bookings/{detailing_booking}/checkout', [DetailingBookingController::class, 'checkout'])->middleware('idempotent:required')->name('bookings.checkout');
+    });
+    // Equipment monitoring (Phase 10): the `equipment` module, staff only. A branch's tool register,
+    // its usage and service logs, and the monitor derived from them.
+    Route::prefix('equipment')->name('equipment.')->group(function (): void {
+        Route::get('/', [EquipmentController::class, 'index'])->name('index');
+        Route::post('/', [EquipmentController::class, 'store'])->middleware('idempotent')->name('store');
+        Route::get('options', [EquipmentController::class, 'options'])->name('options');
+        Route::get('profiles', [EquipmentController::class, 'profiles'])->name('profiles.index');
+        Route::put('profiles/{detailing_package}', [EquipmentController::class, 'setProfile'])->name('profiles.update');
+        Route::get('{equipment}', [EquipmentController::class, 'show'])->name('show');
+        Route::put('{equipment}', [EquipmentController::class, 'update'])->name('update');
+        Route::delete('{equipment}', [EquipmentController::class, 'destroy'])->name('destroy');
+        Route::post('{equipment}/status', [EquipmentController::class, 'status'])->name('status');
+        Route::post('{equipment}/usage-logs', [EquipmentController::class, 'logUsage'])->name('usage-logs.store');
+        Route::delete('{equipment}/usage-logs/{usage_log}', [EquipmentController::class, 'deleteUsage'])->scopeBindings()->name('usage-logs.destroy');
+        Route::post('{equipment}/maintenance-logs', [EquipmentController::class, 'logService'])->name('maintenance-logs.store');
+        Route::delete('{equipment}/maintenance-logs/{maintenance_log}', [EquipmentController::class, 'deleteService'])->scopeBindings()->name('maintenance-logs.destroy');
+    });
+});
+
+// Staff sockets: sign one onto its branch's detailing channel (the session is the credential).
+Route::post('broadcasting/auth', [DetailingBoardController::class, 'authorizeChannel'])->middleware(['auth:sanctum', 'tenant'])->name('broadcasting.auth');
+
+// The shop monitor on a wall screen: a per-branch display token is the credential (read-only, revocable).
+Route::prefix('display')->name('display.')->middleware(['display', 'throttle:display'])->group(function (): void {
+    Route::get('detailing/monitor', [DisplayController::class, 'monitor'])->name('detailing.monitor');
+    Route::post('broadcasting/auth', [DisplayController::class, 'authorizeChannel'])->name('broadcasting.auth');
+});
+
+// A detailing branch's public booking page: no session; rate-limited; captcha-ready.
+Route::prefix('public/detailing')->name('public.detailing.')->middleware('throttle:public')->group(function (): void {
+    Route::get('bookings/{token}', [PublicBookingController::class, 'confirmation'])->where('token', '[0-9a-f]{40}')->name('bookings.show');
+    Route::get('{branchSlug}', [PublicBookingController::class, 'show'])->name('show');
+    Route::get('{branchSlug}/availability', [PublicBookingController::class, 'availability'])->name('availability');
+    Route::post('{branchSlug}/bookings', [PublicBookingController::class, 'store'])->middleware('throttle:public-booking')->name('bookings.store');
 });
 
 // A signed, 60-second URL from GET documents/{id}/download: the signature is

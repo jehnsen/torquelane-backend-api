@@ -19,6 +19,7 @@ use App\Domain\Ledger\Postings\StockFacts;
 use App\Domain\Ledger\Postings\TransferFacts;
 use App\Domain\Shared\Calendar;
 use App\Exceptions\ConflictException;
+use App\Models\DetailingBooking;
 use App\Models\GoodsReceipt;
 use App\Models\GoodsReceiptLine;
 use App\Models\Invoice;
@@ -215,6 +216,7 @@ final class LedgerPostings
             StockSource::StockCount => Cell::string(StockCount::query()->whereKey($id)->value('reference')),
             StockSource::StockTransfer => Cell::string(StockTransfer::query()->whereKey($id)->value('reference')),
             StockSource::WorkOrderLine => Cell::string(WorkOrder::query()->whereKey(Cell::string(WorkOrderLine::query()->whereKey($id)->value('work_order_id')))->value('reference')),
+            StockSource::DetailingBooking => Cell::string(DetailingBooking::query()->whereKey($id)->value('reference')),
             StockSource::Manual => '',
         };
     }

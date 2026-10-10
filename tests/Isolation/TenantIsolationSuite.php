@@ -103,6 +103,31 @@ final class TenantIsolationSuite
         'account_export_mappings' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
         'journal_entries' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id', 'branch2' => 'counter_branch_id'],
         'journal_lines' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id', 'journal_entry' => 'journal_entry_id'],
+        // Phase 9: detailing. Branch-owned and staff-only (a booking names a customer account, but it is the shop's record).
+        'detailing_settings' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id'],
+        'detailing_categories' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id'],
+        'detailing_packages' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id'],
+        'detailing_package_prices' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'detailing_package' => 'package_id'],
+        'detailing_package_materials' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'detailing_package' => 'package_id'],
+        'detailing_addons' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id'],
+        'detailing_addon_prices' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'detailing_addon' => 'addon_id'],
+        'detailing_bookings' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id'],
+        'detailing_booking_detailers' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id'],
+        'detailing_booking_slots' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id'],
+        'detailing_booking_addons' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'detailing_booking' => 'booking_id'],
+        'detailing_booking_status_logs' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'detailing_booking' => 'booking_id'],
+        'detailing_blocked_slots' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id'],
+        'detailing_recurring_schedules' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id'],
+        'detailing_inspections' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id'],
+        'detailing_damage_points' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'detailing_inspection' => 'inspection_id'],
+        'detailing_inspection_photos' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'detailing_inspection' => 'inspection_id'],
+        'detailing_display_tokens' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id'],
+        'invoice_bookings' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'invoice' => 'invoice_id'],
+        // Phase 10: equipment monitoring. Branch-owned and staff-only.
+        'equipment' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id'],
+        'equipment_usage_logs' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id'],
+        'equipment_maintenance_logs' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id'],
+        'equipment_package_profiles' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id'],
     ];
 
     /**
@@ -125,7 +150,7 @@ final class TenantIsolationSuite
     private const array ORGANIZATION_WIDE = ['organizations', 'service_tasks'];
 
     /** Child tables whose owner is their parent row's (column alias → parent). */
-    private const array PARENTS = ['vehicle', 'work_order', 'fleet_part', 'purchase_order', 'shop_purchase_order', 'goods_receipt', 'stock_count', 'stock_transfer', 'invoice', 'payment', 'journal_entry'];
+    private const array PARENTS = ['vehicle', 'work_order', 'fleet_part', 'purchase_order', 'shop_purchase_order', 'goods_receipt', 'stock_count', 'stock_transfer', 'invoice', 'payment', 'journal_entry', 'detailing_package', 'detailing_addon', 'detailing_booking', 'detailing_inspection'];
 
     /** @var array<string, array{org: string, account: string|null, branch: string|null, branches: list<string>, table: string, parents: array<string, string>}> */
     private array $rows = [];

@@ -12,4 +12,6 @@ enum StockSource: string
     case WorkOrderLine = 'work_order_line';
     case StockCount = 'stock_count';
     case StockTransfer = 'stock_transfer';
+    /** A detailing job's package materials, consumed when it completed (Phase 9). */
+    case DetailingBooking = 'detailing_booking';
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Errors\ApiExceptionRenderer;
 use App\Http\Middleware\AssignRequestId;
+use App\Http\Middleware\AuthenticateDisplayToken;
 use App\Http\Middleware\EnforceIdempotency;
 use App\Http\Middleware\ForceJsonResponse;
 use App\Http\Middleware\ResolveTenantContext;
@@ -30,6 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'idempotent' => EnforceIdempotency::class,
             'tenant' => ResolveTenantContext::class,
+            'display' => AuthenticateDisplayToken::class,
         ]);
         // The tenant context must exist before route-model binding runs, so a
         // bound {model} is already organization-scoped (another tenant's id → 404).

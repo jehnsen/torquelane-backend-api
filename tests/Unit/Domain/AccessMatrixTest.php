@@ -27,7 +27,7 @@ it('lets only the organization admin change the books, and a branch manager read
 });
 
 it('gives the cashier customer:manage, a view of the stock room, and the counter\'s billing until the POS module arrives', function () {
-    expect(AccessMatrix::capabilitiesOf(Role::Cashier))->toBe([Capability::CustomerManage, Capability::InventoryView, Capability::BillingView, Capability::BillingManage]);
+    expect(AccessMatrix::capabilitiesOf(Role::Cashier))->toBe([Capability::CustomerManage, Capability::InventoryView, Capability::BillingView, Capability::BillingManage, Capability::DetailingView, Capability::DetailingBook, Capability::EquipmentView]);
 });
 
 it('lets only managers void money, and gives the portal a view of its own billing only', function () {
@@ -66,4 +66,33 @@ it('reports capabilities in declaration order, so /me is stable', function () {
     $values = array_map(fn (Capability $c): string => $c->value, AccessMatrix::capabilitiesOf(Role::ProviderAdmin));
 
     expect($values)->toBe(array_map(fn (Capability $c): string => $c->value, Capability::cases()));
+});
+
+it('gives every staff role a view of detailing, and no portal role any of it', function () {
+    foreach (Role::staff() as $role) {
+        expect(AccessMatrix::can($role, Capability::DetailingView))->toBeTrue($role->value);
+    }
+    foreach (Role::portal() as $role) {
+        foreach ([Capability::DetailingView, Capability::DetailingBook, Capability::DetailingWork, Capability::DetailingQc, Capability::DetailingManage] as $capability) {
+            expect(AccessMatrix::can($role, $capability))->toBeFalse("{$role->value} {$capability->value}");
+        }
+    }
+});
+
+it('splits detailing as the source split its two tiers, with the job card and its sign-off apart', function () {
+    $holders = fn (Capability $c): array => array_values(array_filter(Role::cases(), fn (Role $r): bool => AccessMatrix::can($r, $c)));
+
+    // The source's "admin" (bookings, status, detailers, add-ons) and "super admin" (menu, settings, blocks).
+    expect($holders(Capability::DetailingBook))->toBe([Role::ProviderAdmin, Role::ServiceAdvisor, Role::BranchManager, Role::Cashier])
+        ->and($holders(Capability::DetailingManage))->toBe([Role::ProviderAdmin, Role::BranchManager])
+        // A technician works a job card; signing it off is never a technician's.
+        ->and($holders(Capability::DetailingWork))->toBe([Role::ProviderAdmin, Role::ServiceAdvisor, Role::ProviderTechnician, Role::BranchManager])
+        ->and($holders(Capability::DetailingQc))->toBe([Role::ProviderAdmin, Role::ServiceAdvisor, Role::BranchManager]);
+});
+
+it('lets every staff role see the equipment monitor, managers run it, and no portal role near it', function () {
+    $holders = fn (Capability $c): array => array_values(array_filter(Role::cases(), fn (Role $r): bool => AccessMatrix::can($r, $c)));
+
+    expect($holders(Capability::EquipmentView))->toBe(Role::staff())
+        ->and($holders(Capability::EquipmentManage))->toBe([Role::ProviderAdmin, Role::BranchManager]);
 });

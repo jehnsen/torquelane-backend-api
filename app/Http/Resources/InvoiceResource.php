@@ -94,6 +94,8 @@ final class InvoiceResource extends JsonResource
                 'work_order_line_id' => $line->work_order_line_id,
                 'item_id' => $staff ? $line->item_id : null,
                 'service_task_id' => $line->service_task_id,
+                // The detailing booking a package or add-on line bills: staff only (a booking is the shop's record).
+                'detailing_booking_id' => $staff ? $line->detailing_booking_id : null,
                 'quantity' => Invoicing::quantity((string) $line->quantity),
                 'unit_price_cents' => $line->unit_price_cents,
                 'discount_cents' => $line->discount_cents,

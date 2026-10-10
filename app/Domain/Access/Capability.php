@@ -44,6 +44,20 @@ enum Capability: string
     case LedgerView = 'ledger:view';
     /** Edit the chart, the posting rules and the export mappings; close accounting periods (staff only, whole organization). */
     case LedgerManage = 'ledger:manage';
+    /** See a detailing branch's bookings, schedule, monitor, packages and settings (staff only, Phase 9). */
+    case DetailingView = 'detailing:view';
+    /** Take, edit, confirm and cancel bookings; name detailers; add extras; invoice a finished job (staff only). */
+    case DetailingBook = 'detailing:book';
+    /** Work a job card: inspect the vehicle, start, tick the checklist, complete (staff only). */
+    case DetailingWork = 'detailing:work';
+    /** Sign a finished job off, or send it back (staff only; never the detailer who worked it). */
+    case DetailingQc = 'detailing:qc';
+    /** Set up packages, prices, add-ons, materials and settings; block slots; issue display tokens (staff only). */
+    case DetailingManage = 'detailing:manage';
+    /** See a branch's equipment register and its monitor: service status, forecast, life, reliability, health (staff only, Phase 10). */
+    case EquipmentView = 'equipment:view';
+    /** Register and edit tools, log usage and services, map tools to packages (staff only). */
+    case EquipmentManage = 'equipment:manage';
 
     /** Shown in denial reasons. The ported labels are verbatim from the frontend. */
     public function label(): string
@@ -69,6 +83,13 @@ enum Capability: string
             self::BillingVoid => 'Void invoices and payments',
             self::LedgerView => 'View the books',
             self::LedgerManage => 'Manage the books and close periods',
+            self::DetailingView => 'View detailing bookings',
+            self::DetailingBook => 'Take and manage detailing bookings',
+            self::DetailingWork => 'Work detailing job cards',
+            self::DetailingQc => 'Sign off detailing jobs',
+            self::DetailingManage => 'Manage detailing packages and settings',
+            self::EquipmentView => 'View the equipment monitor',
+            self::EquipmentManage => 'Manage equipment and its service history',
         };
     }
 
@@ -77,7 +98,9 @@ enum Capability: string
     {
         return match ($this) {
             self::CustomerManage, self::OrganizationManage, self::InventoryView, self::InventoryManage,
-            self::BillingView, self::BillingManage, self::BillingVoid, self::LedgerView, self::LedgerManage => true,
+            self::BillingView, self::BillingManage, self::BillingVoid, self::LedgerView, self::LedgerManage,
+            self::DetailingView, self::DetailingBook, self::DetailingWork, self::DetailingQc, self::DetailingManage,
+            self::EquipmentView, self::EquipmentManage => true,
             default => false,
         };
     }

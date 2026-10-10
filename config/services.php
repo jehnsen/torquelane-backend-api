@@ -30,6 +30,13 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    // The public booking form's captcha: unset = none. `turnstile` checks with Cloudflare.
+    'captcha' => [
+        'driver' => env('CAPTCHA_DRIVER'),
+        'site_key' => env('CAPTCHA_SITE_KEY'),
+        'secret' => env('CAPTCHA_SECRET'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

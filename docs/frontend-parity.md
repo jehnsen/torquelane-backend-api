@@ -263,6 +263,84 @@ what the browser did not drive.
 | Reports: balance sheet | `GET /ledger/reports/balance-sheet?as_of=2026-10-08` | staff | done | Assets, liabilities, equity plus earnings to date. | ✓ PA |
 | Reports: daily sales by branch and payment method | `GET /ledger/reports/daily-sales?from=2026-09-01&to=2026-09-30` | staff | done | Net sales, VAT and invoiced per day and branch; receipts by method. | ✓ PA |
 
+## Detailing (Phase 9, staff only; public booking and the wall screen)
+
+Detailing has no counterpart in `../web`: it is the Samahuzai detailing app
+(the source; in production on Supabase) ported as the `detailing` module. The
+source's browser computed the day plan, the free starts and the finish time and
+handed them to SQL functions; here the API computes all of it and the screens
+render it (R2). `tests/Golden/fixtures/detailing/` holds recordings of what the
+source's own JavaScript and SQL do; the port replays them
+(`tests/Unit/Domain/Detailing`, `tests/Feature/Detailing/EngineCharacterizationTest`).
+
+Every screen is module-gated (a branch without `detailing` answers 403
+`module_disabled`; the nav section shows only where `/me` lists the module) and
+staff-only (`detailing:view` reads; `detailing:book`, `detailing:work`,
+`detailing:qc`, `detailing:manage` act). The **Phase 9** column is what the
+API's feature tests drive (`tests/Feature/Detailing`); the screens were built,
+type-checked and compiled against these endpoints but not yet driven in a
+browser against a live API.
+
+| Screen / action | Endpoint(s) | Side | Status | Notes | Phase 9 |
+|---|---|---|---|---|---|
+| `/shop/detailing/new`: menu, extras and detailers to choose from | `GET /detailing/catalogue` | staff | done | Packages with a price per size class; a size with no price is not offered. | tested |
+| `/shop/detailing/new`: free starts, the plan and the finish for a package, size and day | `GET /detailing/availability?package_id={detailing_package}&size_class=medium&date=2026-10-20` | staff | done | Was `getSlotStatuses` / `getTimeAvailability` / `planBookingDays` / `getBusyDetailerIds` in the source's browser. | tested |
+| `/shop/detailing/new`: take the booking | `POST /detailing/bookings` | staff | done | Was `add_booking`. 409 `full`, `blocked`, `detailer_conflict` in the source's words. Numbered BK-. | tested |
+| `/shop/detailing`: bookings, status counts, search | `GET /detailing/bookings` | staff | done | `meta.summary` holds the counts the filter row shows. | tested |
+| `/shop/detailing/bookings/[id]`: the job card | `GET /detailing/bookings/{detailing_booking}`, `PATCH /detailing/bookings/{detailing_booking}` | staff | done | `next` says what the job is waiting for; `finish` is the source's `computeBookingETC`. | tested |
+| Job card: confirm, start, complete, re-open, cancel, no-show | `POST /detailing/bookings/{detailing_booking}/status` | staff | done | Was `update_booking_status`. Start needs the check-in inspection (409 `inspection_required`) or an override reason; complete releases slots and consumes materials. | tested |
+| Job card: name detailers | `PUT /detailing/bookings/{detailing_booking}/detailers` | staff | done | Was `update_booking_detailers`. | tested |
+| Job card: extras | `PUT /detailing/bookings/{detailing_booking}/addons` | staff | done | Was `update_booking_addons`. | tested |
+| Job card: tick the package checklist | `POST /detailing/bookings/{detailing_booking}/checklist` | staff | done | New. | tested |
+| Job card: inspection (ratings, mileage, damage map) | `GET /detailing/bookings/{detailing_booking}/inspections`, `POST /detailing/bookings/{detailing_booking}/inspections` | staff | done | The source's `car_condition_logs`, per booking and stage, plus the damage map. Mileage is recorded as a meter reading. | tested |
+| Job card: before/after photos | `POST /detailing/bookings/{detailing_booking}/inspections/{inspection}/photos`, `DELETE /detailing/bookings/{detailing_booking}/inspections/{inspection}/photos/{photo}` | staff | done | New. Stored as documents on the private disk; opened through `GET /documents/{id}/download`. | tested |
+| Job card: sign off, or send back | `POST /detailing/bookings/{detailing_booking}/sign-off` | staff | done | New. Never by a detailer named on the job (403). | tested |
+| Job card: invoice; counter checkout | `POST /detailing/bookings/{detailing_booking}/invoice`, `POST /detailing/bookings/{detailing_booking}/checkout` | staff | done | New. Checkout is invoice + payment in one transaction; needs an `Idempotency-Key`. | tested |
+| `/shop/detailing/schedule`: the day by bay and by detailer, blocked slots, heads left per slot | `GET /detailing/schedule?from=2026-10-08&to=2026-10-09` | staff | done | Was built in the source's browser from every booking. | tested |
+| Schedule: block and unblock a slot | `POST /detailing/blocked-slots`, `DELETE /detailing/blocked-slots/{blocked_slot}` | staff | done | Was `toggleBlockedSlot`; the API now refuses a booking over a blocked slot itself. | tested |
+| `/shop/detailing/monitor`: the day's confirmed, on-going and completed jobs | `GET /detailing/monitor`, `GET /detailing/realtime`, `POST /broadcasting/auth` | staff | done | Was a Supabase Realtime subscription on `bookings`. Changes are broadcast after commit on `private-detailing.branch.{id}`; the screen polls where no realtime server is configured. | tested |
+| `/shop/detailing/packages`: the menu with every price, inactive ones too | `GET /detailing/catalogue?include_inactive=1`, `GET /detailing/duration?text=2-3%20hrs` | staff | done | The duration's "Interpreted as …" line is the API's reading. | tested |
+| Packages & pricing: packages | `POST /detailing/packages`, `PUT /detailing/packages/{detailing_package}`, `DELETE /detailing/packages/{detailing_package}` | staff | done | Was `upsertService`. Prices per size class and the bill of materials ride with the package. | tested |
+| Packages & pricing: categories, extras, order | `POST /detailing/categories`, `PUT /detailing/categories/{detailing_category}`, `DELETE /detailing/categories/{detailing_category}`, `POST /detailing/addons`, `PUT /detailing/addons/{detailing_addon}`, `DELETE /detailing/addons/{detailing_addon}`, `PUT /detailing/catalogue/order` | staff | done | The order endpoint is the source's drag-to-reorder. | tested |
+| `/shop/detailing/settings`: pool, closing time, inspection, online booking, size factors | `GET /detailing/settings`, `PUT /detailing/settings` | staff | done | Was `update_settings`: the pool cannot drop below what is booked. | tested |
+| Detailing settings: wall screens | `GET /detailing/display-tokens`, `POST /detailing/display-tokens`, `POST /detailing/display-tokens/{display_token}/revoke` | staff | done | New. A token is shown once; only its hash is kept. | tested |
+| — (no screen yet): a customer's standing weekly slot | `GET /detailing/recurring-schedules`, `POST /detailing/recurring-schedules`, `PUT /detailing/recurring-schedules/{recurring_schedule}`, `DELETE /detailing/recurring-schedules/{recurring_schedule}` | staff | done | The source's `recurring_schedules` (member profile). As there, a preference: it books nothing itself. | tested |
+| `/book/[branchSlug]`: a branch's public page and menu | `GET /public/detailing/samahuzai-binan` | both | done | No session. The branch's name, theme tokens, whether online booking is on (and its notice), the active menu. | tested |
+| `/book/[branchSlug]`: free starts | `GET /public/detailing/samahuzai-binan/availability?package_id={detailing_package}&size_class=medium&date=2026-10-20` | both | done | Free or not, and when the job would end; nothing about other bookings. | tested |
+| `/book/[branchSlug]`: request a booking | `POST /public/detailing/samahuzai-binan/bookings` | both | done | Rate-limited; captcha when configured. Lands pending; emails the customer. | tested |
+
+The wall screen (`/display/monitor`) reads `GET /display/detailing/monitor` and
+authorises its socket with `POST /display/broadcasting/auth`. Neither is in
+the table because neither has a side: the credential is a per-branch display
+token (`X-Display-Token`), not a session
+(`tests/Feature/Detailing/PublicAndDisplayTest`). The confirmation page
+(`/book/[branchSlug]/confirmation/[token]`) reads the booking back by the
+token in its link.
+
+## Equipment monitoring (Phase 10, staff only)
+
+No counterpart in `../web`: the source's detailing-equipment register and
+monitor (`/admin/equipment`, `equipmentUtils.js`) ported as the `equipment`
+module. The source derived every meter, ratio, due date and score in the
+browser on each render; here the API derives them when a tool is read and the
+screens render the result (R2). `tests/Golden/fixtures/detailing/equipment.json`
+is a recording of the source's engine; `tests/Unit/Domain/Equipment` holds the
+port to it. Module-gated and staff-only: `equipment:view` reads,
+`equipment:manage` writes. The **Phase 10** column is what
+`tests/Feature/Equipment` drives; the screens were built, type-checked and
+compiled but not yet driven in a browser.
+
+| Screen / action | Endpoint(s) | Side | Status | Notes | Phase 10 |
+|---|---|---|---|---|---|
+| `/shop/equipment`: the board and the floor in numbers | `GET /equipment` | staff | done | Was `buildEquipmentReport` / `summarizeFleet` in the source's browser. | tested |
+| `/shop/equipment`: lists, labels and category presets for the form | `GET /equipment/options` | staff | done | Was constants in `equipmentUtils.js`. | tested |
+| `/shop/equipment`: register and edit a tool | `POST /equipment`, `PUT /equipment/{equipment}`, `DELETE /equipment/{equipment}` | staff | done | Was `upsertEquipment` / `deleteEquipment`. A tool with a history is retired, not deleted (409). | tested |
+| `/shop/equipment/[id]`: one tool, its usage log and service history | `GET /equipment/{equipment}` | staff | done | | tested |
+| Tool: change status | `POST /equipment/{equipment}/status` | staff | done | Was `updateEquipmentStatus`. | tested |
+| Tool: log usage, remove an entry | `POST /equipment/{equipment}/usage-logs`, `DELETE /equipment/{equipment}/usage-logs/{usage_log}` | staff | done | Was `logEquipmentUsage`. | tested |
+| Tool: log a service, remove an entry | `POST /equipment/{equipment}/maintenance-logs`, `DELETE /equipment/{equipment}/maintenance-logs/{maintenance_log}` | staff | done | Was `logEquipmentService`. The meter snapshot is the API's, not the form's. | tested |
+| `/shop/equipment/profiles`: which packages put hours on which tools | `GET /equipment/profiles`, `PUT /equipment/profiles/{detailing_package}` | staff | done | Was `setServiceEquipmentProfile`. | tested |
+
 ## What moved from the browser to the server
 
 The frontend used to compute these itself. It now renders them:

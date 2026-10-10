@@ -22,6 +22,8 @@ enum DocumentType: string
     case StockCount = 'stock_count';
     /** Payments received (acknowledgment receipts, Phase 7). `receipt` (OR) is left for an official receipt, should one ever be needed. */
     case Payment = 'payment';
+    /** Detailing bookings (Phase 9): numbered when made, so a customer can quote one. */
+    case DetailingBooking = 'detailing_booking';
 
     public function defaultPrefix(): string
     {
@@ -36,6 +38,7 @@ enum DocumentType: string
             self::StockTransfer => 'TR',
             self::StockCount => 'SC',
             self::Payment => 'PAY',
+            self::DetailingBooking => 'BK',
         };
     }
 }

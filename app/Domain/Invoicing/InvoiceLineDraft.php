@@ -28,6 +28,8 @@ final readonly class InvoiceLineDraft
         public ?string $workOrderLineId = null,
         public ?string $itemId = null,
         public ?string $serviceTaskId = null,
+        /** The detailing booking a package or add-on line bills (Phase 9). */
+        public ?string $detailingBookingId = null,
     ) {
         if (! BigDecimal::of($quantity)->isPositive()) {
             throw new InvalidArgumentException('An invoice line bills a positive quantity.');
@@ -53,6 +55,6 @@ final readonly class InvoiceLineDraft
 
     public function withDiscount(int $discountCents): self
     {
-        return new self($this->kind, $this->description, $this->quantity, $this->unitPriceCents, $discountCents, $this->taxClass, $this->workOrderId, $this->workOrderLineId, $this->itemId, $this->serviceTaskId);
+        return new self($this->kind, $this->description, $this->quantity, $this->unitPriceCents, $discountCents, $this->taxClass, $this->workOrderId, $this->workOrderLineId, $this->itemId, $this->serviceTaskId, $this->detailingBookingId);
     }
 }

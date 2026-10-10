@@ -25,7 +25,17 @@ namespace App\Domain\Access;
  *    for provider_admin, branch_manager, service_advisor and cashier;
  *    `billing:void` for provider_admin and branch_manager;
  *  - the books (Phase 8): `ledger:view` for provider_admin and branch_manager
- *    (within their branches), `ledger:manage` for provider_admin.
+ *    (within their branches), `ledger:manage` for provider_admin;
+ *  - detailing (Phase 9, never a portal role): `detailing:view` for every
+ *    staff role; `detailing:book` for provider_admin, branch_manager,
+ *    service_advisor and cashier (the source's "admin" tier: bookings, status,
+ *    detailers, add-ons); `detailing:work` for provider_admin, branch_manager,
+ *    service_advisor and provider_technician; `detailing:qc` for
+ *    provider_admin, branch_manager and service_advisor; `detailing:manage`
+ *    for provider_admin and branch_manager (the source's "super admin" tier);
+ *  - equipment (Phase 10, never a portal role): `equipment:view` for every
+ *    staff role, `equipment:manage` for provider_admin and branch_manager (the
+ *    source kept the whole page to its super admin).
  */
 final class AccessMatrix
 {
@@ -71,6 +81,9 @@ final class AccessMatrix
             'workorder:complete',
             'document:upload',
             'inventory:view',
+            'detailing:view',
+            'detailing:work',
+            'equipment:view',
         ],
         'service_advisor' => [
             'vehicle:update',
@@ -82,8 +95,13 @@ final class AccessMatrix
             'inventory:view',
             'billing:view',
             'billing:manage',
+            'detailing:view',
+            'detailing:book',
+            'detailing:work',
+            'detailing:qc',
+            'equipment:view',
         ],
-        'cashier' => ['customer:manage', 'inventory:view', 'billing:view', 'billing:manage'],
+        'cashier' => ['customer:manage', 'inventory:view', 'billing:view', 'billing:manage', 'detailing:view', 'detailing:book', 'equipment:view'],
         // Everything but organization:manage, applied only to the branches the
         // manager is pinned to (branch_user).
         'branch_manager' => [
@@ -105,6 +123,13 @@ final class AccessMatrix
             'billing:manage',
             'billing:void',
             'ledger:view',
+            'detailing:view',
+            'detailing:book',
+            'detailing:work',
+            'detailing:qc',
+            'detailing:manage',
+            'equipment:view',
+            'equipment:manage',
         ],
         'provider_admin' => [
             'vehicle:update',
@@ -127,6 +152,13 @@ final class AccessMatrix
             'billing:void',
             'ledger:view',
             'ledger:manage',
+            'detailing:view',
+            'detailing:book',
+            'detailing:work',
+            'detailing:qc',
+            'detailing:manage',
+            'equipment:view',
+            'equipment:manage',
         ],
     ];
 

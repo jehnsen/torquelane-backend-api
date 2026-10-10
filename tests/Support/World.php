@@ -29,7 +29,15 @@ use App\Models\BranchModule;
 use App\Models\Consent;
 use App\Models\Contact;
 use App\Models\CustomerAccount;
+use App\Models\DetailingBooking;
+use App\Models\DetailingBookingSlot;
+use App\Models\DetailingBookingStatusLog;
+use App\Models\DetailingInspection;
+use App\Models\DetailingPackage;
+use App\Models\DetailingPackagePrice;
 use App\Models\Document;
+use App\Models\Equipment;
+use App\Models\EquipmentPackageProfile;
 use App\Models\FleetPart;
 use App\Models\FleetPartUsage;
 use App\Models\Invitation;
@@ -220,10 +228,68 @@ final class World
         $admin = $this->makeUser($organization->id, 'admin@other.example', Role::ProviderAdmin, null);
         $this->ids['rival:admin'] = $admin->id;
         $this->ids['rival:portal'] = $this->makeUser($organization->id, 'fleet@rivalfleet.example', Role::FleetManager, $fleet->id)->id;
+        $this->rivalDetailing($organization->id, $branch->id, $this->ids['rival:walk-in']);
 
         $this->ids['rival:invite'] = $this->invitation($organization->id, 'someone@rivalfleet.example', Role::Viewer, $fleet->id, $admin->id)->id;
 
         $this->rivalFleet($organization->id, $fleet->id);
+    }
+
+    /**
+     * A detailing floor in the rival organization (Phase 9), so every detailing
+     * probe has another organization's record to try: a package with a price,
+     * a booking with its slots and status log, and an inspection.
+     */
+    private function rivalDetailing(string $organizationId, string $branchId, string $accountId): void
+    {
+        (new OrganizationModule)->forceFill(['organization_id' => $organizationId, 'module' => Module::Detailing, 'enabled' => true])->save();
+        (new BranchModule)->forceFill(['organization_id' => $organizationId, 'branch_id' => $branchId, 'module' => Module::Detailing, 'enabled' => true])->save();
+
+        $package = new DetailingPackage;
+        $package->forceFill(['organization_id' => $organizationId, 'branch_id' => $branchId, 'name' => 'Rival Wash', 'duration_text' => '1 hr'])->save();
+        (new DetailingPackagePrice)->forceFill(['organization_id' => $organizationId, 'package_id' => $package->id, 'size_class' => 'medium', 'price_cents' => 90_000])->save();
+        $this->ids['rival:detailing:package'] = $package->id;
+
+        $booking = new DetailingBooking;
+        $booking->forceFill([
+            'organization_id' => $organizationId,
+            'branch_id' => $branchId,
+            'customer_account_id' => $accountId,
+            'reference' => 'BK-2026-0001',
+            'status' => 'confirmed',
+            'package_id' => $package->id,
+            'package_name' => 'Rival Wash',
+            'size_class' => 'medium',
+            'package_price_cents' => 90_000,
+            'duration_text' => '1 hr',
+            'scheduled_date' => '2026-10-08',
+            'start_minutes' => 540,
+            'customer_name' => 'Rival Walk-in',
+            'created_by_name' => 'Rival Admin',
+        ])->save();
+        $this->ids['rival:detailing:booking'] = $booking->id;
+        foreach ([540, 570] as $slot) {
+            (new DetailingBookingSlot)->forceFill(['organization_id' => $organizationId, 'branch_id' => $branchId, 'booking_id' => $booking->id, 'date' => '2026-10-08', 'slot' => $slot])->save();
+        }
+        (new DetailingBookingStatusLog)->forceFill(['organization_id' => $organizationId, 'booking_id' => $booking->id, 'to_status' => 'confirmed', 'actor_name' => 'Rival Admin', 'changed_at' => '2026-10-07 02:00:00+00'])->save();
+        // Phase 10: a tool on the rival's floor, mapped to its package.
+        (new OrganizationModule)->forceFill(['organization_id' => $organizationId, 'module' => Module::Equipment, 'enabled' => true])->save();
+        (new BranchModule)->forceFill(['organization_id' => $organizationId, 'branch_id' => $branchId, 'module' => Module::Equipment, 'enabled' => true])->save();
+        $tool = new Equipment;
+        $tool->forceFill(['organization_id' => $organizationId, 'branch_id' => $branchId, 'name' => 'Rival Polisher', 'category' => 'polishing', 'service_interval_hours' => '100'])->save();
+        $this->ids['rival:equipment'] = $tool->id;
+        (new EquipmentPackageProfile)->forceFill(['organization_id' => $organizationId, 'branch_id' => $branchId, 'package_id' => $package->id, 'equipment_id' => $tool->id, 'hours_per_job' => '1.500'])->save();
+
+        (new DetailingInspection)->forceFill([
+            'organization_id' => $organizationId,
+            'branch_id' => $branchId,
+            'booking_id' => $booking->id,
+            'customer_account_id' => $accountId,
+            'stage' => 'check_in',
+            'overall_rating' => 6,
+            'recorded_by_name' => 'Rival Admin',
+            'recorded_at' => '2026-10-08 01:00:00+00',
+        ])->save();
     }
 
     private function rivalFleet(string $organizationId, string $accountId): void
