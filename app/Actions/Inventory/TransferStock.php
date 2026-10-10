@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Inventory;
 
 use App\Actions\Audit\AuditTrail;
+use App\Actions\Ledger\LedgerPostings;
 use App\Actions\Numbering\DocumentNumbers;
 use App\Domain\Inventory\MoveRequest;
 use App\Domain\Inventory\MoveType;
@@ -40,6 +41,7 @@ final class TransferStock
         private readonly DocumentNumbers $numbers,
         private readonly AuditTrail $audit,
         private readonly TenantManager $tenancy,
+        private readonly LedgerPostings $postings,
     ) {}
 
     /**
@@ -87,7 +89,8 @@ final class TransferStock
                     throw ValidationException::withMessages(["lines.{$position}.quantity" => 'Transfer more than nothing.']);
                 }
                 $out = $this->ledger->handle($from, $input['item_id'], new MoveRequest(MoveType::TransferOut, $quantity->negated()), StockSource::StockTransfer, $transfer->id, "{$transfer->reference} to {$to->name}", $now);
-                $this->ledger->handle($to, $input['item_id'], new MoveRequest(MoveType::TransferIn, $quantity, $out->unit_cost_cents), StockSource::StockTransfer, $transfer->id, "{$transfer->reference} from {$from->name}", $now);
+                $in = $this->ledger->handle($to, $input['item_id'], new MoveRequest(MoveType::TransferIn, $quantity, $out->unit_cost_cents), StockSource::StockTransfer, $transfer->id, "{$transfer->reference} from {$from->name}", $now);
+                $this->postings->stockTransfer($out, $out->bookDeltaCents, $in, $in->bookDeltaCents);
 
                 $line = new StockTransferLine;
                 $line->forceFill([

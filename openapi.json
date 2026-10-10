@@ -12,6 +12,446 @@
         }
     ],
     "paths": {
+        "/ledger/accounts": {
+            "get": {
+                "operationId": "ledger.accounts.index",
+                "description": "`ledger:view` (staff). Every account with its balance through `as_of`\n(default today) over the caller's branches, and the posting rules that\npoint at it. The chart is installed on first use.",
+                "summary": "Chart of accounts",
+                "tags": [
+                    "Account"
+                ],
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    },
+                    {
+                        "name": "as_of",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {}
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "as_of": {
+                                                    "type": "string"
+                                                },
+                                                "scope": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "branches": {
+                                                            "type": "array",
+                                                            "items": {}
+                                                        },
+                                                        "all_branches": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "branches",
+                                                        "all_branches"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "as_of",
+                                                "scope"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "ledger.accounts.store",
+                "description": "`ledger:manage`. A new account takes no postings until a posting rule\nis pointed at it. Its code is unique in the chart.",
+                "summary": "Add an account",
+                "tags": [
+                    "Account"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SaveAccountRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "`AccountResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/ledger/accounts/{account}": {
+            "patch": {
+                "operationId": "ledger.accounts.update",
+                "description": "`ledger:manage`. Rename or describe it, or deactivate one no posting\nrule uses. Once an account has been posted to its code, type and side\nare fixed (409).",
+                "summary": "Edit an account",
+                "tags": [
+                    "Account"
+                ],
+                "parameters": [
+                    {
+                        "name": "account",
+                        "in": "path",
+                        "required": true,
+                        "description": "The account ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SaveAccountRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`AccountResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/ledger/posting-rules": {
+            "get": {
+                "operationId": "ledger.rules.index",
+                "description": "`ledger:view`. Each event or category the books post by, the account it\nposts to and the account type it needs.",
+                "summary": "Posting rules",
+                "tags": [
+                    "Account"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {}
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            },
+            "put": {
+                "operationId": "ledger.rules.update",
+                "description": "`ledger:manage`. Re-point rules at other accounts of the right type.\nIt applies to postings from now on; entries already made are never\nrewritten.",
+                "summary": "Edit posting rules",
+                "tags": [
+                    "Account"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdatePostingRulesRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/ledger/settings": {
+            "get": {
+                "operationId": "ledger.settings.show",
+                "description": "`ledger:view`. The accounting product the books are exported for\n(`none`, `xero` or `quickbooks`) and the account mappings its import\nneeds.",
+                "summary": "Ledger settings",
+                "tags": [
+                    "Account"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "accounting_target": {
+                                                    "type": "string"
+                                                },
+                                                "mappings": {
+                                                    "type": "array",
+                                                    "items": {}
+                                                }
+                                            },
+                                            "required": [
+                                                "accounting_target",
+                                                "mappings"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            },
+            "put": {
+                "operationId": "ledger.settings.update",
+                "description": "`ledger:manage`. `xero` and `quickbooks` switch on that product's\nmanual-journal import file next to the plain CSV.",
+                "summary": "Set the accounting product",
+                "tags": [
+                    "Account"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/LedgerSettingsRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "accounting_target": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "accounting_target"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/ledger/export-mappings": {
+            "put": {
+                "operationId": "ledger.mappings.update",
+                "description": "`ledger:manage`. Our account \u2192 the code (Xero) or name (QuickBooks\nOnline) the accountant's books use; an empty code and name removes the\nmapping.",
+                "summary": "Map accounts for export",
+                "tags": [
+                    "Account"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SaveExportMappingsRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
         "/alerts": {
             "get": {
                 "operationId": "alerts.index",
@@ -5392,6 +5832,1023 @@
                 }
             }
         },
+        "/ledger/journal": {
+            "get": {
+                "operationId": "ledger.journal.index",
+                "description": "`ledger:view`. Entries in the caller's branches, newest first, filtered\nby date range, account, event, branch, source document or a search on\nnumber, reference and memo.",
+                "summary": "Journal",
+                "tags": [
+                    "Journal"
+                ],
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    },
+                    {
+                        "name": "as_of",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "account_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "event",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "invoice_issued",
+                                "invoice_voided",
+                                "payment_received",
+                                "payment_voided",
+                                "credit_applied",
+                                "credit_reversed",
+                                "stock_opening",
+                                "stock_receipt",
+                                "stock_receipt_return",
+                                "stock_issue",
+                                "stock_return",
+                                "stock_consumption",
+                                "stock_adjustment",
+                                "stock_transfer"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "branch_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "source_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 100
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `JournalEntryResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/JournalEntryCollection"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/ledger/journal/export": {
+            "get": {
+                "operationId": "ledger.journal.export",
+                "description": "`ledger:view`. `format` `csv` (default): one row per line. `xero` or\n`quickbooks`: that product's manual-journal import, when it is the\norganization's accounting target and every account used is mapped\n(409 `unmapped_accounts` names the ones that are not). A caller limited\nto some branches exports only those branches' lines. No live sync.",
+                "summary": "Export the journal",
+                "tags": [
+                    "Journal"
+                ],
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    },
+                    {
+                        "name": "as_of",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "format",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "csv",
+                                "xero",
+                                "quickbooks"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "text/csv; charset=UTF-8": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "headers": {
+                            "Content-Disposition": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "no-store"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/ledger/journal/{journalEntry}": {
+            "get": {
+                "operationId": "ledger.journal.show",
+                "summary": "Show a journal entry",
+                "tags": [
+                    "Journal"
+                ],
+                "parameters": [
+                    {
+                        "name": "journalEntry",
+                        "in": "path",
+                        "required": true,
+                        "description": "The journal entry ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`JournalEntryResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/JournalEntryResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            }
+        },
+        "/ledger/reports/trial-balance": {
+            "get": {
+                "operationId": "ledger.reports.trial-balance",
+                "description": "Every account with activity through `as_of` (default today), its net\nbalance in the debit or credit column, and whether the columns agree.",
+                "summary": "Trial balance",
+                "tags": [
+                    "LedgerReport"
+                ],
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    },
+                    {
+                        "name": "as_of",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {}
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/ledger/reports/general-ledger/{account}": {
+            "get": {
+                "operationId": "ledger.reports.general-ledger",
+                "description": "One account's lines over `from`..`to` (default this month) with a\nrunning balance on the account's own side after the balance brought\nforward. Paged.",
+                "summary": "General ledger for an account",
+                "tags": [
+                    "LedgerReport"
+                ],
+                "parameters": [
+                    {
+                        "name": "account",
+                        "in": "path",
+                        "required": true,
+                        "description": "The account ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    },
+                    {
+                        "name": "as_of",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "account": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string"
+                                                        },
+                                                        "code": {
+                                                            "type": "string"
+                                                        },
+                                                        "name": {
+                                                            "type": "string"
+                                                        },
+                                                        "type": {
+                                                            "type": "string"
+                                                        },
+                                                        "normal_side": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "code",
+                                                        "name",
+                                                        "type",
+                                                        "normal_side"
+                                                    ]
+                                                },
+                                                "from": {
+                                                    "type": "string"
+                                                },
+                                                "to": {
+                                                    "type": "string"
+                                                },
+                                                "scope": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "branches": {
+                                                            "type": "array",
+                                                            "items": {}
+                                                        },
+                                                        "all_branches": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "branches",
+                                                        "all_branches"
+                                                    ]
+                                                },
+                                                "opening_balance_cents": {
+                                                    "type": "number"
+                                                },
+                                                "total_debit_cents": {
+                                                    "type": "integer"
+                                                },
+                                                "total_credit_cents": {
+                                                    "type": "integer"
+                                                },
+                                                "closing_balance_cents": {
+                                                    "type": "number"
+                                                },
+                                                "lines": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "string"
+                                                            },
+                                                            "entry_id": {
+                                                                "type": "string"
+                                                            },
+                                                            "number": {
+                                                                "type": "string"
+                                                            },
+                                                            "entry_date": {
+                                                                "type": "string"
+                                                            },
+                                                            "event": {
+                                                                "type": "string"
+                                                            },
+                                                            "event_label": {
+                                                                "type": "string"
+                                                            },
+                                                            "reference": {
+                                                                "type": "string"
+                                                            },
+                                                            "memo": {
+                                                                "type": "string"
+                                                            },
+                                                            "branch_id": {
+                                                                "type": "string"
+                                                            },
+                                                            "branch_name": {
+                                                                "type": "string"
+                                                            },
+                                                            "debit_cents": {
+                                                                "type": "integer"
+                                                            },
+                                                            "credit_cents": {
+                                                                "type": "integer"
+                                                            },
+                                                            "balance_cents": {
+                                                                "type": "number"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "id",
+                                                            "entry_id",
+                                                            "number",
+                                                            "entry_date",
+                                                            "event",
+                                                            "event_label",
+                                                            "reference",
+                                                            "memo",
+                                                            "branch_id",
+                                                            "branch_name",
+                                                            "debit_cents",
+                                                            "credit_cents",
+                                                            "balance_cents"
+                                                        ]
+                                                    }
+                                                },
+                                                "meta": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "page": {
+                                                            "type": "integer"
+                                                        },
+                                                        "per_page": {
+                                                            "type": "integer"
+                                                        },
+                                                        "total": {
+                                                            "type": "integer",
+                                                            "minimum": 0
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "page",
+                                                        "per_page",
+                                                        "total"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "account",
+                                                "from",
+                                                "to",
+                                                "scope",
+                                                "opening_balance_cents",
+                                                "total_debit_cents",
+                                                "total_credit_cents",
+                                                "closing_balance_cents",
+                                                "lines",
+                                                "meta"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error.not_found"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/ledger/reports/profit-and-loss": {
+            "get": {
+                "operationId": "ledger.reports.profit-and-loss",
+                "description": "Revenue (net of discounts), cost of sales, gross profit, other expenses\nand net profit over `from`..`to`, with a column per branch in scope and\nthe consolidated total.",
+                "summary": "Profit and loss",
+                "tags": [
+                    "LedgerReport"
+                ],
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    },
+                    {
+                        "name": "as_of",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {}
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/ledger/reports/balance-sheet": {
+            "get": {
+                "operationId": "ledger.reports.balance-sheet",
+                "description": "Assets, liabilities and equity through `as_of`, including the earnings\nmade to date; `balanced` says whether assets = liabilities + equity.",
+                "summary": "Balance sheet",
+                "tags": [
+                    "LedgerReport"
+                ],
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    },
+                    {
+                        "name": "as_of",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {}
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/ledger/reports/daily-sales": {
+            "get": {
+                "operationId": "ledger.reports.daily-sales",
+                "description": "By day and branch over `from`..`to`: net sales, VAT and the invoiced\ntotal (voids netted on the day they happened), and the money received\nthat day by payment method.",
+                "summary": "Daily sales",
+                "tags": [
+                    "LedgerReport"
+                ],
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1024
+                        }
+                    },
+                    {
+                        "name": "as_of",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "from": {
+                                                    "type": "string"
+                                                },
+                                                "to": {
+                                                    "type": "string"
+                                                },
+                                                "scope": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "branches": {
+                                                            "type": "array",
+                                                            "items": {}
+                                                        },
+                                                        "all_branches": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "branches",
+                                                        "all_branches"
+                                                    ]
+                                                },
+                                                "days": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "date": {
+                                                                "type": "string"
+                                                            },
+                                                            "branch_id": {
+                                                                "type": "string"
+                                                            },
+                                                            "branch_name": {
+                                                                "type": "string"
+                                                            },
+                                                            "net_sales_cents": {
+                                                                "type": "string"
+                                                            },
+                                                            "vat_cents": {
+                                                                "type": "string"
+                                                            },
+                                                            "invoiced_cents": {
+                                                                "type": "string"
+                                                            },
+                                                            "received_cents": {
+                                                                "type": "number"
+                                                            },
+                                                            "receipts": {
+                                                                "type": "array",
+                                                                "items": {}
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "date",
+                                                            "branch_id",
+                                                            "branch_name",
+                                                            "net_sales_cents",
+                                                            "vat_cents",
+                                                            "invoiced_cents",
+                                                            "received_cents",
+                                                            "receipts"
+                                                        ]
+                                                    }
+                                                },
+                                                "totals": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "net_sales_cents": {
+                                                            "type": "number"
+                                                        },
+                                                        "vat_cents": {
+                                                            "type": "number"
+                                                        },
+                                                        "invoiced_cents": {
+                                                            "type": "number"
+                                                        },
+                                                        "received_cents": {
+                                                            "type": "number"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "net_sales_cents",
+                                                        "vat_cents",
+                                                        "invoiced_cents",
+                                                        "received_cents"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "from",
+                                                "to",
+                                                "scope",
+                                                "days",
+                                                "totals"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
         "/vehicles/{vehicle}/readings": {
             "get": {
                 "operationId": "vehicles.readings.index",
@@ -6380,6 +7837,641 @@
                     },
                     "401": {
                         "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            }
+        },
+        "/ledger/periods": {
+            "get": {
+                "operationId": "ledger.periods.index",
+                "description": "`ledger:view`. The months that have entries, newest first, with their\nstatus and (once closed) who closed them and the checklist as it\npassed. The current month is always listed.",
+                "summary": "Periods",
+                "tags": [
+                    "Period"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {}
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "current": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "current"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    }
+                }
+            }
+        },
+        "/ledger/periods/checklist": {
+            "get": {
+                "operationId": "ledger.periods.checklist",
+                "description": "`ledger:view`, `period` `YYYY-MM`. The five checks for that month (every\nsource posted; receivables = Accounts Receivable; stock valuation =\nInventory; unapplied credit = Customer Deposits; trial balance\nbalanced), whether the month can be closed now and, if not, why.\nRead-only.",
+                "summary": "Close checklist",
+                "tags": [
+                    "Period"
+                ],
+                "parameters": [
+                    {
+                        "name": "period",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "period_key": {
+                                                    "type": "string"
+                                                },
+                                                "label": {
+                                                    "type": "string"
+                                                },
+                                                "starts_on": {
+                                                    "type": "string"
+                                                },
+                                                "ends_on": {
+                                                    "type": "string"
+                                                },
+                                                "status": {
+                                                    "type": "string"
+                                                },
+                                                "ended": {
+                                                    "type": "boolean"
+                                                },
+                                                "checklist": {
+                                                    "type": "array",
+                                                    "prefixItems": [
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "key": {
+                                                                    "type": "string",
+                                                                    "const": "unposted_sources"
+                                                                },
+                                                                "label": {
+                                                                    "type": "string",
+                                                                    "const": "Every invoice, payment and stock move is posted"
+                                                                },
+                                                                "passed": {
+                                                                    "type": "boolean"
+                                                                },
+                                                                "expected_cents": {
+                                                                    "type": "null"
+                                                                },
+                                                                "actual_cents": {
+                                                                    "type": "null"
+                                                                },
+                                                                "difference_cents": {
+                                                                    "type": "null"
+                                                                },
+                                                                "detail": {
+                                                                    "type": "string"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "key",
+                                                                "label",
+                                                                "passed",
+                                                                "expected_cents",
+                                                                "actual_cents",
+                                                                "difference_cents",
+                                                                "detail"
+                                                            ]
+                                                        },
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "key": {
+                                                                    "type": "string",
+                                                                    "const": "receivables"
+                                                                },
+                                                                "label": {
+                                                                    "type": "string",
+                                                                    "const": "Receivables subledger equals Accounts Receivable"
+                                                                },
+                                                                "passed": {
+                                                                    "type": "boolean"
+                                                                },
+                                                                "expected_cents": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "actual_cents": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "difference_cents": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "detail": {
+                                                                    "type": "string"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "key",
+                                                                "label",
+                                                                "passed",
+                                                                "expected_cents",
+                                                                "actual_cents",
+                                                                "difference_cents",
+                                                                "detail"
+                                                            ]
+                                                        },
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "key": {
+                                                                    "type": "string",
+                                                                    "const": "inventory"
+                                                                },
+                                                                "label": {
+                                                                    "type": "string",
+                                                                    "const": "Stock valuation equals Inventory"
+                                                                },
+                                                                "passed": {
+                                                                    "type": "boolean"
+                                                                },
+                                                                "expected_cents": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "actual_cents": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "difference_cents": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "detail": {
+                                                                    "type": "string"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "key",
+                                                                "label",
+                                                                "passed",
+                                                                "expected_cents",
+                                                                "actual_cents",
+                                                                "difference_cents",
+                                                                "detail"
+                                                            ]
+                                                        },
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "key": {
+                                                                    "type": "string",
+                                                                    "const": "customer_deposits"
+                                                                },
+                                                                "label": {
+                                                                    "type": "string",
+                                                                    "const": "Unapplied customer credit equals Customer Deposits"
+                                                                },
+                                                                "passed": {
+                                                                    "type": "boolean"
+                                                                },
+                                                                "expected_cents": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "actual_cents": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "difference_cents": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "detail": {
+                                                                    "type": "string"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "key",
+                                                                "label",
+                                                                "passed",
+                                                                "expected_cents",
+                                                                "actual_cents",
+                                                                "difference_cents",
+                                                                "detail"
+                                                            ]
+                                                        },
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "key": {
+                                                                    "type": "string",
+                                                                    "const": "trial_balance"
+                                                                },
+                                                                "label": {
+                                                                    "type": "string",
+                                                                    "const": "The trial balance balances"
+                                                                },
+                                                                "passed": {
+                                                                    "type": "boolean"
+                                                                },
+                                                                "expected_cents": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "actual_cents": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "difference_cents": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "detail": {
+                                                                    "type": "string"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "key",
+                                                                "label",
+                                                                "passed",
+                                                                "expected_cents",
+                                                                "actual_cents",
+                                                                "difference_cents",
+                                                                "detail"
+                                                            ]
+                                                        }
+                                                    ],
+                                                    "minItems": 5,
+                                                    "maxItems": 5
+                                                },
+                                                "can_close": {
+                                                    "type": "boolean"
+                                                },
+                                                "blocked_by": {
+                                                    "anyOf": [
+                                                        {
+                                                            "type": "string"
+                                                        },
+                                                        {
+                                                            "type": "null"
+                                                        },
+                                                        {
+                                                            "type": "string",
+                                                            "enum": [
+                                                                "This month is already closed.",
+                                                                "The month is not over yet.",
+                                                                "The checklist has failures."
+                                                            ]
+                                                        }
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "period_key",
+                                                "label",
+                                                "starts_on",
+                                                "ends_on",
+                                                "status",
+                                                "ended",
+                                                "checklist",
+                                                "can_close",
+                                                "blocked_by"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
+                    }
+                }
+            }
+        },
+        "/ledger/periods/close": {
+            "post": {
+                "operationId": "ledger.periods.close",
+                "description": "`ledger:manage` (and not branch-limited). Only once the month is over,\nearlier months are closed and the checklist passes (409\n`close_checklist_failed` carries it). A closed month takes no new entry\nand is never reopened; a void of one of its documents posts in the\ncurrent month, dated today, naming the original.",
+                "summary": "Close a month",
+                "tags": [
+                    "Period"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ClosePeriodRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "period_key": {
+                                                    "type": "string"
+                                                },
+                                                "label": {
+                                                    "type": "string"
+                                                },
+                                                "starts_on": {
+                                                    "type": "string"
+                                                },
+                                                "ends_on": {
+                                                    "type": "string"
+                                                },
+                                                "status": {
+                                                    "type": "string"
+                                                },
+                                                "ended": {
+                                                    "type": "boolean"
+                                                },
+                                                "checklist": {
+                                                    "type": "array",
+                                                    "prefixItems": [
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "key": {
+                                                                    "type": "string",
+                                                                    "const": "unposted_sources"
+                                                                },
+                                                                "label": {
+                                                                    "type": "string",
+                                                                    "const": "Every invoice, payment and stock move is posted"
+                                                                },
+                                                                "passed": {
+                                                                    "type": "boolean"
+                                                                },
+                                                                "expected_cents": {
+                                                                    "type": "null"
+                                                                },
+                                                                "actual_cents": {
+                                                                    "type": "null"
+                                                                },
+                                                                "difference_cents": {
+                                                                    "type": "null"
+                                                                },
+                                                                "detail": {
+                                                                    "type": "string"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "key",
+                                                                "label",
+                                                                "passed",
+                                                                "expected_cents",
+                                                                "actual_cents",
+                                                                "difference_cents",
+                                                                "detail"
+                                                            ]
+                                                        },
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "key": {
+                                                                    "type": "string",
+                                                                    "const": "receivables"
+                                                                },
+                                                                "label": {
+                                                                    "type": "string",
+                                                                    "const": "Receivables subledger equals Accounts Receivable"
+                                                                },
+                                                                "passed": {
+                                                                    "type": "boolean"
+                                                                },
+                                                                "expected_cents": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "actual_cents": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "difference_cents": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "detail": {
+                                                                    "type": "string"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "key",
+                                                                "label",
+                                                                "passed",
+                                                                "expected_cents",
+                                                                "actual_cents",
+                                                                "difference_cents",
+                                                                "detail"
+                                                            ]
+                                                        },
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "key": {
+                                                                    "type": "string",
+                                                                    "const": "inventory"
+                                                                },
+                                                                "label": {
+                                                                    "type": "string",
+                                                                    "const": "Stock valuation equals Inventory"
+                                                                },
+                                                                "passed": {
+                                                                    "type": "boolean"
+                                                                },
+                                                                "expected_cents": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "actual_cents": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "difference_cents": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "detail": {
+                                                                    "type": "string"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "key",
+                                                                "label",
+                                                                "passed",
+                                                                "expected_cents",
+                                                                "actual_cents",
+                                                                "difference_cents",
+                                                                "detail"
+                                                            ]
+                                                        },
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "key": {
+                                                                    "type": "string",
+                                                                    "const": "customer_deposits"
+                                                                },
+                                                                "label": {
+                                                                    "type": "string",
+                                                                    "const": "Unapplied customer credit equals Customer Deposits"
+                                                                },
+                                                                "passed": {
+                                                                    "type": "boolean"
+                                                                },
+                                                                "expected_cents": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "actual_cents": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "difference_cents": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "detail": {
+                                                                    "type": "string"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "key",
+                                                                "label",
+                                                                "passed",
+                                                                "expected_cents",
+                                                                "actual_cents",
+                                                                "difference_cents",
+                                                                "detail"
+                                                            ]
+                                                        },
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "key": {
+                                                                    "type": "string",
+                                                                    "const": "trial_balance"
+                                                                },
+                                                                "label": {
+                                                                    "type": "string",
+                                                                    "const": "The trial balance balances"
+                                                                },
+                                                                "passed": {
+                                                                    "type": "boolean"
+                                                                },
+                                                                "expected_cents": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "actual_cents": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "difference_cents": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "detail": {
+                                                                    "type": "string"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "key",
+                                                                "label",
+                                                                "passed",
+                                                                "expected_cents",
+                                                                "actual_cents",
+                                                                "difference_cents",
+                                                                "detail"
+                                                            ]
+                                                        }
+                                                    ],
+                                                    "minItems": 5,
+                                                    "maxItems": 5
+                                                },
+                                                "can_close": {
+                                                    "type": "boolean"
+                                                },
+                                                "blocked_by": {
+                                                    "anyOf": [
+                                                        {
+                                                            "type": "string"
+                                                        },
+                                                        {
+                                                            "type": "null"
+                                                        },
+                                                        {
+                                                            "type": "string",
+                                                            "enum": [
+                                                                "This month is already closed.",
+                                                                "The month is not over yet.",
+                                                                "The checklist has failures."
+                                                            ]
+                                                        }
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "period_key",
+                                                "label",
+                                                "starts_on",
+                                                "ends_on",
+                                                "status",
+                                                "ended",
+                                                "checklist",
+                                                "can_close",
+                                                "blocked_by"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error.forbidden"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error.unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error.validation"
                     }
                 }
             }
@@ -13528,6 +15620,46 @@
                 ],
                 "title": "AcceptInvitationRequest"
             },
+            "AccountResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "code": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "type": "string"
+                    },
+                    "normal_side": {
+                        "type": "string"
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "is_system": {
+                        "type": "boolean"
+                    },
+                    "description": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "code",
+                    "name",
+                    "type",
+                    "normal_side",
+                    "is_active",
+                    "is_system",
+                    "description"
+                ],
+                "title": "AccountResource"
+            },
             "AlertInteractionRequest": {
                 "type": "object",
                 "properties": {
@@ -14020,6 +16152,19 @@
                     "odometer"
                 ],
                 "title": "CheckInRequest"
+            },
+            "ClosePeriodRequest": {
+                "type": "object",
+                "description": "A month, `YYYY-MM`.",
+                "properties": {
+                    "period": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "period"
+                ],
+                "title": "ClosePeriodRequest"
             },
             "CollectWorkOrdersRequest": {
                 "type": "object",
@@ -15727,6 +17872,155 @@
                 ],
                 "title": "ItemType"
             },
+            "JournalEntryCollection": {
+                "type": "array",
+                "items": {
+                    "$ref": "#/components/schemas/JournalEntryResource"
+                },
+                "title": "JournalEntryCollection"
+            },
+            "JournalEntryResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "number": {
+                        "type": "string"
+                    },
+                    "entry_date": {
+                        "type": "string"
+                    },
+                    "period": {
+                        "type": "string"
+                    },
+                    "period_closed": {
+                        "type": "boolean"
+                    },
+                    "event": {
+                        "type": "string"
+                    },
+                    "event_label": {
+                        "type": "string",
+                        "enum": [
+                            "Invoice issued",
+                            "Invoice voided",
+                            "Payment received",
+                            "Payment voided",
+                            "Credit applied to an invoice",
+                            "Credit application reversed",
+                            "Opening stock",
+                            "Goods received",
+                            "Goods receipt voided",
+                            "Parts issued to a job",
+                            "Parts returned from a job",
+                            "Stock consumed",
+                            "Stock adjustment",
+                            "Stock transfer"
+                        ]
+                    },
+                    "is_reversal": {
+                        "type": "boolean"
+                    },
+                    "source_type": {
+                        "type": "string"
+                    },
+                    "source_id": {
+                        "type": "string"
+                    },
+                    "reference": {
+                        "type": "string"
+                    },
+                    "memo": {
+                        "type": "string"
+                    },
+                    "payment_method": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "branch_id": {
+                        "type": "string"
+                    },
+                    "branch_name": {
+                        "type": "string"
+                    },
+                    "counter_branch_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "reversal_of_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "reversed_by_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "total_cents": {
+                        "type": "integer"
+                    },
+                    "posted_by_name": {
+                        "type": "string"
+                    },
+                    "posted_at": {
+                        "type": "string"
+                    },
+                    "lines": {
+                        "type": "array",
+                        "items": {}
+                    }
+                },
+                "required": [
+                    "id",
+                    "number",
+                    "entry_date",
+                    "period",
+                    "period_closed",
+                    "event",
+                    "event_label",
+                    "is_reversal",
+                    "source_type",
+                    "source_id",
+                    "reference",
+                    "memo",
+                    "payment_method",
+                    "branch_id",
+                    "branch_name",
+                    "counter_branch_id",
+                    "reversal_of_id",
+                    "reversed_by_id",
+                    "total_cents",
+                    "posted_by_name",
+                    "posted_at",
+                    "lines"
+                ],
+                "title": "JournalEntryResource"
+            },
+            "LedgerSettingsRequest": {
+                "type": "object",
+                "properties": {
+                    "accounting_target": {
+                        "type": "string",
+                        "enum": [
+                            "none",
+                            "xero",
+                            "quickbooks"
+                        ]
+                    }
+                },
+                "required": [
+                    "accounting_target"
+                ],
+                "title": "LedgerSettingsRequest"
+            },
             "LineUrgency": {
                 "type": "string",
                 "description": "A safety-critical line cannot be declined without a reason on record.\n",
@@ -16879,6 +19173,53 @@
                 },
                 "title": "SaveAccountApprovalSettingsRequest"
             },
+            "SaveAccountRequest": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9.\\-]{1,16}$"
+                    },
+                    "name": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 120
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "asset",
+                            "liability",
+                            "equity",
+                            "revenue",
+                            "expense"
+                        ]
+                    },
+                    "normal_side": {
+                        "type": "string",
+                        "enum": [
+                            "debit",
+                            "credit"
+                        ]
+                    },
+                    "description": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 500
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "code",
+                    "name",
+                    "type"
+                ],
+                "title": "SaveAccountRequest"
+            },
             "SaveApprovalSettingsRequest": {
                 "type": "object",
                 "description": "PUT /approval-settings (organization defaults) and\nPUT /branches/{branch}/approval-settings (a branch's sparse override; null\nclears a field back to inheriting). Money in centavos.",
@@ -17346,6 +19687,53 @@
                     }
                 },
                 "title": "SaveCustomerAccountRequest"
+            },
+            "SaveExportMappingsRequest": {
+                "type": "object",
+                "properties": {
+                    "mappings": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "account_id": {
+                                    "type": "string"
+                                },
+                                "target": {
+                                    "type": "string",
+                                    "enum": [
+                                        "xero",
+                                        "quickbooks"
+                                    ]
+                                },
+                                "external_code": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ],
+                                    "maxLength": 64
+                                },
+                                "external_name": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ],
+                                    "maxLength": 160
+                                }
+                            },
+                            "required": [
+                                "account_id",
+                                "target"
+                            ]
+                        },
+                        "minItems": 1,
+                        "maxItems": 200
+                    }
+                },
+                "required": [
+                    "mappings"
+                ],
+                "title": "SaveExportMappingsRequest"
             },
             "SaveFleetPartRequest": {
                 "type": "object",
@@ -19117,6 +21505,65 @@
                     }
                 },
                 "title": "UpdateOrganizationRequest"
+            },
+            "UpdatePostingRulesRequest": {
+                "type": "object",
+                "properties": {
+                    "rules": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "key": {
+                                    "type": "string",
+                                    "enum": [
+                                        "cash.on_hand",
+                                        "cash.bank",
+                                        "clearing.gcash",
+                                        "clearing.maya",
+                                        "clearing.card",
+                                        "receivables.control",
+                                        "inventory.stock",
+                                        "tax.input_vat",
+                                        "payables.control",
+                                        "clearing.grir",
+                                        "tax.output_vat",
+                                        "liability.customer_deposits",
+                                        "liability.unearned_revenue",
+                                        "equity.opening_balance",
+                                        "sales.labour",
+                                        "sales.parts",
+                                        "sales.detailing",
+                                        "sales.cafe",
+                                        "sales.fees",
+                                        "sales.manual",
+                                        "sales.discounts",
+                                        "cogs.parts",
+                                        "cogs.consumables",
+                                        "cogs.cafe",
+                                        "inventory.adjustments",
+                                        "inventory.price_variance",
+                                        "expense.equipment_repairs"
+                                    ]
+                                },
+                                "account_id": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "key",
+                                "account_id"
+                            ]
+                        },
+                        "minItems": 1,
+                        "maxItems": 50,
+                        "uniqueItems": true
+                    }
+                },
+                "required": [
+                    "rules"
+                ],
+                "title": "UpdatePostingRulesRequest"
             },
             "UpdateProfileRequest": {
                 "type": "object",

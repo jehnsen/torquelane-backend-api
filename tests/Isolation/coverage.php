@@ -117,4 +117,19 @@ return [
     'api/v1/customer-accounts/{customer_account}/balance' => $isolated,
     'api/v1/customer-accounts/{customer_account}/statement' => $isolated,
     'api/v1/customer-accounts/{customer_account}/statement/pdf' => $isolated,
+
+    // Phase 8: the books. Staff-only; the chart is the organization's, entries belong to the branches they touch.
+    'api/v1/ledger/accounts' => $isolated,
+    'api/v1/ledger/posting-rules' => $isolated,
+    'api/v1/ledger/settings' => $isolated,
+    'api/v1/ledger/journal' => $isolated,
+    'api/v1/ledger/journal/export' => $isolated,
+    'api/v1/ledger/journal/{journal_entry}' => $isolated,
+    'api/v1/ledger/periods' => $isolated,
+    'api/v1/ledger/periods/checklist' => $isolated,
+    'api/v1/ledger/reports/trial-balance' => $isolated,
+    'api/v1/ledger/reports/general-ledger/{account}' => $isolated,
+    'api/v1/ledger/reports/profit-and-loss' => $isolated,
+    'api/v1/ledger/reports/balance-sheet' => $isolated,
+    'api/v1/ledger/reports/daily-sales' => $isolated,
 ];

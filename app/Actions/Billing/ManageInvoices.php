@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Billing;
 
+use App\Actions\Ledger\LedgerPostings;
 use App\Actions\Numbering\DocumentNumbers;
 use App\Actions\WorkOrders\ApprovalSettingsResolver;
 use App\Domain\Approvals\LineApprovalStatus;
@@ -59,6 +60,7 @@ final class ManageInvoices
         private readonly InvoiceParties $parties,
         private readonly ApprovalSettingsResolver $settings,
         private readonly DocumentNumbers $numbers,
+        private readonly LedgerPostings $postings,
     ) {}
 
     /**
@@ -222,6 +224,8 @@ final class ManageInvoices
 
             // Nothing due is settled the moment it is issued.
             $this->settlement->refresh($locked, $now);
+            // Accrual: the receivable, the sales and the VAT are booked in the same transaction as the invoice.
+            $this->postings->invoiceIssued($locked->refresh());
             $this->journal->auditInvoice($locked, 'issued', $before);
             event(new InvoiceIssued($locked->organization_id, $locked->id, (string) $locked->number));
 
@@ -250,6 +254,7 @@ final class ManageInvoices
                 'void_reason' => $reason,
             ])->save();
             InvoiceWorkOrder::query()->where('invoice_id', $locked->id)->whereNull('released_at')->update(['released_at' => $now]);
+            $this->postings->invoiceVoided($locked, $reason);
 
             $this->journal->auditInvoice($locked, 'voided', $before);
             event(new InvoiceVoided($locked->organization_id, $locked->id, (string) $locked->number));

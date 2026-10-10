@@ -96,6 +96,13 @@ final class TenantIsolationSuite
         'invoice_work_orders' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'invoice' => 'invoice_id'],
         'payments' => ['org' => 'organization_id', 'account' => 'customer_account_id', 'branch' => 'branch_id'],
         'payment_allocations' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'payment' => 'payment_id'],
+        // Phase 8: the books. The chart and its rules are the organization's (staff-only); an entry belongs to the branch(es) it touches.
+        'accounts' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
+        'posting_rules' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
+        'periods' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
+        'account_export_mappings' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
+        'journal_entries' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id', 'branch2' => 'counter_branch_id'],
+        'journal_lines' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id', 'journal_entry' => 'journal_entry_id'],
     ];
 
     /**
@@ -118,7 +125,7 @@ final class TenantIsolationSuite
     private const array ORGANIZATION_WIDE = ['organizations', 'service_tasks'];
 
     /** Child tables whose owner is their parent row's (column alias → parent). */
-    private const array PARENTS = ['vehicle', 'work_order', 'fleet_part', 'purchase_order', 'shop_purchase_order', 'goods_receipt', 'stock_count', 'stock_transfer', 'invoice', 'payment'];
+    private const array PARENTS = ['vehicle', 'work_order', 'fleet_part', 'purchase_order', 'shop_purchase_order', 'goods_receipt', 'stock_count', 'stock_transfer', 'invoice', 'payment', 'journal_entry'];
 
     /** @var array<string, array{org: string, account: string|null, branch: string|null, branches: list<string>, table: string, parents: array<string, string>}> */
     private array $rows = [];

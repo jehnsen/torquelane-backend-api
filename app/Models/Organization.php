@@ -31,6 +31,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $brand_color
  * @property array<string, string>|null $theme_tokens
  * @property string $status
+ * @property string $accounting_target
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
  */
@@ -39,7 +40,7 @@ final class Organization extends Model
     /** @use HasFactory<OrganizationFactory> */
     use HasFactory, HasUlids;
 
-    protected $attributes = ['status' => 'active'];
+    protected $attributes = ['status' => 'active', 'accounting_target' => 'none'];
 
     protected function casts(): array
     {

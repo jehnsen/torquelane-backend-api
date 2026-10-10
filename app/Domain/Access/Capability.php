@@ -40,6 +40,10 @@ enum Capability: string
     case BillingManage = 'billing:manage';
     /** Void an issued invoice or a payment (staff only). */
     case BillingVoid = 'billing:void';
+    /** Read the chart of accounts, the journal and the accounting reports, within the caller's branches (staff only, Phase 8). */
+    case LedgerView = 'ledger:view';
+    /** Edit the chart, the posting rules and the export mappings; close accounting periods (staff only, whole organization). */
+    case LedgerManage = 'ledger:manage';
 
     /** Shown in denial reasons. The ported labels are verbatim from the frontend. */
     public function label(): string
@@ -63,6 +67,8 @@ enum Capability: string
             self::BillingView => 'View invoices and payments',
             self::BillingManage => 'Invoice and record payments',
             self::BillingVoid => 'Void invoices and payments',
+            self::LedgerView => 'View the books',
+            self::LedgerManage => 'Manage the books and close periods',
         };
     }
 
@@ -71,7 +77,7 @@ enum Capability: string
     {
         return match ($this) {
             self::CustomerManage, self::OrganizationManage, self::InventoryView, self::InventoryManage,
-            self::BillingView, self::BillingManage, self::BillingVoid => true,
+            self::BillingView, self::BillingManage, self::BillingVoid, self::LedgerView, self::LedgerManage => true,
             default => false,
         };
     }

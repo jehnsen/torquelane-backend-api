@@ -23,7 +23,9 @@ namespace App\Domain\Access;
  *    technician, and for the portal's fleet manager, purchasing officer and
  *    viewer (their own account's invoices only, by scope); `billing:manage`
  *    for provider_admin, branch_manager, service_advisor and cashier;
- *    `billing:void` for provider_admin and branch_manager.
+ *    `billing:void` for provider_admin and branch_manager;
+ *  - the books (Phase 8): `ledger:view` for provider_admin and branch_manager
+ *    (within their branches), `ledger:manage` for provider_admin.
  */
 final class AccessMatrix
 {
@@ -102,6 +104,7 @@ final class AccessMatrix
             'billing:view',
             'billing:manage',
             'billing:void',
+            'ledger:view',
         ],
         'provider_admin' => [
             'vehicle:update',
@@ -122,6 +125,8 @@ final class AccessMatrix
             'billing:view',
             'billing:manage',
             'billing:void',
+            'ledger:view',
+            'ledger:manage',
         ],
     ];
 

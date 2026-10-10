@@ -311,6 +311,8 @@ from rbac.json). API additions:
 | `billing:view` (invoices, payments, balance, statement; staff also aging, revenue, the billing queue) — Phase 7 | every staff role but provider_technician; fleet_manager, purchasing_officer, viewer (own account, issued invoices only, by scope) |
 | `billing:manage` (raise, edit, issue invoices; record and allocate payments) — Phase 7 | provider_admin, branch_manager, service_advisor, cashier |
 | `billing:void` (void invoices and payments) — Phase 7 | provider_admin, branch_manager |
+| `ledger:view` (the chart, the journal, the periods and the accounting reports, within the caller's branches) — Phase 8 | provider_admin, branch_manager |
+| `ledger:manage` (edit the chart, the posting rules and the export mappings; close months) — Phase 8 | provider_admin |
 
 | Role (new, staff) | Grants |
 |---|---|
@@ -954,6 +956,142 @@ credit limit is set to ₱5,000 so new work for it warns), INV-2026-0003
 no seeded `collected_at` moves (the golden revenue sweeps read it). Every
 other closed job is in the billing queue.
 
+## General ledger (Phase 8)
+
+TODO: confirm the Xero and QuickBooks import layouts (`App\Domain\Ledger\Export`) against the accountant's current templates before go-live.
+
+Every money and stock event posts a balanced double-entry journal entry in the
+SAME transaction as the event; if posting fails, the event rolls back. There is
+no accounting UI beyond the chart, the rules, the journal, the close checklist
+and the reports: the ledger exists so reports reconcile and the accountant gets
+clean data. The books are core (no module) and staff-only.
+
+### Tables (Phase 8)
+
+| Table | Notes |
+|---|---|
+| `accounts` | The organization's chart: `code` (unique per organization), name, `type` asset/liability/equity/revenue/expense, `normal_side` (Sales Discounts is revenue on the debit side), `is_active`, `is_system` (seeded). Never deleted. Trigger: once a line has posted to it, its code, type and side cannot change; a system or posted account is not deleted. |
+| `posting_rules` | `rule_key` → `account_id`, one per key per organization (`RuleKey`: cash by method, receivables, inventory, GR/IR, output/input VAT, deposits, each sales and COGS category, adjustments, price variance, equipment repairs…). Editable by `ledger:manage`; a change applies to postings from then on. |
+| `periods` | Manila calendar months, created on the first posting. `status` open/closed, who closed it and the checklist as it passed. Trigger: a closed period is final; an open one closes once; dates never change. |
+| `journal_entries` | **Append-only.** `JE-YYYY-NNNN` from the `journal_entry` series (R8, org-wide, gap-free); `entry_date` (business date) inside its `period_id`; `branch_id` (+ `counter_branch_id` when it touches two); `event` (`LedgerEvent`), `source_type` + `source_id` (**unique per organization × event × source**: an event posts once), `reference` (INV-/PAY-/GR-…), `memo`, `payment_method` (payment events), `reversal_of_id` (unique), `total_cents`, who/when. Trigger: an entry is dated inside its period and a closed period takes no new entry. |
+| `journal_lines` | **Append-only.** `account_id`, `branch_id`, `debit_cents` / `credit_cents` (one side, never negative), `customer_account_id` (the AR / deposits subledger key), `stock_move_id` (unique: a move is posted once). |
+| `account_export_mappings` | Our account → the Xero account code or QuickBooks account name, per target. |
+| `organizations` (altered) | `accounting_target` `none`/`xero`/`quickbooks` (the brief's `{{ACCOUNTING_TARGET}}`, which the prompt never supplied; it is a setting here). |
+
+Deferred constraint triggers check, at COMMIT, that every entry balances and has
+at least two lines (`journal_entry_balances`), re-reading the current rows.
+
+### What each event posts (`App\Domain\Ledger\Postings`, pure)
+
+`Postings::postingsFor(PostingFacts)` returns a `JournalDraft`, which cannot be
+built unbalanced (`UnbalancedEntry` is thrown before anything is written).
+Accounts are named by `RuleKey` (resolved through `posting_rules` when the entry
+is written) or, in a reversal, by id.
+
+| Event | Dr | Cr |
+|---|---|---|
+| invoice issued (accrual) | Accounts Receivable (total due), Sales Discounts | Sales – Labour / Parts / (fees, typed-in lines → Labour) for what was sold before discounts; Output VAT |
+| invoice voided | the mirror image, dated today | |
+| payment received | Cash on Hand / Cash in Bank / GCash / Maya / Card Clearing by method | Customer Deposits |
+| credit applied (one per allocation) | Customer Deposits | Accounts Receivable |
+| payment voided | mirrors the receipt **and** each application (`credit_reversed`) | |
+| goods received | Inventory | GR/IR Clearing |
+| goods receipt voided | GR/IR Clearing (at the receipt's cost) | Inventory |
+| parts issued to a job / consumed | COGS – Parts / Consumables / Café by item type | Inventory |
+| parts returned | Inventory | COGS |
+| count variance | Inventory ⇄ Inventory Adjustments | |
+| opening balance | Inventory | Opening Balance Equity |
+| transfer (one entry per line) | Inventory (destination branch) | Inventory (source branch): **no P&L effect** |
+
+- **The Inventory line is the change in the balance's BOOK value** (on hand ×
+  average, rounded to a centavo), so the Inventory account equals the stock
+  room's valuation to the centavo. The other side is the move's value at its own
+  cost. The moving average is rounded, which revalues stock already on the shelf;
+  that difference is posted as an explicit `Average-cost rounding` line to
+  Inventory Adjustments, never hidden.
+- **VAT and discounts.** The invoice stores totals per tax bucket (rounded once,
+  R6). Each bucket's sales are split across its lines' accounts by largest
+  remainder (`Apportion`), so Parts + Labour always adds up to the stored sales
+  figure. Sales are credited gross and the discount debited to Sales Discounts
+  (a VAT-inclusive branch's discount has its VAT taken out first).
+- **Payments are deposits first.** Receiving money never touches Accounts
+  Receivable: it credits Customer Deposits, and each allocation moves that to
+  Receivable. What is not allocated stays a liability, which is exactly the
+  customer's credit.
+
+### Hooks (R3: same transaction)
+
+`App\Actions\Ledger\LedgerPostings` is the one service the actions call:
+`ManageInvoices::issue` / `void`, `RecordPayment::record` / `allocate` / `void`,
+`PostStockMove::handle` (every stock move, so receiving, work-order issues,
+counts, opening balances and returns post themselves) and `TransferStock` (both
+halves as one entry). `App\Actions\Ledger\Ledger` is the only writer of
+`journal_entries` / `journal_lines`: it finds or opens the period (refusing a
+closed one with 409 `conflict`, `details.reason = period_closed`), numbers the
+entry and appends it.
+
+### Periods and the close
+
+- Posting into a closed period is rejected (409 `period_closed`, and the whole
+  document rolls back: a backdated invoice or payment into a closed month
+  consumes no number). Every posting holds the period row `FOR SHARE` until it
+  commits; the close takes it `FOR UPDATE`, so it waits for postings in flight.
+- **A void of a closed-period document** posts the reversal in the CURRENT open
+  period, dated today, naming the original (`reversal_of_id`, the original's
+  `reference`, and "closed" in the memo). The original is never touched.
+- `GET /ledger/periods/checklist?period=YYYY-MM` runs `CloseChecklist` over the
+  WHOLE organization (never the caller's branches) as of the month's last day:
+  (1) every invoice, void, payment, application and stock move has its entry;
+  (2) open invoices (the AR subledger) = the Accounts Receivable account;
+  (3) the stock room's valuation (replayed through `StockLedger` for a past date)
+  = Inventory; (4) unapplied payments = Customer Deposits; (5) debits = credits.
+  `POST /ledger/periods/close` needs the month over, every earlier month with
+  entries closed, all five passing, `ledger:manage`, and a session that is not
+  branch-limited. Closing is final (no reopen).
+
+### Reports (`LedgerQueries`, over the caller's branches; a report with no branch picked and none pinned is the consolidated one)
+
+Trial balance; general ledger by account (running balance on the account's own
+side, paged); profit and loss with a column per branch and the consolidated
+total (cost-of-sales accounts are the ones the `cogs.*` rules point at); a
+simple balance sheet (earnings to date included, there being no year-end close);
+daily sales by branch (net sales and VAT from the invoice entries, voids netted
+the day they happen) and money received by payment method.
+
+### Export
+
+`GET /ledger/journal/export` is a CSV of the journal (UTF-8 with BOM, one row per
+line). With `organizations.accounting_target` set to `xero` or `quickbooks` it
+also exports that product's manual-journal import (`format=xero|quickbooks`),
+refusing (409 `unmapped_accounts`, naming them) until every account in the file
+has a code (Xero) or name (QuickBooks) in `account_export_mappings`. No live API
+sync. A branch-limited caller exports only their branches' lines.
+
+### Backfill
+
+`php artisan ledger:backfill [--organization=ID] [--dry-run]` posts the entries
+for invoices, voids, payments, applications and stock moves that have none. It
+is idempotent (a source with an entry is skipped; the unique indexes are the
+backstop), posts each document in its own transaction in date order, dates a void
+the day it really happened, marks its entries `Backfill`, and reports (does not
+post) a source that falls in a closed month.
+
+### Endpoints (Phase 8)
+
+`GET|POST /ledger/accounts`, `PATCH /ledger/accounts/{account}`;
+`GET|PUT /ledger/posting-rules`; `GET|PUT /ledger/settings`;
+`PUT /ledger/export-mappings`; `GET /ledger/journal` (+ `/export`,
+`/{journal_entry}`); `GET /ledger/periods` (+ `/checklist`), `POST
+/ledger/periods/close`; `GET /ledger/reports/{trial-balance,
+general-ledger/{account}, profit-and-loss, balance-sheet, daily-sales}`.
+
+### Demo data (Phase 8)
+
+No seeder of its own: the demo seed runs through the real actions, so the
+seeded invoices, the part payment, the opening stock, the receipt, the transfer
+and the count each post as they happen (the chart installs on the first). On the
+seeded activity the trial balance balances and all five close checks pass.
+
 ## Rules that bite
 
 - **Tests use `RefreshApiDatabase`, never `DatabaseTruncation`.** The
@@ -1152,6 +1290,36 @@ other closed job is in the billing queue.
 - **`composer openapi` needs more than 128 MB** since Phase 7
   (`php -d memory_limit=1G artisan scramble:export --path=openapi.json`).
 
+- **Money and stock events reach the ledger only through `LedgerPostings`**, from
+  inside the event's own transaction (`ManageInvoices`, `RecordPayment`,
+  `PostStockMove`, `TransferStock`). Never insert a journal row anywhere else;
+  `Ledger::post` refuses to run outside a transaction. A new event type is a new
+  `LedgerEvent` case, its `Postings` rule and its balance test, its place in the
+  close checklist's "unposted" count (`Reconciliation::unposted`) and in
+  `BackfillLedger`.
+- **A journal entry is never edited or deleted** (triggers, 23001). Correct with a
+  reversal: `Ledger::reverse` mirrors the lines, dated today, in the current
+  period. Posting rules and accounts can change; entries already made do not.
+- **The Inventory account moves by the BOOK-value change** of the balance, not by
+  the move's value; the difference is the visible `Average-cost rounding` line.
+  `StockMove::$bookDeltaCents` is set by `PostStockMove` and is not stored.
+- **`Ledger` is a scoped singleton** (the backfill marks its entries through the
+  same instance the posting service uses). `PostingRules::map` reads the rules
+  every time: a cached map could point at accounts a rolled-back transaction
+  created.
+- **Raw `DB::table` rows are untyped**: read them through `App\Database\Cell`
+  (Larastan level max), never casts.
+- **Reconciliation is whole-organization**; reports are the caller's branches. A
+  close attests to every branch, so a branch-limited session cannot close.
+- **Tests that count journal rows must scope to an organization**: `World` builds
+  a rival organization with its own books. A test that needs the journal empty
+  deletes it as a superuser (`set local session_replication_role = replica`) and
+  resets the role. The API's error envelope has no `errors` key:
+  `assertJsonValidationErrors` does not apply; assert `error.details.fields`.
+- **A new money or stock test in a closed month** needs the month to be open when
+  the document is dated; close months in a test with `POST /ledger/periods/close`
+  in order, after everything it checks is posted.
+
 ## Running it
 
 Prerequisites: PHP 8.4 with `pdo_pgsql` (plus `mbstring`, `intl`, `bcmath`,
@@ -1237,7 +1405,7 @@ audit rows). Fill in the rest from the phase plan.
 - [ ] **5**: *(title not provided)*
 - [x] **6**: Shop inventory (items, branch stock, the append-only stock ledger, receiving against purchase orders, work-order issues, counts, transfers, reorder)
 - [x] **7**: Order-to-cash (invoices with VAT and BIR snapshots, payments and allocations, receivables: aging, statements, credit limit; PDFs; billing events)
-- [ ] **8**: *(title not provided)*
+- [x] **8**: General ledger (chart of accounts, posting rules, balanced append-only journal posted in the event's transaction, monthly periods and the close checklist, reports, journal export, backfill)
 - [ ] **9**: *(title not provided)*
 - [ ] **10**: *(title not provided)*
 - [ ] **11**: *(title not provided)*
@@ -1330,3 +1498,23 @@ admin, branch manager, service advisor and cashier, `billing:void` for
 provider admin and branch manager; the credit check counts open invoices less
 unallocated credit (not uninvoiced work); a payment from an invoice is
 allocated to it, without one oldest due first.
+
+Phase 8 status: done locally (gates green: Pest, Larastan max, Pint,
+`openapi.json` regenerated; the frontend's books screens driven against this API).
+On the seeded activity the trial balance balances and AR, Inventory and Customer
+Deposits reconcile with their control accounts. Decisions taken here, for
+review: `{{ACCOUNTING_TARGET}}` is an organization setting (`none` / `xero` /
+`quickbooks`); a payment is booked to Customer Deposits and applied to
+Receivable by its allocations (so credit is a liability and a payment with
+allocations posts several entries); revenue is recognised at invoice issue and
+cost of sales at the issue of parts to the job, so a job's gross profit spans two
+dates; goods received post against GR/IR and wait there, because no vendor bill
+exists yet (Accounts Payable, Input VAT, Purchase Price Variance, Unearned
+Revenue, Sales – Detailing / Café and Equipment Repairs have accounts and rules
+but nothing posts to them yet); the average-cost rounding is an explicit
+Inventory Adjustments line; months close in order and never reopen; closing
+needs `ledger:manage` (provider admin only) and a session that is not branch-
+limited, while `ledger:view` is also a branch manager's, within their branches;
+a payment or invoice dated into a closed month is refused rather than moved; the
+Xero and QuickBooks layouts follow their published templates and need the
+accountant's confirmation (see the TODO in the Phase 8 section).

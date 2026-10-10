@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Models\Account;
 use App\Models\Bay;
 use App\Models\Contact;
+use App\Models\JournalEntry;
 use App\Models\MeterReading;
 use App\Models\Technician;
 use App\Models\Vendor;
@@ -82,6 +84,8 @@ function parityPlaceholders(World $world, string $document): array
         'reading' => (string) MeterReading::query()->where('vehicle_id', $world->id('veh-001'))->orderBy('id')->value('id'),
         'invoice' => $world->id('invoice:actimed-overdue'),
         'payment' => $world->id('payment:actimed-partial'),
+        'account' => (string) Account::query()->where('organization_id', $world->id('prov-mekanikomore'))->where('code', '1100')->value('id'),
+        'journal_entry' => (string) JournalEntry::query()->where('organization_id', $world->id('prov-mekanikomore'))->orderBy('id')->value('id'),
     ]);
 }
 

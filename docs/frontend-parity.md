@@ -231,6 +231,38 @@ a write the browser did not drive says so, and `tests/Feature/Billing` covers it
 | Raise a work order for an account over its credit limit | `POST /work-orders` | both | done | Still created; `warnings[].code = credit_limit_exceeded`; the override is audited. | API-tested only (Pest); the dialog and check-in show the warning |
 | Check-out: hand the vehicle back | `POST /work-orders/collect` | staff | done | Phase 7: stamps `released_at`; settles nothing (payment does). | API-tested (Pest); check-out wording updated |
 
+## The books (Phase 8)
+
+The general ledger has no counterpart in `../web`: these screens are new, and
+there is no full accounting UI by design. Every money and stock event posts a
+balanced double-entry journal entry in the same transaction as the event; the
+screens read the result. The books are core (no module) and staff-only:
+`ledger:view` (provider admin; a branch manager within their branches) reads,
+`ledger:manage` (provider admin) edits the chart, the posting rules and the
+export mappings, and closes months. The **Phase 8** column is the real
+frontend driven against this API on a fresh demo seed (PA provider admin, BM
+the branch-limited branch manager, C cashier); `tests/Feature/Ledger` covers
+what the browser did not drive.
+
+| Screen / action | Endpoint(s) | Side | Status | Notes | Phase 8 |
+|---|---|---|---|---|---|
+| `/shop/books`: chart of accounts, with balances | `GET /ledger/accounts?as_of=2026-10-08` | staff | done | The lean chart is installed on first use; `balance_cents` is on the account's own side through `as_of`, over the branches in view. | ✓ PA BM (read-only); C: refused |
+| Chart: add, edit, deactivate an account | `POST /ledger/accounts`, `PATCH /ledger/accounts/{account}` | staff | done | `ledger:manage`. Once posted to, code/type/side are fixed (409); a rule's account cannot be deactivated. | ✓ PA (add); BM: control disabled |
+| `/shop/books/rules`: posting rules | `GET /ledger/posting-rules` | staff | done | Every rule key with its account and the account type it needs. | ✓ PA |
+| Posting rules: re-point | `PUT /ledger/posting-rules` | staff | done | `ledger:manage`; applies to postings from now on; wrong type or inactive account is 422. | ✓ PA (re-point and restore) |
+| Accounting product and export mapping | `GET /ledger/settings`, `PUT /ledger/settings`, `PUT /ledger/export-mappings` | staff | done | `none`, `xero` or `quickbooks`; the account-code (Xero) or account-name (QuickBooks) mapping table. | API-tested only (Pest); the mapping table is built |
+| `/shop/books/journal`: journal browser | `GET /ledger/journal?from=2026-07-01&to=2026-10-08` | staff | done | Filters: range, account, event, branch, source document, search. Newest first. | ✓ PA |
+| Journal: open an entry | `GET /ledger/journal/{journal_entry}` | staff | done | Lines with accounts and branches; a reversal names the entry it undoes. A branch-limited caller gets 404 for another branch's entry. | ✓ PA (an invoice's entry, balanced) |
+| Journal: export | `GET /ledger/journal/export?from=2026-07-01&to=2026-10-08` | staff | done | `format` csv, or xero / quickbooks when that is the accounting target and every account is mapped (409 `unmapped_accounts`). | ✓ PA (CSV download) |
+| `/shop/books/periods`: months | `GET /ledger/periods` | staff | done | Newest first, with status and who closed it. | ✓ PA |
+| Period close: checklist | `GET /ledger/periods/checklist?period=2026-09` | staff | done | Unposted sources = 0, receivables = AR, stock valuation = Inventory, unapplied credit = Customer Deposits, trial balance balanced. | ✓ PA |
+| Period close: close the month | `POST /ledger/periods/close` | staff | done | `ledger:manage`, not branch-limited; month over, earlier months closed, checklist passing. Final. | ✓ PA (oldest month closed); BM: control disabled |
+| `/shop/books/reports`: trial balance | `GET /ledger/reports/trial-balance?as_of=2026-10-08` | staff | done | `balanced` is the API's. | ✓ PA |
+| Reports: general ledger | `GET /ledger/reports/general-ledger/{account}?from=2026-07-01&to=2026-10-08` | staff | done | Running balance on the account's own side after the balance brought forward; paged. | ✓ PA |
+| Reports: profit and loss by branch and consolidated | `GET /ledger/reports/profit-and-loss?from=2026-07-01&to=2026-10-08` | staff | done | Revenue (net of discounts), cost of sales, gross profit, expenses, net profit; a column per branch in scope. | ✓ PA |
+| Reports: balance sheet | `GET /ledger/reports/balance-sheet?as_of=2026-10-08` | staff | done | Assets, liabilities, equity plus earnings to date. | ✓ PA |
+| Reports: daily sales by branch and payment method | `GET /ledger/reports/daily-sales?from=2026-09-01&to=2026-09-30` | staff | done | Net sales, VAT and invoiced per day and branch; receipts by method. | ✓ PA |
+
 ## What moved from the browser to the server
 
 The frontend used to compute these itself. It now renders them:

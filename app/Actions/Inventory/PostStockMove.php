@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Actions\Inventory;
 
+use App\Actions\Ledger\LedgerPostings;
 use App\Domain\Inventory\InsufficientStock;
 use App\Domain\Inventory\MoveRequest;
+use App\Domain\Inventory\MoveType;
 use App\Domain\Inventory\StockLedger;
 use App\Domain\Inventory\StockSource;
 use App\Exceptions\ConflictException;
@@ -41,7 +43,10 @@ final class PostStockMove
 {
     private ?User $actor = null;
 
-    public function __construct(private readonly TenantManager $tenancy) {}
+    public function __construct(
+        private readonly TenantManager $tenancy,
+        private readonly LedgerPostings $postings,
+    ) {}
 
     /**
      * Lock the balances of the given (location, item) pairs, creating the rows
@@ -105,7 +110,14 @@ final class PostStockMove
             'negative_flag' => $outcome->negative,
         ])->save();
 
+        // What the Inventory account moves by: the change in the balance's book value.
+        $row->bookDeltaCents = StockLedger::valuation($outcome->after) - StockLedger::valuation($balance->state());
         $balance->forceFill(['on_hand' => $outcome->after->onHand, 'avg_cost_cents' => $outcome->after->avgCostCents])->save();
+
+        // Both halves of a transfer are one entry, posted by the transfer once it has made them both.
+        if ($move->type !== MoveType::TransferOut && $move->type !== MoveType::TransferIn) {
+            $this->postings->stockMove($row, $row->bookDeltaCents, $item->item_type);
+        }
 
         return $row;
     }

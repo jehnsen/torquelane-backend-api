@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Billing;
 
+use App\Actions\Ledger\LedgerPostings;
 use App\Actions\Numbering\DocumentNumbers;
 use App\Domain\Invoicing\InvoiceStatus;
 use App\Domain\Numbering\DocumentType;
@@ -44,6 +45,7 @@ final class RecordPayment
         private readonly BillingJournal $journal,
         private readonly InvoiceSettlement $settlement,
         private readonly DocumentNumbers $numbers,
+        private readonly LedgerPostings $postings,
     ) {}
 
     /**
@@ -78,6 +80,8 @@ final class RecordPayment
                 'notes' => trim((string) ($data['notes'] ?? '')),
             ])->save();
 
+            // The money is booked as the customer's deposit first; each allocation then applies it to an invoice.
+            $this->postings->paymentReceived($payment);
             $this->apply($payment, $open, $data['allocations'] ?? null, $receivedOn, $now);
             $this->journal->auditPayment($payment, 'received', null);
             event(new PaymentReceived($payment->organization_id, $payment->id, $payment->number));
@@ -135,6 +139,7 @@ final class RecordPayment
             foreach ($invoices as $invoice) {
                 $this->settlement->refresh($invoice);
             }
+            $this->postings->paymentVoided($locked, $reason);
             $this->journal->auditPayment($locked, 'voided', $before);
 
             return $locked->load('allocations');
@@ -179,6 +184,7 @@ final class RecordPayment
                 'allocated_by' => $actor->id,
                 'allocated_by_name' => $actor->name,
             ])->save();
+            $this->postings->creditApplied($allocation, $payment, $open[$invoiceId]);
             $this->settlement->refresh($open[$invoiceId], $now);
         }
 

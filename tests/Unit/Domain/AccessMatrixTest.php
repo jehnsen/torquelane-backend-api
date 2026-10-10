@@ -12,10 +12,18 @@ it('puts the new roles on the staff side', function () {
         ->and(Role::Cashier->side())->toBe(Side::Staff);
 });
 
-it('gives the branch manager everything but organization:manage', function () {
+it('gives the branch manager everything but organization:manage and ledger:manage', function () {
     $missing = array_values(array_filter(Capability::cases(), fn (Capability $c): bool => ! AccessMatrix::can(Role::BranchManager, $c)));
 
-    expect($missing)->toBe([Capability::OrganizationManage]);
+    expect($missing)->toBe([Capability::OrganizationManage, Capability::LedgerManage]);
+});
+
+it('lets only the organization admin change the books, and a branch manager read them', function () {
+    $managers = array_values(array_filter(Role::cases(), fn (Role $r): bool => AccessMatrix::can($r, Capability::LedgerManage)));
+    $viewers = array_values(array_filter(Role::cases(), fn (Role $r): bool => AccessMatrix::can($r, Capability::LedgerView)));
+
+    expect($managers)->toBe([Role::ProviderAdmin])
+        ->and($viewers)->toBe([Role::ProviderAdmin, Role::BranchManager]);
 });
 
 it('gives the cashier customer:manage, a view of the stock room, and the counter\'s billing until the POS module arrives', function () {

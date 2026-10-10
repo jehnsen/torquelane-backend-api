@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Actions\Ledger\Ledger;
 use App\Database\EnsureSchemaExists;
 use App\Database\SchemaMacros;
 use App\Http\Errors\ApiExceptionRenderer;
@@ -37,6 +38,9 @@ class AppServiceProvider extends ServiceProvider
 
         // One tenant context per request (and per queued job).
         $this->app->scoped(TenantManager::class);
+
+        // One journal writer per request: the backfill marks the entries it makes through it.
+        $this->app->scoped(Ledger::class);
     }
 
     public function boot(): void

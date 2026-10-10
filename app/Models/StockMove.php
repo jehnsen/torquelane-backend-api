@@ -48,6 +48,9 @@ final class StockMove extends Model
 
     public const UPDATED_AT = null;
 
+    /** The change this move made to its balance's book value, in centavos. Set by the ledger service as it posts; never stored (the journal holds it). */
+    public int $bookDeltaCents = 0;
+
     protected function casts(): array
     {
         return [

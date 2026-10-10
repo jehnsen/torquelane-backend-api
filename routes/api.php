@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Api\V1\AccountController;
 use App\Http\Controllers\Api\V1\AlertController;
 use App\Http\Controllers\Api\V1\AnalyticsController;
 use App\Http\Controllers\Api\V1\ApprovalRequestsController;
@@ -25,10 +26,13 @@ use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\InvitationController;
 use App\Http\Controllers\Api\V1\InvoiceController;
 use App\Http\Controllers\Api\V1\ItemController;
+use App\Http\Controllers\Api\V1\JournalController;
+use App\Http\Controllers\Api\V1\LedgerReportController;
 use App\Http\Controllers\Api\V1\MeterReadingController;
 use App\Http\Controllers\Api\V1\ModuleController;
 use App\Http\Controllers\Api\V1\OrganizationController;
 use App\Http\Controllers\Api\V1\PaymentController;
+use App\Http\Controllers\Api\V1\PeriodController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\PurchaseOrderController;
 use App\Http\Controllers\Api\V1\ReceivablesController;
@@ -253,6 +257,27 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::get('customer-accounts/{customer_account}/balance', [ReceivablesController::class, 'balance'])->name('customer-accounts.balance');
     Route::get('customer-accounts/{customer_account}/statement', [ReceivablesController::class, 'statement'])->name('customer-accounts.statement');
     Route::get('customer-accounts/{customer_account}/statement/pdf', [ReceivablesController::class, 'statementPdf'])->name('customer-accounts.statement-pdf');
+
+    // The books (Phase 8): chart, posting rules, journal, periods, reports, export. Core, staff-only.
+    Route::get('ledger/accounts', [AccountController::class, 'index'])->name('ledger.accounts.index');
+    Route::post('ledger/accounts', [AccountController::class, 'store'])->middleware('idempotent')->name('ledger.accounts.store');
+    Route::patch('ledger/accounts/{account}', [AccountController::class, 'update'])->name('ledger.accounts.update');
+    Route::get('ledger/posting-rules', [AccountController::class, 'rules'])->name('ledger.rules.index');
+    Route::put('ledger/posting-rules', [AccountController::class, 'updateRules'])->name('ledger.rules.update');
+    Route::get('ledger/settings', [AccountController::class, 'settings'])->name('ledger.settings.show');
+    Route::put('ledger/settings', [AccountController::class, 'updateSettings'])->name('ledger.settings.update');
+    Route::put('ledger/export-mappings', [AccountController::class, 'updateMappings'])->name('ledger.mappings.update');
+    Route::get('ledger/journal', [JournalController::class, 'index'])->name('ledger.journal.index');
+    Route::get('ledger/journal/export', [JournalController::class, 'export'])->name('ledger.journal.export');
+    Route::get('ledger/journal/{journal_entry}', [JournalController::class, 'show'])->name('ledger.journal.show');
+    Route::get('ledger/periods', [PeriodController::class, 'index'])->name('ledger.periods.index');
+    Route::get('ledger/periods/checklist', [PeriodController::class, 'checklist'])->name('ledger.periods.checklist');
+    Route::post('ledger/periods/close', [PeriodController::class, 'close'])->name('ledger.periods.close');
+    Route::get('ledger/reports/trial-balance', [LedgerReportController::class, 'trialBalance'])->name('ledger.reports.trial-balance');
+    Route::get('ledger/reports/general-ledger/{account}', [LedgerReportController::class, 'generalLedger'])->name('ledger.reports.general-ledger');
+    Route::get('ledger/reports/profit-and-loss', [LedgerReportController::class, 'profitAndLoss'])->name('ledger.reports.profit-and-loss');
+    Route::get('ledger/reports/balance-sheet', [LedgerReportController::class, 'balanceSheet'])->name('ledger.reports.balance-sheet');
+    Route::get('ledger/reports/daily-sales', [LedgerReportController::class, 'dailySales'])->name('ledger.reports.daily-sales');
 });
 
 // A signed, 60-second URL from GET documents/{id}/download: the signature is

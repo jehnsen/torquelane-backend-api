@@ -27,7 +27,7 @@ function expectedCapabilities(): array
     }
 
     return [
-        'provider_admin' => [...$web['provider_admin'], 'customer:manage', 'organization:manage', 'inventory:view', 'inventory:manage', 'billing:view', 'billing:manage', 'billing:void'],
+        'provider_admin' => [...$web['provider_admin'], 'customer:manage', 'organization:manage', 'inventory:view', 'inventory:manage', 'billing:view', 'billing:manage', 'billing:void', 'ledger:view', 'ledger:manage'],
         'service_advisor' => [...$web['service_advisor'], 'customer:manage', 'inventory:view', 'billing:view', 'billing:manage'],
         'provider_technician' => [...$web['provider_technician'], 'inventory:view'],
         'fleet_manager' => [...$web['fleet_manager'], 'customer:manage', 'billing:view'],
@@ -36,7 +36,7 @@ function expectedCapabilities(): array
         'purchasing_officer' => [...$web['purchasing_officer'], 'billing:view'],
         'viewer' => [...$web['viewer'], 'billing:view'],
         // Proposed grants for the API-only roles (see CLAUDE.md, "Roles").
-        'branch_manager' => ['vehicle:update', 'vehicle:manage', 'workorder:create', 'workorder:update', 'workorder:complete', 'workorder:approve', 'po:issue', 'document:upload', 'document:delete', 'settings:manage', 'access:manage', 'customer:manage', 'inventory:view', 'inventory:manage', 'billing:view', 'billing:manage', 'billing:void'],
+        'branch_manager' => ['vehicle:update', 'vehicle:manage', 'workorder:create', 'workorder:update', 'workorder:complete', 'workorder:approve', 'po:issue', 'document:upload', 'document:delete', 'settings:manage', 'access:manage', 'customer:manage', 'inventory:view', 'inventory:manage', 'billing:view', 'billing:manage', 'billing:void', 'ledger:view'],
         'cashier' => ['customer:manage', 'inventory:view', 'billing:view', 'billing:manage'],
     ];
 }

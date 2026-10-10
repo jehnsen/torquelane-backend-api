@@ -19,6 +19,12 @@ database `{{DB_HOST}}`.
 | Post-deploy `GET /api/v1/health` (if `DEPLOY_HEALTH_URL` is set) | Scheduler cron entry |
 | Keeps the last 5 releases for `dep rollback` | GitHub secrets |
 
+**Phase 8 (the general ledger), once, on an environment that already has
+invoices, payments or stock:** after the deploy, run `php artisan ledger:backfill
+--dry-run` to see what has no journal entry, then `php artisan ledger:backfill`.
+It is idempotent and posts each document in its own transaction, so it is safe
+to re-run and to interrupt. New documents post themselves from then on.
+
 Deploys run through [Deployer](https://deployer.org) (`deploy.php`), from the
 **Deploy staging** GitHub Action or from a Linux/macOS shell. Deployer's SSH
 multiplexing does not work with Windows OpenSSH, so deploy from CI or WSL, not
