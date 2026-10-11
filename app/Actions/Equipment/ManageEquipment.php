@@ -124,7 +124,7 @@ final class ManageEquipment
         if (! $hours->isPositive() && $cycles <= 0) {
             throw ValidationException::withMessages(['hours' => 'Enter runtime hours or job cycles.']);
         }
-        $usedAt = isset($data['used_at']) ? CarbonImmutable::parse($data['used_at']) : CarbonImmutable::now();
+        $usedAt = isset($data['used_at']) ? CarbonImmutable::parse($data['used_at'])->utc() : CarbonImmutable::now();
         if ($usedAt->isFuture()) {
             throw ValidationException::withMessages(['used_at' => 'Usage is logged once it has happened.']);
         }
@@ -176,7 +176,7 @@ final class ManageEquipment
      */
     public function logService(Equipment $tool, array $data): EquipmentMaintenanceLog
     {
-        $performedAt = isset($data['performed_at']) ? CarbonImmutable::parse($data['performed_at']) : CarbonImmutable::now();
+        $performedAt = isset($data['performed_at']) ? CarbonImmutable::parse($data['performed_at'])->utc() : CarbonImmutable::now();
         if ($performedAt->isFuture()) {
             throw ValidationException::withMessages(['performed_at' => 'A service is logged once it has been done.']);
         }

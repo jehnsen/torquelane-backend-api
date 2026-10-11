@@ -198,6 +198,8 @@ it('is staff-only, branch-scoped and module-gated; every staff role reads, manag
 
     equipAs('manager.samahuzai@mekanikomore.ph');
     $write()->assertCreated();
+    // An instant given with an offset is the same instant when read back, not the same clock time in UTC.
+    expect($this->postJson("/api/v1/equipment/{$compressor}/usage-logs", ['hours' => '1', 'used_at' => '2026-10-12T08:00:00+08:00'])->assertCreated()->json('data.usage_logs.*.used_at'))->toContain('2026-10-12T00:00:00Z');
     $this->postJson('/api/v1/equipment', ['name' => 'air compressor (belt-drive)'])->assertStatus(422)
         ->assertJsonPath('error.details.fields.name.0', 'Another tool of this branch has that name.');
     $this->putJson("/api/v1/equipment/profiles/{$this->essential}", ['lines' => [['equipment_id' => $this->world->id('rival:equipment'), 'hours_per_job' => '1']]])->assertStatus(422);

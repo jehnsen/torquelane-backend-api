@@ -80,10 +80,10 @@ it('activates a module in a branch only when the organization has it too', funct
 
     $this->putJson('/api/v1/modules/pos', ['enabled' => true])->assertOk()->assertJsonPath('data.organization_enabled', true);
 
-    $this->getJson('/api/v1/me', ['X-Branch-Id' => $repair])->assertJsonPath('data.modules.active', ['repair_pms', 'pos']);
+    $this->getJson('/api/v1/me', ['X-Branch-Id' => $repair])->assertJsonPath('data.modules.active', ['repair_pms', 'pos', 'crm']);
 
     $this->putJson('/api/v1/modules/repair_pms', ['enabled' => false])->assertOk();
-    $this->getJson('/api/v1/me', ['X-Branch-Id' => $repair])->assertJsonPath('data.modules.active', ['pos']);
+    $this->getJson('/api/v1/me', ['X-Branch-Id' => $repair])->assertJsonPath('data.modules.active', ['pos', 'crm']);
 
     $this->putJson('/api/v1/modules/teleportation', ['enabled' => true])->assertNotFound();
 });

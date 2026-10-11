@@ -23,6 +23,7 @@ use App\Tenancy\TenantManager;
 use Brick\Money\Money;
 use Carbon\CarbonImmutable;
 use Database\Seeders\Demo\BillingSeed;
+use Database\Seeders\Demo\CrmSeed;
 use Database\Seeders\Demo\DetailingSeed;
 use Database\Seeders\Demo\EquipmentSeed;
 use Database\Seeders\Demo\FleetSeed;
@@ -153,10 +154,10 @@ final class DemoSeeder extends Seeder
         ])->save();
         $this->ids[self::str($provider['id'] ?? null)] = $organization->id;
 
-        $repair = $this->branch($organization, 'MekanikoMoR-Biñan', self::REPAIR_BRANCH, null, [Module::RepairPms]);
-        $detailing = $this->branch($organization, 'Samahuzai-Biñan', self::DETAILING_BRANCH, 'Samahuzai', [Module::Detailing, Module::Equipment]);
+        $repair = $this->branch($organization, 'MekanikoMoR-Biñan', self::REPAIR_BRANCH, null, [Module::RepairPms, Module::Crm]);
+        $detailing = $this->branch($organization, 'Samahuzai-Biñan', self::DETAILING_BRANCH, 'Samahuzai', [Module::Detailing, Module::Equipment, Module::Crm]);
 
-        foreach ([Module::RepairPms, Module::Detailing, Module::Equipment] as $module) {
+        foreach ([Module::RepairPms, Module::Detailing, Module::Equipment, Module::Crm] as $module) {
             (new OrganizationModule)->forceFill(['organization_id' => $organization->id, 'module' => $module, 'enabled' => true])->save();
         }
 
@@ -204,6 +205,7 @@ final class DemoSeeder extends Seeder
         BillingSeed::run($this->ids);
         DetailingSeed::run($this->ids);
         EquipmentSeed::run($this->ids);
+        CrmSeed::run($this->ids);
     }
 
     /**

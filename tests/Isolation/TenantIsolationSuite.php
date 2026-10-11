@@ -128,6 +128,27 @@ final class TenantIsolationSuite
         'equipment_usage_logs' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id'],
         'equipment_maintenance_logs' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id'],
         'equipment_package_profiles' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id'],
+        'equipment_maintenance_parts' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
+        // Phase 11: the CRM. Staff-only, and the ORGANIZATION's: a customer is served by every branch, so a CRM
+        // record is not held to the branches a member of staff is pinned to (the columns below name no branch,
+        // even where a row remembers the branch it came from).
+        'crm_settings' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
+        'message_templates' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
+        'reminder_rules' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
+        'messages' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
+        'message_suppressions' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
+        'crm_leads' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
+        'crm_notes' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
+        'crm_tasks' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
+        'feedback_requests' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
+        'crm_segments' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
+        'crm_campaigns' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
+        'membership_tiers' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
+        'memberships' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
+        'prepaid_plans' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
+        'prepaid_packages' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
+        'prepaid_redemptions' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
+        'loyalty_entries' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
     ];
 
     /**

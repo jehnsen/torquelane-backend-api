@@ -24,6 +24,8 @@ enum DocumentType: string
     case Payment = 'payment';
     /** Detailing bookings (Phase 9): numbered when made, so a customer can quote one. */
     case DetailingBooking = 'detailing_booking';
+    /** Prepaid packages sold (Phase 11). */
+    case PrepaidPackage = 'prepaid_package';
 
     public function defaultPrefix(): string
     {
@@ -39,6 +41,7 @@ enum DocumentType: string
             self::StockCount => 'SC',
             self::Payment => 'PAY',
             self::DetailingBooking => 'BK',
+            self::PrepaidPackage => 'PP',
         };
     }
 }

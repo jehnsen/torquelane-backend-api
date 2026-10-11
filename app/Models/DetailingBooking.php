@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * A detailing booking, and from the moment work starts its job card. The
@@ -73,6 +74,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read Collection<int, InvoiceBooking> $invoiceLinks
  * @property-read Bay|null $bay
  * @property-read CustomerAccount $customerAccount
+ * @property-read PrepaidRedemption|null $prepaidRedemption
  * @property-read Vehicle|null $vehicle
  */
 final class DetailingBooking extends Model
@@ -160,6 +162,16 @@ final class DetailingBooking extends Model
     public function invoiceLinks(): HasMany
     {
         return $this->hasMany(InvoiceBooking::class, 'booking_id');
+    }
+
+    /**
+     * The prepaid credit that settled this job, when one did (Phase 11).
+     *
+     * @return HasOne<PrepaidRedemption, $this>
+     */
+    public function prepaidRedemption(): HasOne
+    {
+        return $this->hasOne(PrepaidRedemption::class, 'detailing_booking_id');
     }
 
     /**

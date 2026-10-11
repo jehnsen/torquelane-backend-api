@@ -28,6 +28,9 @@ use App\Models\Branch;
 use App\Models\BranchModule;
 use App\Models\Consent;
 use App\Models\Contact;
+use App\Models\CrmCampaign;
+use App\Models\CrmLead;
+use App\Models\CrmSegment;
 use App\Models\CustomerAccount;
 use App\Models\DetailingBooking;
 use App\Models\DetailingBookingSlot;
@@ -42,6 +45,7 @@ use App\Models\FleetPart;
 use App\Models\FleetPartUsage;
 use App\Models\Invitation;
 use App\Models\MaintenanceState;
+use App\Models\MessageTemplate;
 use App\Models\MeterReading;
 use App\Models\Organization;
 use App\Models\OrganizationModule;
@@ -272,6 +276,18 @@ final class World
             (new DetailingBookingSlot)->forceFill(['organization_id' => $organizationId, 'branch_id' => $branchId, 'booking_id' => $booking->id, 'date' => '2026-10-08', 'slot' => $slot])->save();
         }
         (new DetailingBookingStatusLog)->forceFill(['organization_id' => $organizationId, 'booking_id' => $booking->id, 'to_status' => 'confirmed', 'actor_name' => 'Rival Admin', 'changed_at' => '2026-10-07 02:00:00+00'])->save();
+        // Phase 11: the rival's own CRM records, which this organization must never reach.
+        $template = new MessageTemplate;
+        $template->forceFill(['organization_id' => $organizationId, 'name' => 'Rival promo', 'channel' => 'email', 'purpose' => 'marketing', 'subject' => 'Rival', 'body' => 'Rival'])->save();
+        $segment = new CrmSegment;
+        $segment->forceFill(['organization_id' => $organizationId, 'name' => 'Rival segment'])->save();
+        $this->ids['rival:crm:segment'] = $segment->id;
+        $campaign = new CrmCampaign;
+        $campaign->forceFill(['organization_id' => $organizationId, 'name' => 'Rival campaign', 'segment_id' => $segment->id, 'template_id' => $template->id, 'created_by_name' => 'Rival Admin'])->save();
+        $this->ids['rival:crm:campaign'] = $campaign->id;
+        $lead = new CrmLead;
+        $lead->forceFill(['organization_id' => $organizationId, 'company_name' => 'Rival Prospect', 'stage_changed_at' => '2026-10-01 02:00:00+00', 'created_by_name' => 'Rival Admin'])->save();
+        $this->ids['rival:crm:lead'] = $lead->id;
         // Phase 10: a tool on the rival's floor, mapped to its package.
         (new OrganizationModule)->forceFill(['organization_id' => $organizationId, 'module' => Module::Equipment, 'enabled' => true])->save();
         (new BranchModule)->forceFill(['organization_id' => $organizationId, 'branch_id' => $branchId, 'module' => Module::Equipment, 'enabled' => true])->save();

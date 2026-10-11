@@ -71,6 +71,8 @@ final class DetailingBookingResource extends JsonResource
         $invoice = $link?->invoice;
         $first = $booking->slots->first();
         $completed = $booking->status === BookingStatus::Completed;
+        // Settled by a prepaid credit (Phase 11): there is nothing left to invoice.
+        $redemption = $booking->prepaidRedemption;
         $signedOff = $booking->qc_status === DetailingBooking::QC_PASSED;
         $worksIt = $this->callerWorkedIt($booking);
 
@@ -140,14 +142,23 @@ final class DetailingBookingResource extends JsonResource
                 'total_due_cents' => $invoice->total_due_cents,
                 'balance_cents' => $invoice->balanceCents(),
             ],
+            'prepaid' => $redemption === null ? null : [
+                'package_id' => $redemption->prepaid_package_id,
+                'reference' => $redemption->package->reference,
+                'plan_name' => $redemption->package->plan_name,
+                'amount_cents' => $redemption->amount_cents,
+                'redeemed_on' => $redemption->redeemed_on->toDateString(),
+            ],
             // What the job is waiting for; the API still checks each step when it is taken.
             'next' => [
                 'needs_inspection' => $needsInspection,
-                'can_sign_off' => $completed && ! $signedOff && $invoice === null && ! $worksIt,
+                'can_sign_off' => $completed && ! $signedOff && $invoice === null && $redemption === null && ! $worksIt,
                 'sign_off_blocked_reason' => $completed && ! $signedOff && $worksIt ? 'A job is signed off by someone other than the detailer who worked it.' : null,
-                'can_invoice' => $completed && $signedOff && $invoice === null,
-                'can_check_out' => $completed && $signedOff && ($invoice === null || in_array($invoice->status, [InvoiceStatus::Draft, InvoiceStatus::Issued, InvoiceStatus::PartiallyPaid], true)),
-                'locked_by_invoice' => $invoice !== null,
+                'can_invoice' => $completed && $signedOff && $invoice === null && $redemption === null,
+                'can_check_out' => $completed && $signedOff && $redemption === null && ($invoice === null || in_array($invoice->status, [InvoiceStatus::Draft, InvoiceStatus::Issued, InvoiceStatus::PartiallyPaid], true)),
+                // A prepaid credit may settle it instead of an invoice (`POST /crm/prepaid-packages/{id}/redeem`).
+                'can_redeem' => $completed && $signedOff && $invoice === null && $redemption === null,
+                'locked_by_invoice' => $invoice !== null || $redemption !== null,
             ],
             'status_log' => $booking->relationLoaded('statusLogs')
                 ? array_values($booking->statusLogs->map(fn (DetailingBookingStatusLog $log): array => [

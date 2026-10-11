@@ -344,6 +344,47 @@ bands, forecast, life, reliability and health are the source's formulas.
 | Equipment alerts in the bell | `GET /alerts` (+ read / dismiss / restore) | staff | done | New kinds `equipment_service_due_soon`, `equipment_service_overdue`, `equipment_replace_soon`, `equipment_end_of_life`; `href` is the tool's page. | tested |
 | `/shop/equipment/profiles`: which packages put hours on which tools | `GET /equipment/profiles`, `PUT /equipment/profiles/{detailing_package}` | staff | done | Was `setServiceEquipmentProfile`. | tested |
 
+## CRM (Phase 11, staff only)
+
+No counterpart in `../web`. The `crm` module: `crm:view` reads, `crm:work`
+keeps notes and tasks, works leads, enrols members and sells or redeems
+packages, `crm:manage` sets up. Every figure and flag a screen shows (a
+customer's balance and spend, a task's `overdue` and `reminder_due`, a
+package's credits left and what it still owes, a segment's size, a campaign's
+progress, the NPS) is worked out by the API (R2). The **Phase 11** column is
+what `tests/Feature/Crm` drives; the screens were built, type-checked and
+compiled but not yet driven in a browser.
+
+| Screen / action | Endpoint(s) | Side | Status | Notes | Phase 11 |
+|---|---|---|---|---|---|
+| `/shop/crm`: customers, with spend, last visit, tier, open tasks | `GET /crm/customers` | staff | done | `q` searches the name. | tested |
+| `/shop/crm/customers/[id]`: Customer 360 | `GET /crm/customers/{customer_account}` | staff | done | One read: vehicles, jobs, invoices and balance, payments and bookings at every branch, consents, notes, tasks, messages, feedback, membership, packages, points, and a timeline built on read. | tested |
+| Customer 360 and the booking screens: what the customer holds | `GET /crm/customers/{customer_account}/benefits` | staff | done | The tier in force, usable prepaid packages with credits left, points. | tested |
+| Customer 360: notes | `POST /crm/customers/{customer_account}/notes`, `PUT /crm/customers/{customer_account}/notes/{note}`, `DELETE /crm/customers/{customer_account}/notes/{note}` | staff | done | | tested |
+| Customer 360: membership | `POST /crm/customers/{customer_account}/membership`, `DELETE /crm/customers/{customer_account}/membership/{membership}` | staff | done | A new tier replaces the old one. | tested |
+| Customer 360: spend or correct points | `POST /crm/customers/{customer_account}/points` | staff | done | Never below zero (409 `insufficient_points`). | tested |
+| Forms: staff to assign to, pipeline stages, task kinds | `GET /crm/options` | staff | done | | tested |
+| `/shop/crm/tasks` | `GET /crm/tasks`, `POST /crm/tasks`, `PUT /crm/tasks/{task}`, `POST /crm/tasks/{task}/status` | staff | done | `summary` counts open, overdue, reminders due, booking requests, unassigned. | tested |
+| `/shop/crm/pipeline`: the board | `GET /crm/leads`, `POST /crm/leads`, `GET /crm/leads/{lead}`, `PUT /crm/leads/{lead}` | staff | done | Stages in board order with count and value. | tested |
+| Pipeline: move a lead, win it | `POST /crm/leads/{lead}/stage`, `POST /crm/leads/{lead}/convert` | staff | done | `won` only by conversion (409 `convert_to_win` on a move); conversion opens a company account with terms, approval overrides, the dealer tag and consent. | tested |
+| `/shop/crm/reminders`: rules, settings, run now | `GET /crm/reminder-rules`, `PUT /crm/reminder-rules/{kind}`, `GET /crm/settings`, `PUT /crm/settings`, `POST /crm/reminders/run` | staff | done | Four kinds; quiet hours, cooldown, lapsed-after, hourly limit, feedback and points switches. | tested |
+| `/shop/crm/templates` | `GET /crm/templates`, `POST /crm/templates`, `PUT /crm/templates/{template}`, `DELETE /crm/templates/{template}` | staff | done | `placeholders` per template; `meta` lists channels, purposes (with the consent each needs) and the standard placeholders. | tested |
+| `/shop/crm/messages`: the message log | `GET /crm/messages` | staff | done | Sent, queued, failed and skipped (with `skip_reason`); filters by status, purpose, source and customer. | tested |
+| Message log / Customer 360: feedback and NPS | `GET /crm/feedback` | staff | done | | tested |
+| `/shop/crm/memberships`: tiers | `GET /crm/tiers`, `POST /crm/tiers`, `PUT /crm/tiers/{tier}` | staff | done | With how many customers hold each. | tested |
+| `/shop/crm/memberships`: prepaid plans and packages sold | `GET /crm/prepaid-plans`, `POST /crm/prepaid-plans`, `PUT /crm/prepaid-plans/{plan}`, `GET /crm/prepaid-packages`, `POST /crm/prepaid-packages` | staff | done | A sale is numbered and posted (Dr cash / Cr Unearned Revenue) in one transaction; needs an `Idempotency-Key`. `summary.unearned_cents` is what is still owed as service. | tested |
+| Job card: settle a finished job with a prepaid credit | `POST /crm/prepaid-packages/{prepaid_package}/redeem` | staff | done | Dr Unearned Revenue / Cr Sales – Detailing. 409 with `reason` when it may not be. The booking then shows `prepaid` and `next.can_redeem` false. | tested |
+| `/shop/crm/campaigns`: segments | `GET /crm/segments`, `POST /crm/segments`, `POST /crm/segments/preview`, `GET /crm/segments/{segment}/members`, `PUT /crm/segments/{segment}`, `DELETE /crm/segments/{segment}` | staff | done | Membership is worked out on read; `preview` shows who a filter matches before it is saved. | tested |
+| `/shop/crm/campaigns`: campaigns | `GET /crm/campaigns`, `POST /crm/campaigns`, `GET /crm/campaigns/{campaign}`, `PUT /crm/campaigns/{campaign}`, `POST /crm/campaigns/{campaign}/status` | staff | done | Marketing consent required; throttled; `progress` from the message log. | tested |
+
+Public pages (no session; the token in the link is the credential):
+
+| Page | Endpoint(s) | Notes |
+|---|---|---|
+| `/r/[token]`: a reminder's booking link | `GET /public/crm/reminders/{token}`, `POST /public/crm/reminders/{token}/book` | Opens the branch's online booking where one applies; otherwise leaves a booking request on the staff's task list. |
+| `/feedback/[token]` | `GET /public/crm/feedback/{token}`, `POST /public/crm/feedback/{token}` | One 0–10 answer, once. |
+| `/unsubscribe/[token]` | `GET /public/crm/unsubscribe/{token}`, `POST /public/crm/unsubscribe/{token}` | Suppresses the address and withdraws the consent. |
+
 ## What moved from the browser to the server
 
 The frontend used to compute these itself. It now renders them:

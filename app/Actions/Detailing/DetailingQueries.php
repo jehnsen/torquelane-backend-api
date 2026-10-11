@@ -37,7 +37,7 @@ use Illuminate\Database\Eloquent\Collection;
 final class DetailingQueries
 {
     /** What a booking is shown with. */
-    public const array WITH = ['detailers.technician', 'addons', 'slots', 'bay', 'invoiceLinks.invoice', 'inspections'];
+    public const array WITH = ['detailers.technician', 'addons', 'slots', 'bay', 'invoiceLinks.invoice', 'inspections', 'prepaidRedemption.package'];
 
     public function __construct(
         private readonly TenantManager $tenancy,

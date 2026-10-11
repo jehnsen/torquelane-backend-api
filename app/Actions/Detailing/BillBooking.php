@@ -109,5 +109,8 @@ final class BillBooking
         if ($booking->qc_status !== DetailingBooking::QC_PASSED) {
             throw new InvalidTransitionException("{$booking->reference} has not been signed off; quality control comes before the bill.");
         }
+        if ($booking->prepaidRedemption()->exists()) {
+            throw new ConflictException("{$booking->reference} was settled with a prepaid credit; there is nothing to invoice.");
+        }
     }
 }

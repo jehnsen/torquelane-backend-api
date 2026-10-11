@@ -35,7 +35,11 @@ namespace App\Domain\Access;
  *    for provider_admin and branch_manager (the source's "super admin" tier);
  *  - equipment (Phase 10, never a portal role): `equipment:view` for every
  *    staff role, `equipment:manage` for provider_admin and branch_manager (the
- *    source kept the whole page to its super admin).
+ *    source kept the whole page to its super admin);
+ *  - CRM (Phase 11, never a portal role): `crm:view` and `crm:work` for
+ *    provider_admin, branch_manager, service_advisor and cashier (the people
+ *    who talk to customers); `crm:manage` for provider_admin and
+ *    branch_manager. The technician holds none.
  */
 final class AccessMatrix
 {
@@ -100,8 +104,10 @@ final class AccessMatrix
             'detailing:work',
             'detailing:qc',
             'equipment:view',
+            'crm:view',
+            'crm:work',
         ],
-        'cashier' => ['customer:manage', 'inventory:view', 'billing:view', 'billing:manage', 'detailing:view', 'detailing:book', 'equipment:view'],
+        'cashier' => ['customer:manage', 'inventory:view', 'billing:view', 'billing:manage', 'detailing:view', 'detailing:book', 'equipment:view', 'crm:view', 'crm:work'],
         // Everything but organization:manage, applied only to the branches the
         // manager is pinned to (branch_user).
         'branch_manager' => [
@@ -130,6 +136,9 @@ final class AccessMatrix
             'detailing:manage',
             'equipment:view',
             'equipment:manage',
+            'crm:view',
+            'crm:work',
+            'crm:manage',
         ],
         'provider_admin' => [
             'vehicle:update',
@@ -159,6 +168,9 @@ final class AccessMatrix
             'detailing:manage',
             'equipment:view',
             'equipment:manage',
+            'crm:view',
+            'crm:work',
+            'crm:manage',
         ],
     ];
 

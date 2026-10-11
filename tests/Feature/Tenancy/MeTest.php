@@ -27,8 +27,8 @@ function expectedCapabilities(): array
     }
 
     return [
-        'provider_admin' => [...$web['provider_admin'], 'customer:manage', 'organization:manage', 'inventory:view', 'inventory:manage', 'billing:view', 'billing:manage', 'billing:void', 'ledger:view', 'ledger:manage', 'detailing:view', 'detailing:book', 'detailing:work', 'detailing:qc', 'detailing:manage', 'equipment:view', 'equipment:manage'],
-        'service_advisor' => [...$web['service_advisor'], 'customer:manage', 'inventory:view', 'billing:view', 'billing:manage', 'detailing:view', 'detailing:book', 'detailing:work', 'detailing:qc', 'equipment:view'],
+        'provider_admin' => [...$web['provider_admin'], 'customer:manage', 'organization:manage', 'inventory:view', 'inventory:manage', 'billing:view', 'billing:manage', 'billing:void', 'ledger:view', 'ledger:manage', 'detailing:view', 'detailing:book', 'detailing:work', 'detailing:qc', 'detailing:manage', 'equipment:view', 'equipment:manage', 'crm:view', 'crm:work', 'crm:manage'],
+        'service_advisor' => [...$web['service_advisor'], 'customer:manage', 'inventory:view', 'billing:view', 'billing:manage', 'detailing:view', 'detailing:book', 'detailing:work', 'detailing:qc', 'equipment:view', 'crm:view', 'crm:work'],
         'provider_technician' => [...$web['provider_technician'], 'inventory:view', 'detailing:view', 'detailing:work', 'equipment:view'],
         'fleet_manager' => [...$web['fleet_manager'], 'customer:manage', 'billing:view'],
         'operations' => $web['operations'],
@@ -36,8 +36,8 @@ function expectedCapabilities(): array
         'purchasing_officer' => [...$web['purchasing_officer'], 'billing:view'],
         'viewer' => [...$web['viewer'], 'billing:view'],
         // Proposed grants for the API-only roles (see CLAUDE.md, "Roles").
-        'branch_manager' => ['vehicle:update', 'vehicle:manage', 'workorder:create', 'workorder:update', 'workorder:complete', 'workorder:approve', 'po:issue', 'document:upload', 'document:delete', 'settings:manage', 'access:manage', 'customer:manage', 'inventory:view', 'inventory:manage', 'billing:view', 'billing:manage', 'billing:void', 'ledger:view', 'detailing:view', 'detailing:book', 'detailing:work', 'detailing:qc', 'detailing:manage', 'equipment:view', 'equipment:manage'],
-        'cashier' => ['customer:manage', 'inventory:view', 'billing:view', 'billing:manage', 'detailing:view', 'detailing:book', 'equipment:view'],
+        'branch_manager' => ['vehicle:update', 'vehicle:manage', 'workorder:create', 'workorder:update', 'workorder:complete', 'workorder:approve', 'po:issue', 'document:upload', 'document:delete', 'settings:manage', 'access:manage', 'customer:manage', 'inventory:view', 'inventory:manage', 'billing:view', 'billing:manage', 'billing:void', 'ledger:view', 'detailing:view', 'detailing:book', 'detailing:work', 'detailing:qc', 'detailing:manage', 'equipment:view', 'equipment:manage', 'crm:view', 'crm:work', 'crm:manage'],
+        'cashier' => ['customer:manage', 'inventory:view', 'billing:view', 'billing:manage', 'detailing:view', 'detailing:book', 'equipment:view', 'crm:view', 'crm:work'],
     ];
 }
 
@@ -76,10 +76,10 @@ it('shows unrestricted staff every branch, working across "all"', function () {
     expect(array_column($me->json('data.branches.allowed'), 'slug'))->toBe(['mekanikomor-binan', 'samahuzai-binan'])
         ->and($me->json('data.branches.selected'))->toBe('all')
         ->and($me->json('data.branches.restricted'))->toBeFalse()
-        ->and($me->json('data.modules.organization'))->toBe(['repair_pms', 'detailing', 'equipment'])
-        ->and($me->json('data.modules.active'))->toBe(['repair_pms', 'detailing', 'equipment'])
-        ->and($me->json('data.modules.by_branch.'.$this->world->id('mekanikomor-binan')))->toBe(['repair_pms'])
-        ->and($me->json('data.modules.by_branch.'.$this->world->id('samahuzai-binan')))->toBe(['detailing', 'equipment'])
+        ->and($me->json('data.modules.organization'))->toBe(['repair_pms', 'detailing', 'equipment', 'crm'])
+        ->and($me->json('data.modules.active'))->toBe(['repair_pms', 'detailing', 'equipment', 'crm'])
+        ->and($me->json('data.modules.by_branch.'.$this->world->id('mekanikomor-binan')))->toBe(['repair_pms', 'crm'])
+        ->and($me->json('data.modules.by_branch.'.$this->world->id('samahuzai-binan')))->toBe(['detailing', 'equipment', 'crm'])
         ->and($me->json('data.branding.display_name'))->toBe('MekanikoMoR');
 });
 
@@ -91,7 +91,7 @@ it('pins a branch manager to their branch, with its modules and its brand', func
     expect(array_column($me->json('data.branches.allowed'), 'slug'))->toBe(['samahuzai-binan'])
         ->and($me->json('data.branches.selected'))->toBe($this->world->id('samahuzai-binan'))
         ->and($me->json('data.branches.restricted'))->toBeTrue()
-        ->and($me->json('data.modules.active'))->toBe(['detailing', 'equipment'])
+        ->and($me->json('data.modules.active'))->toBe(['detailing', 'equipment', 'crm'])
         ->and($me->json('data.branding.display_name'))->toBe('Samahuzai')
         ->and($me->json('data.branding.brand_color'))->toBe('#1d5ba6')
         ->and($me->json('data.branding.support_email'))->toBe('support@mekanikomore.ph');

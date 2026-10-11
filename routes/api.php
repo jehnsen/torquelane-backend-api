@@ -15,6 +15,11 @@ use App\Http\Controllers\Api\V1\BranchController;
 use App\Http\Controllers\Api\V1\CheckInController;
 use App\Http\Controllers\Api\V1\ConsentController;
 use App\Http\Controllers\Api\V1\ContactController;
+use App\Http\Controllers\Api\V1\CrmCampaignController;
+use App\Http\Controllers\Api\V1\CrmCustomerController;
+use App\Http\Controllers\Api\V1\CrmLoyaltyController;
+use App\Http\Controllers\Api\V1\CrmMessagingController;
+use App\Http\Controllers\Api\V1\CrmWorkController;
 use App\Http\Controllers\Api\V1\CustomerAccountController;
 use App\Http\Controllers\Api\V1\DemandForecastController;
 use App\Http\Controllers\Api\V1\DetailingBoardController;
@@ -41,6 +46,7 @@ use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\PeriodController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\PublicBookingController;
+use App\Http\Controllers\Api\V1\PublicCrmController;
 use App\Http\Controllers\Api\V1\PurchaseOrderController;
 use App\Http\Controllers\Api\V1\ReceivablesController;
 use App\Http\Controllers\Api\V1\ServiceTaskController;
@@ -352,6 +358,67 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
         Route::post('{equipment}/maintenance-logs', [EquipmentController::class, 'logService'])->name('maintenance-logs.store');
         Route::delete('{equipment}/maintenance-logs/{maintenance_log}', [EquipmentController::class, 'deleteService'])->scopeBindings()->name('maintenance-logs.destroy');
     });
+    // CRM (Phase 11): the `crm` module, staff only. Customer 360 (across branches), notes and tasks, the B2B
+    // pipeline, messaging (templates, reminder rules, the message log), memberships, prepaid packages, feedback,
+    // segments and campaigns. Every message goes through one gate: consent, opt-out, cooldown, quiet hours.
+    Route::prefix('crm')->name('crm.')->group(function (): void {
+        Route::get('options', [CrmCustomerController::class, 'options'])->name('options');
+        Route::get('customers', [CrmCustomerController::class, 'index'])->name('customers.index');
+        Route::get('customers/{customer_account}', [CrmCustomerController::class, 'show'])->name('customers.show');
+        Route::get('customers/{customer_account}/benefits', [CrmCustomerController::class, 'benefits'])->name('customers.benefits');
+        Route::post('customers/{customer_account}/notes', [CrmCustomerController::class, 'storeNote'])->name('customers.notes.store');
+        Route::put('customers/{customer_account}/notes/{note}', [CrmCustomerController::class, 'updateNote'])->name('customers.notes.update');
+        Route::delete('customers/{customer_account}/notes/{note}', [CrmCustomerController::class, 'destroyNote'])->name('customers.notes.destroy');
+        Route::post('customers/{customer_account}/membership', [CrmCustomerController::class, 'enrol'])->name('customers.membership.store');
+        Route::delete('customers/{customer_account}/membership/{membership}', [CrmCustomerController::class, 'cancelMembership'])->name('customers.membership.destroy');
+        Route::post('customers/{customer_account}/points', [CrmCustomerController::class, 'adjustPoints'])->middleware('idempotent')->name('customers.points.store');
+
+        Route::get('tasks', [CrmWorkController::class, 'tasks'])->name('tasks.index');
+        Route::post('tasks', [CrmWorkController::class, 'storeTask'])->name('tasks.store');
+        Route::put('tasks/{task}', [CrmWorkController::class, 'updateTask'])->name('tasks.update');
+        Route::post('tasks/{task}/status', [CrmWorkController::class, 'taskStatus'])->name('tasks.status');
+
+        Route::get('leads', [CrmWorkController::class, 'leads'])->name('leads.index');
+        Route::post('leads', [CrmWorkController::class, 'storeLead'])->name('leads.store');
+        Route::get('leads/{lead}', [CrmWorkController::class, 'showLead'])->name('leads.show');
+        Route::put('leads/{lead}', [CrmWorkController::class, 'updateLead'])->name('leads.update');
+        Route::post('leads/{lead}/stage', [CrmWorkController::class, 'moveLead'])->name('leads.stage');
+        Route::post('leads/{lead}/convert', [CrmWorkController::class, 'convertLead'])->middleware('idempotent')->name('leads.convert');
+
+        Route::get('settings', [CrmMessagingController::class, 'settings'])->name('settings.show');
+        Route::put('settings', [CrmMessagingController::class, 'updateSettings'])->name('settings.update');
+        Route::get('templates', [CrmMessagingController::class, 'templates'])->name('templates.index');
+        Route::post('templates', [CrmMessagingController::class, 'storeTemplate'])->name('templates.store');
+        Route::put('templates/{template}', [CrmMessagingController::class, 'updateTemplate'])->name('templates.update');
+        Route::delete('templates/{template}', [CrmMessagingController::class, 'destroyTemplate'])->name('templates.destroy');
+        Route::get('reminder-rules', [CrmMessagingController::class, 'rules'])->name('reminder-rules.index');
+        Route::put('reminder-rules/{kind}', [CrmMessagingController::class, 'updateRule'])->name('reminder-rules.update');
+        Route::post('reminders/run', [CrmMessagingController::class, 'runReminders'])->name('reminders.run');
+        Route::get('messages', [CrmMessagingController::class, 'messages'])->name('messages.index');
+        Route::get('feedback', [CrmMessagingController::class, 'feedback'])->name('feedback.index');
+
+        Route::get('tiers', [CrmLoyaltyController::class, 'tiers'])->name('tiers.index');
+        Route::post('tiers', [CrmLoyaltyController::class, 'storeTier'])->name('tiers.store');
+        Route::put('tiers/{tier}', [CrmLoyaltyController::class, 'updateTier'])->name('tiers.update');
+        Route::get('prepaid-plans', [CrmLoyaltyController::class, 'plans'])->name('prepaid-plans.index');
+        Route::post('prepaid-plans', [CrmLoyaltyController::class, 'storePlan'])->name('prepaid-plans.store');
+        Route::put('prepaid-plans/{plan}', [CrmLoyaltyController::class, 'updatePlan'])->name('prepaid-plans.update');
+        Route::get('prepaid-packages', [CrmLoyaltyController::class, 'packages'])->name('prepaid-packages.index');
+        Route::post('prepaid-packages', [CrmLoyaltyController::class, 'sell'])->middleware('idempotent')->name('prepaid-packages.store');
+        Route::post('prepaid-packages/{prepaid_package}/redeem', [CrmLoyaltyController::class, 'redeem'])->middleware('idempotent')->name('prepaid-packages.redeem');
+
+        Route::get('segments', [CrmCampaignController::class, 'segments'])->name('segments.index');
+        Route::post('segments', [CrmCampaignController::class, 'storeSegment'])->name('segments.store');
+        Route::post('segments/preview', [CrmCampaignController::class, 'preview'])->name('segments.preview');
+        Route::get('segments/{segment}/members', [CrmCampaignController::class, 'members'])->name('segments.members');
+        Route::put('segments/{segment}', [CrmCampaignController::class, 'updateSegment'])->name('segments.update');
+        Route::delete('segments/{segment}', [CrmCampaignController::class, 'destroySegment'])->name('segments.destroy');
+        Route::get('campaigns', [CrmCampaignController::class, 'campaigns'])->name('campaigns.index');
+        Route::post('campaigns', [CrmCampaignController::class, 'storeCampaign'])->name('campaigns.store');
+        Route::get('campaigns/{campaign}', [CrmCampaignController::class, 'showCampaign'])->name('campaigns.show');
+        Route::put('campaigns/{campaign}', [CrmCampaignController::class, 'updateCampaign'])->name('campaigns.update');
+        Route::post('campaigns/{campaign}/status', [CrmCampaignController::class, 'campaignStatus'])->name('campaigns.status');
+    });
 });
 
 // Staff sockets: sign one onto its branch's detailing channel (the session is the credential).
@@ -361,6 +428,17 @@ Route::post('broadcasting/auth', [DetailingBoardController::class, 'authorizeCha
 Route::prefix('display')->name('display.')->middleware(['display', 'throttle:display'])->group(function (): void {
     Route::get('detailing/monitor', [DisplayController::class, 'monitor'])->name('detailing.monitor');
     Route::post('broadcasting/auth', [DisplayController::class, 'authorizeChannel'])->name('broadcasting.auth');
+});
+
+// What the links inside a CRM message open (Phase 11): a reminder's booking link, a feedback link, the unsubscribe
+// link. No session; the 40-character token is the credential; rate-limited.
+Route::prefix('public/crm')->name('public.crm.')->middleware('throttle:public')->where(['token' => '[0-9A-Za-z]{40}'])->group(function (): void {
+    Route::get('reminders/{token}', [PublicCrmController::class, 'reminder'])->name('reminders.show');
+    Route::post('reminders/{token}/book', [PublicCrmController::class, 'requestBooking'])->name('reminders.book');
+    Route::get('feedback/{token}', [PublicCrmController::class, 'feedback'])->name('feedback.show');
+    Route::post('feedback/{token}', [PublicCrmController::class, 'answerFeedback'])->name('feedback.answer');
+    Route::get('unsubscribe/{token}', [PublicCrmController::class, 'unsubscribe'])->name('unsubscribe.show');
+    Route::post('unsubscribe/{token}', [PublicCrmController::class, 'confirmUnsubscribe'])->name('unsubscribe.confirm');
 });
 
 // A detailing branch's public booking page: no session; rate-limited; captcha-ready.

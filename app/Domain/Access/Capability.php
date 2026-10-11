@@ -58,6 +58,12 @@ enum Capability: string
     case EquipmentView = 'equipment:view';
     /** Register and edit tools, log usage and services, map tools to packages (staff only). */
     case EquipmentManage = 'equipment:manage';
+    /** See a customer's whole record across branches, the tasks, the pipeline, the message log, memberships and packages (staff only, Phase 11). */
+    case CrmView = 'crm:view';
+    /** Keep notes and tasks, work the pipeline, enrol members, sell and redeem prepaid packages (staff only). */
+    case CrmWork = 'crm:work';
+    /** Set up templates, reminder rules, tiers, plans, segments and campaigns; change CRM settings (staff only). */
+    case CrmManage = 'crm:manage';
 
     /** Shown in denial reasons. The ported labels are verbatim from the frontend. */
     public function label(): string
@@ -90,6 +96,9 @@ enum Capability: string
             self::DetailingManage => 'Manage detailing packages and settings',
             self::EquipmentView => 'View the equipment monitor',
             self::EquipmentManage => 'Manage equipment and its service history',
+            self::CrmView => 'See customer records, tasks and the pipeline',
+            self::CrmWork => 'Keep notes and tasks, work leads, sell packages',
+            self::CrmManage => 'Set up reminders, templates, tiers and campaigns',
         };
     }
 
@@ -100,7 +109,8 @@ enum Capability: string
             self::CustomerManage, self::OrganizationManage, self::InventoryView, self::InventoryManage,
             self::BillingView, self::BillingManage, self::BillingVoid, self::LedgerView, self::LedgerManage,
             self::DetailingView, self::DetailingBook, self::DetailingWork, self::DetailingQc, self::DetailingManage,
-            self::EquipmentView, self::EquipmentManage => true,
+            self::EquipmentView, self::EquipmentManage,
+            self::CrmView, self::CrmWork, self::CrmManage => true,
             default => false,
         };
     }

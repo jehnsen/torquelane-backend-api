@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Billing;
 
+use App\Actions\Crm\ManageLoyalty;
 use App\Actions\Ledger\LedgerPostings;
 use App\Actions\Numbering\DocumentNumbers;
 use App\Actions\WorkOrders\ApprovalSettingsResolver;
@@ -63,6 +64,7 @@ final class ManageInvoices
         private readonly ApprovalSettingsResolver $settings,
         private readonly DocumentNumbers $numbers,
         private readonly LedgerPostings $postings,
+        private readonly ManageLoyalty $loyalty,
     ) {}
 
     /**
@@ -135,15 +137,22 @@ final class ManageInvoices
                 $branch = Branch::query()->findOrFail($booking->branch_id);
                 $account = CustomerAccount::query()->findOrFail($booking->customer_account_id);
 
+                // A member's tier takes its percentage off each line, and its free add-ons off in full (Phase 11).
+                $benefits = $this->loyalty->benefitsOf($account->id);
                 $lines = [new InvoiceLineDraft(
                     InvoiceLineKind::Detailing,
                     sprintf('%s (%s) — %s', $booking->package_name, $booking->size_class->label(), $booking->reference),
                     '1',
                     $booking->package_price_cents,
+                    $benefits?->discountCents($booking->package_price_cents) ?? 0,
                     detailingBookingId: $booking->id,
                 )];
                 foreach ($booking->addons as $addon) {
-                    $lines[] = new InvoiceLineDraft(InvoiceLineKind::Addon, $addon->name, (string) $addon->quantity, $addon->unit_price_cents, detailingBookingId: $booking->id);
+                    $line = new InvoiceLineDraft(InvoiceLineKind::Addon, $addon->name, (string) $addon->quantity, $addon->unit_price_cents, detailingBookingId: $booking->id);
+                    $lines[] = $benefits === null ? $line : new InvoiceLineDraft(InvoiceLineKind::Addon, $addon->name, (string) $addon->quantity, $addon->unit_price_cents, $benefits->discountCents($line->grossCents(), $addon->addon_id), detailingBookingId: $booking->id);
+                }
+                if ($benefits !== null) {
+                    $notes = trim("{$notes}\n{$benefits->tierName} member: {$benefits->discountPct}% off.");
                 }
 
                 $invoice = $this->draft($branch, $account, InvoiceSource::Detailing, $lines, $notes);

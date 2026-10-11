@@ -33,6 +33,10 @@ enum LedgerEvent: string
     case StockMaintenance = 'stock_maintenance';
     /** Those parts put back, because the service entry was removed. */
     case StockMaintenanceReturn = 'stock_maintenance_return';
+    /** A prepaid package sold: cash in, service owed (Phase 11). */
+    case PrepaidSold = 'prepaid_sold';
+    /** A prepaid credit used: its share of the price is earned. */
+    case PrepaidRedeemed = 'prepaid_redeemed';
 
     public function label(): string
     {
@@ -53,6 +57,8 @@ enum LedgerEvent: string
             self::StockTransfer => 'Stock transfer',
             self::StockMaintenance => 'Parts used on equipment',
             self::StockMaintenanceReturn => 'Parts returned from equipment',
+            self::PrepaidSold => 'Prepaid package sold',
+            self::PrepaidRedeemed => 'Prepaid credit redeemed',
         };
     }
 
@@ -63,6 +69,8 @@ enum LedgerEvent: string
             self::InvoiceIssued, self::InvoiceVoided => 'invoice',
             self::PaymentReceived, self::PaymentVoided => 'payment',
             self::CreditApplied, self::CreditReversed => 'payment_allocation',
+            self::PrepaidSold => 'prepaid_package',
+            self::PrepaidRedeemed => 'prepaid_redemption',
             default => 'stock_move',
         };
     }

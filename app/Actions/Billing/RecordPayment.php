@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Billing;
 
+use App\Actions\Crm\ManageLoyalty;
 use App\Actions\Ledger\LedgerPostings;
 use App\Actions\Numbering\DocumentNumbers;
 use App\Domain\Invoicing\InvoiceStatus;
@@ -46,6 +47,7 @@ final class RecordPayment
         private readonly InvoiceSettlement $settlement,
         private readonly DocumentNumbers $numbers,
         private readonly LedgerPostings $postings,
+        private readonly ManageLoyalty $loyalty,
     ) {}
 
     /**
@@ -140,6 +142,8 @@ final class RecordPayment
                 $this->settlement->refresh($invoice);
             }
             $this->postings->paymentVoided($locked, $reason);
+            // The points the payment earned go back with it (Phase 11).
+            $this->loyalty->reverseFor($locked);
             $this->journal->auditPayment($locked, 'voided', $before);
 
             return $locked->load('allocations');

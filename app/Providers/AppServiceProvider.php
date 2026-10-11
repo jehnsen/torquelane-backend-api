@@ -8,8 +8,12 @@ use App\Actions\Ledger\Ledger;
 use App\Database\EnsureSchemaExists;
 use App\Database\SchemaMacros;
 use App\Http\Errors\ApiExceptionRenderer;
+use App\Messaging\LogSmsGateway;
+use App\Messaging\SmsGateway;
+use App\Models\CrmSetting;
 use App\Models\User;
 use App\OpenApi\OpenApiConfiguration;
+use App\Policies\CrmPolicy;
 use App\Tenancy\TenantAwareUserProvider;
 use App\Tenancy\TenantManager;
 use Carbon\CarbonImmutable;
@@ -24,6 +28,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\Sanctum;
@@ -41,12 +46,18 @@ class AppServiceProvider extends ServiceProvider
 
         // One journal writer per request: the backfill marks the entries it makes through it.
         $this->app->scoped(Ledger::class);
+
+        // Until an SMS provider is chosen, text messages are written to the log (Phase 11).
+        $this->app->bind(SmsGateway::class, LogSmsGateway::class);
     }
 
     public function boot(): void
     {
         // Mutating a shared Carbon instance is a classic date bug; immutable everywhere.
         Date::use(CarbonImmutable::class);
+
+        // The CRM's records belong to the organization and share one policy; it is asked through its settings model.
+        Gate::policy(CrmSetting::class, CrmPolicy::class);
 
         Model::shouldBeStrict(! $this->app->isProduction());
 

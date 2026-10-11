@@ -27,6 +27,8 @@ final class Postings
             $facts instanceof StockFacts => StockPostings::move($facts),
             $facts instanceof TransferFacts => StockPostings::transfer($facts),
             $facts instanceof ReversalFacts => self::reversal($facts),
+            $facts instanceof PrepaidSaleFacts => self::prepaidSold($facts),
+            $facts instanceof PrepaidRedemptionFacts => self::prepaidRedeemed($facts),
             default => throw new InvalidArgumentException('No postings for '.$facts::class.'.'),
         };
     }
@@ -41,6 +43,46 @@ final class Postings
             PaymentMethod::Maya => RuleKey::ClearingMaya,
             PaymentMethod::Card => RuleKey::ClearingCard,
         };
+    }
+
+    /**
+     * A prepaid package sold: Dr the cash-side account of the method / Cr
+     * Unearned Revenue. Nothing is earned until a credit is used.
+     */
+    private static function prepaidSold(PrepaidSaleFacts $facts): JournalDraft
+    {
+        $memo = "Prepaid package {$facts->reference} — {$facts->customerName}";
+
+        return new JournalDraft(
+            LedgerEvent::PrepaidSold,
+            $facts->soldOn,
+            $facts->branchId,
+            $facts->packageId,
+            $facts->reference,
+            $memo,
+            [
+                PostingLine::debit(self::receivedInto($facts->method), $facts->priceCents, $facts->branchId, memo: $memo),
+                PostingLine::credit(RuleKey::UnearnedRevenue, $facts->priceCents, $facts->branchId, $facts->customerAccountId, memo: $memo),
+            ],
+            paymentMethod: $facts->method->value,
+        );
+    }
+
+    /** A prepaid credit used: Dr Unearned Revenue / Cr Sales – Detailing, for its share of the price. */
+    private static function prepaidRedeemed(PrepaidRedemptionFacts $facts): JournalDraft
+    {
+        return new JournalDraft(
+            LedgerEvent::PrepaidRedeemed,
+            $facts->redeemedOn,
+            $facts->branchId,
+            $facts->redemptionId,
+            $facts->reference,
+            $facts->memo,
+            [
+                PostingLine::debit(RuleKey::UnearnedRevenue, $facts->amountCents, $facts->branchId, $facts->customerAccountId, memo: $facts->memo),
+                PostingLine::credit(RuleKey::SalesDetailing, $facts->amountCents, $facts->branchId, $facts->customerAccountId, memo: $facts->memo),
+            ],
+        );
     }
 
     private static function paymentReceived(PaymentFacts $facts): JournalDraft

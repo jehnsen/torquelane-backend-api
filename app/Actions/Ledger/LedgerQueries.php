@@ -258,8 +258,9 @@ final class LedgerQueries
      */
     public function dailySales(string $from, string $to): array
     {
-        $invoiceEvents = [LedgerEvent::InvoiceIssued->value, LedgerEvent::InvoiceVoided->value];
-        $paymentEvents = [LedgerEvent::PaymentReceived->value, LedgerEvent::PaymentVoided->value];
+        // A prepaid credit used is revenue earned that day; a prepaid package sold is money taken.
+        $invoiceEvents = [LedgerEvent::InvoiceIssued->value, LedgerEvent::InvoiceVoided->value, LedgerEvent::PrepaidRedeemed->value];
+        $paymentEvents = [LedgerEvent::PaymentReceived->value, LedgerEvent::PaymentVoided->value, LedgerEvent::PrepaidSold->value];
         $outputVat = $this->rules->accountId($this->tenancy->require()->organizationId(), RuleKey::OutputVat);
 
         $sales = $this->lines()

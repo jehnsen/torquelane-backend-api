@@ -27,6 +27,12 @@ return [
     'api/v1/public/detailing/bookings/{token}' => ['public' => 'One booking\'s confirmation by its 160-bit token (only its SHA-256 is stored); its own reference, package and times (PublicAndDisplayTest).'],
     'api/v1/display/detailing/monitor' => ['public' => 'No session: a per-branch display token (X-Display-Token, revocable) is the credential, and it reads that branch\'s monitor only (PublicAndDisplayTest).'],
 
+    // Phase 11: what the links inside a CRM message open. The 40-character token in the link (only its SHA-256 is
+    // stored) is the credential, and it reaches that one message's own subject.
+    'api/v1/public/crm/reminders/{token}' => ['public' => 'A reminder\'s booking link by its token: the shop, the customer\'s first name as addressed, the vehicle it was about (CrmPublicLinksTest).'],
+    'api/v1/public/crm/feedback/{token}' => ['public' => 'A feedback link by its token: the shop and whether it was answered (CrmPublicLinksTest).'],
+    'api/v1/public/crm/unsubscribe/{token}' => ['public' => 'An unsubscribe link by its token: the shop and the kind of message (CrmPublicLinksTest).'],
+
     'api/v1/document-files/{document}' => ['public' => 'Signed 60-second URL issued after the document policy check; the signature is the credential (tested in DocumentTest).'],
 
     'api/v1/me' => $isolated,
@@ -159,4 +165,25 @@ return [
     'api/v1/equipment/options' => $isolated,
     'api/v1/equipment/profiles' => $isolated,
     'api/v1/equipment/{equipment}' => $isolated,
+
+    // Phase 11: the CRM. Staff-only, the organization's, behind the `crm` module.
+    'api/v1/crm/options' => $isolated,
+    'api/v1/crm/customers' => $isolated,
+    'api/v1/crm/customers/{customer_account}' => $isolated,
+    'api/v1/crm/customers/{customer_account}/benefits' => $isolated,
+    'api/v1/crm/tasks' => $isolated,
+    'api/v1/crm/leads' => $isolated,
+    'api/v1/crm/leads/{lead}' => $isolated,
+    'api/v1/crm/settings' => $isolated,
+    'api/v1/crm/templates' => $isolated,
+    'api/v1/crm/reminder-rules' => $isolated,
+    'api/v1/crm/messages' => $isolated,
+    'api/v1/crm/feedback' => $isolated,
+    'api/v1/crm/tiers' => $isolated,
+    'api/v1/crm/prepaid-plans' => $isolated,
+    'api/v1/crm/prepaid-packages' => $isolated,
+    'api/v1/crm/segments' => $isolated,
+    'api/v1/crm/segments/{segment}/members' => $isolated,
+    'api/v1/crm/campaigns' => $isolated,
+    'api/v1/crm/campaigns/{campaign}' => $isolated,
 ];

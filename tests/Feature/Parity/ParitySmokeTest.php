@@ -92,6 +92,20 @@ function parityPlaceholders(World $world, string $document): array
         'detailing_category' => $world->id('detailing:category:exterior'),
         'detailing_addon' => $world->id('detailing:addon:engine-bay'),
         'equipment' => $world->id('equipment:air-compressor'),
+        // Phase 11: the CRM's records are the organization's. Nothing is sold or enrolled in the seed, so a prepaid
+        // package and a membership are ids that match nothing (404), and so is a message token.
+        'lead' => $world->id('crm:lead:laguna-logistics'),
+        'task' => $world->id('crm:task:actimed'),
+        'note' => $world->id('crm:note:actimed'),
+        'template' => $world->id('crm:template:service-due'),
+        'tier' => $world->id('crm:tier:vip'),
+        'plan' => $world->id('crm:plan:wash-pass'),
+        'segment' => $world->id('crm:segment:companies'),
+        'campaign' => $world->id('crm:campaign:rainy-season'),
+        'prepaid_package' => '01j00000000000000000000000',
+        'membership' => '01j00000000000000000000001',
+        'kind' => 'pms_due',
+        'token' => str_repeat('a', 40),
     ]);
 }
 

@@ -16,8 +16,8 @@ use Tests\Golden\Support\WebFixtures;
 
 /** Grants the API adds to ported roles (capabilities that do not exist in ../web). */
 const API_GRANTS_ON_PORTED_ROLES = [
-    'provider_admin' => ['customer:manage', 'organization:manage', 'inventory:view', 'inventory:manage', 'billing:view', 'billing:manage', 'billing:void', 'ledger:view', 'ledger:manage', 'detailing:view', 'detailing:book', 'detailing:work', 'detailing:qc', 'detailing:manage', 'equipment:view', 'equipment:manage'],
-    'service_advisor' => ['customer:manage', 'inventory:view', 'billing:view', 'billing:manage', 'detailing:view', 'detailing:book', 'detailing:work', 'detailing:qc', 'equipment:view'],
+    'provider_admin' => ['customer:manage', 'organization:manage', 'inventory:view', 'inventory:manage', 'billing:view', 'billing:manage', 'billing:void', 'ledger:view', 'ledger:manage', 'detailing:view', 'detailing:book', 'detailing:work', 'detailing:qc', 'detailing:manage', 'equipment:view', 'equipment:manage', 'crm:view', 'crm:work', 'crm:manage'],
+    'service_advisor' => ['customer:manage', 'inventory:view', 'billing:view', 'billing:manage', 'detailing:view', 'detailing:book', 'detailing:work', 'detailing:qc', 'equipment:view', 'crm:view', 'crm:work'],
     // Phase 9: a technician sees detailing and works its job cards.
     'provider_technician' => ['inventory:view', 'detailing:view', 'detailing:work', 'equipment:view'],
     'fleet_manager' => ['customer:manage', 'billing:view'],
@@ -98,7 +98,7 @@ it('adds only the documented capabilities and roles', function () {
     $constants = rbacConstants();
 
     $added = array_values(array_diff(array_map(fn (Capability $c): string => $c->value, Capability::cases()), $constants['ALL_CAPABILITIES']));
-    expect($added)->toBe(['customer:manage', 'organization:manage', 'inventory:view', 'inventory:manage', 'billing:view', 'billing:manage', 'billing:void', 'ledger:view', 'ledger:manage', 'detailing:view', 'detailing:book', 'detailing:work', 'detailing:qc', 'detailing:manage', 'equipment:view', 'equipment:manage'])
+    expect($added)->toBe(['customer:manage', 'organization:manage', 'inventory:view', 'inventory:manage', 'billing:view', 'billing:manage', 'billing:void', 'ledger:view', 'ledger:manage', 'detailing:view', 'detailing:book', 'detailing:work', 'detailing:qc', 'detailing:manage', 'equipment:view', 'equipment:manage', 'crm:view', 'crm:work', 'crm:manage'])
         ->and(array_values(array_map(fn (Capability $c): string => $c->value, array_filter(Capability::cases(), fn (Capability $c): bool => $c->isApiOnly()))))->toBe($added);
 
     $newRoles = array_values(array_diff(array_map(fn (Role $r): string => $r->value, Role::cases()), array_keys($constants['ROLE_LABEL'])));

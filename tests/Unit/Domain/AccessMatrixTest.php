@@ -27,7 +27,7 @@ it('lets only the organization admin change the books, and a branch manager read
 });
 
 it('gives the cashier customer:manage, a view of the stock room, and the counter\'s billing until the POS module arrives', function () {
-    expect(AccessMatrix::capabilitiesOf(Role::Cashier))->toBe([Capability::CustomerManage, Capability::InventoryView, Capability::BillingView, Capability::BillingManage, Capability::DetailingView, Capability::DetailingBook, Capability::EquipmentView]);
+    expect(AccessMatrix::capabilitiesOf(Role::Cashier))->toBe([Capability::CustomerManage, Capability::InventoryView, Capability::BillingView, Capability::BillingManage, Capability::DetailingView, Capability::DetailingBook, Capability::EquipmentView, Capability::CrmView, Capability::CrmWork]);
 });
 
 it('lets only managers void money, and gives the portal a view of its own billing only', function () {
@@ -94,5 +94,6 @@ it('lets every staff role see the equipment monitor, managers run it, and no por
     $holders = fn (Capability $c): array => array_values(array_filter(Role::cases(), fn (Role $r): bool => AccessMatrix::can($r, $c)));
 
     expect($holders(Capability::EquipmentView))->toBe(Role::staff())
-        ->and($holders(Capability::EquipmentManage))->toBe([Role::ProviderAdmin, Role::BranchManager]);
+        ->and($holders(Capability::EquipmentManage))->toBe([Role::ProviderAdmin, Role::BranchManager])
+        ->and($holders(Capability::CrmManage))->toBe([Role::ProviderAdmin, Role::BranchManager]);
 });

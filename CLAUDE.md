@@ -1388,6 +1388,158 @@ which is due soon and so raises the demo's one equipment alert. Rows in new
 tables only; nothing is issued from stock and nothing posts: no earlier
 phase's figure moves.
 
+## CRM (Phase 11)
+
+The `crm` module: staff-only, and the ORGANIZATION's (a customer is served by
+every branch, so no CRM record is held to the branches a member of staff is
+pinned to). `CrmPolicy` (asked through `CrmSetting`): side, module 403
+`module_disabled`, capability; a customer's own record checks scope first (an
+account the caller cannot reach is 404).
+
+The brief began at item 2. Item 1 was taken to be the messaging foundation the
+other items stand on (templates, the message log, opt-out, quiet hours).
+
+### Tables (Phase 11)
+
+| Table | Notes |
+|---|---|
+| `crm_settings` | One per organization: quiet hours (minutes of the Manila day; may wrap midnight), `reminder_cooldown_days`, `lapsed_after_days`, `campaign_hourly_limit`, `feedback_enabled`, `loyalty_enabled`, `loyalty_cents_per_point`. Made with defaults on first read. |
+| `message_templates` | Name (unique per organization, any case), `channel` (`email`/`sms`), `purpose` (`service_reminder`/`marketing`/`feedback`/`transactional`), subject, body with `{{placeholders}}`. |
+| `reminder_rules` | One per kind (`pms_due`, `document_expiry`, `detailing_repeat`, `lapsed_customer`): enabled, a service-reminder template, `lead_days` (documents only). |
+| `messages` | THE message log. One row per message decided on: recipient, channel, purpose, rendered subject and body, `status` (`queued`/`sent`/`failed`/`skipped`), `skip_reason`, what produced it (`source_type` + `source_id`) and what it is about (`subject_type` + `subject_id`), `dedupe_key` + `dedupe_on` (unique per day unless skipped), `token_hash` (SHA-256 of the token in its link), `send_after`, `responded_at`. |
+| `message_suppressions` | An address that opted out of a channel (unique per organization and channel). |
+| `crm_notes` | A note on a customer account (optionally about one of its vehicles); may be pinned. |
+| `crm_tasks` | A follow-up about a customer or a lead (CHECK: at least one): kind, assignee, `due_on`, `remind_at` / `reminded_at`, status. A reminder's booking request is a task of kind `booking_request` with `source_message_id`. |
+| `crm_leads` | The B2B pipeline: company, contact, `stage` (`new`, `contacted`, `site_visit`, `quote_sent`, `negotiating`, `won`, `lost`), `value_cents`, owner, next step and date, `is_dealer`, `lost_reason`, `customer_account_id` (CHECK: set when won; unique). |
+| `feedback_requests` | A 0–10 score asked for once per invoice (unique), about the job it billed (`work_order_id` or `detailing_booking_id`) and the customer; `token_hash`, `score`, `comment`. |
+| `crm_segments` | A saved definition (`filters` jsonb, `SegmentFilter`); membership is worked out on read. |
+| `crm_campaigns` | A segment + a marketing template + when: `draft` → `scheduled` → `sending` → `sent` (or `cancelled`); `hourly_limit`; `audience` (the account ids fixed as sending began). Its recipients are rows of `messages`. |
+| `membership_tiers` / `memberships` | A tier: `discount_pct`, `priority_booking`, `free_addon_ids` (detailing add-ons), perks. A customer holds at most one active membership (partial unique index). |
+| `prepaid_plans` / `prepaid_packages` | A plan: so many credits for a price, for one detailing package or any. A package sold snapshots the plan, is numbered from the `prepaid_package` series (`PP-`), and counts `credits_used` (CHECK ≤ `credits_total`). |
+| `prepaid_redemptions` | **Append-only.** One credit used for one detailing booking (unique), with the share of the price it earned. |
+| `loyalty_entries` | **Append-only** points ledger: signed `points`, `reason` (`earned`, `reversed`, `redeemed`, `adjusted`), `payment_id` (a payment earns once). Balance = sum. |
+
+Also: `detailing_packages.repeat_interval_days` (how often a package is due
+again).
+
+### Messaging: one gate, one log
+
+`Messenger::queue` is the ONLY writer of `messages`. Every reminder, campaign
+message and feedback request goes through it, and through the pure
+`ReminderGate`, in this order of refusal: no address (`no_address`); the
+purpose's consent is not on record (`no_consent`: `service_reminder` and
+`feedback` need `service_reminders`, `marketing` needs `marketing`,
+`transactional` needs none; a contact's own decision wins over the account's);
+the address opted out (`opted_out`); the same dedupe key was sent within the
+cooldown (`recently_sent`). **Quiet hours never refuse**: they set
+`send_after` to when the window ends (Asia/Manila).
+
+- A message that may not go is still logged, as `skipped` with its reason,
+  once per cooldown (a daily run does not repeat the row).
+- A queued message is handed to `SendMessage` after commit when it may go now;
+  one being held is picked up by `crm:run deliver` (every minute), which also
+  re-checks the suppression list at send time.
+- The recipient is the account's primary contact who takes reminders (any
+  contact, for marketing) with an address on the channel, else the account's
+  own email / mobile.
+- Each sent message carries one 40-character token (only its SHA-256 is
+  stored) that opens its public links: `/r/{token}` (a reminder's booking
+  link), `/feedback/{token}`, `/unsubscribe/{token}`. Unsubscribing suppresses
+  the address AND appends a withdrawn consent to the ledger.
+- Email goes through `CrmMessageMail`. SMS goes to `App\Messaging\SmsGateway`,
+  bound to `LogSmsGateway` (it writes to the log): no provider is chosen yet.
+
+### Service reminders
+
+`crm:run reminders` (daily 09:00 Manila; also `POST /crm/reminders/run`) runs
+`BuildReminders` once per organization with the module on, AS that
+organization (`CrmContexts`: its first active provider admin's tenant context,
+so reads stay inside the tenant scope). It gathers facts and hands them to the
+pure `Reminders\CandidateBuilder`:
+
+- **Maintenance due** (`pms_due`): ONE candidate per vehicle with any item in
+  the maintenance engine's due-soon or overdue band (`FleetQueries::fleetHealth`),
+  naming its items most urgent first. Dedupe key `pms_due:<vehicle>`.
+- **Document expiring**: within the rule's `lead_days`, and up to 30 days
+  after it lapsed.
+- **Detailing due again**: the last completed job of a package with a
+  `repeat_interval_days`, that long ago or more, with nothing booked ahead; one
+  per vehicle (the package longest overdue).
+- **Lapsed customer**: served before, not for `lapsed_after_days`, nothing
+  ahead, and no other reminder going to them in this run.
+
+A reminder's link opens the branch's online booking page where the message
+names a detailing branch with public booking on; otherwise a request form
+that leaves a `booking_request` task for the staff (once per reminder).
+
+### Customer 360
+
+`GET /crm/customers/{account}` (`Customer360`): vehicles, work orders,
+invoices and balance, payments and detailing bookings at EVERY branch,
+current consents, notes, tasks, messages, feedback, membership, prepaid
+packages, points, and a timeline. **The timeline is built on read**
+(`Timeline::merge` over those same records, newest first, capped at 150):
+nothing is copied into a feed.
+
+### Memberships, prepaid packages, points
+
+- A membership's tier takes its percentage off each line of a DETAILING
+  invoice and its free add-ons off in full (`ManageInvoices::fromBooking` asks
+  `ManageLoyalty::benefitsOf`; per line, rounded half up; the invoice totals).
+  Priority booking is shown, not enforced by the booking engine.
+- **A prepaid package is money.** Sale: Dr the cash-side account of the
+  payment method / Cr Unearned Revenue (`LedgerEvent::PrepaidSold`), in the
+  sale's transaction. Redemption of one credit for a finished, signed-off
+  booking: Dr Unearned Revenue / Cr Sales – Detailing
+  (`LedgerEvent::PrepaidRedeemed`) for `Prepaid::redemptionCents`, which
+  shares the price cumulatively so a package's redemptions add up to its price
+  to the centavo. A redeemed booking is settled: it cannot be invoiced or
+  re-opened (`next.can_redeem`, `prepaid` on the booking).
+- Loyalty points are optional (`loyalty_enabled`): `CrmOnPaymentReceived`
+  (queued, after commit) earns whole points per `loyalty_cents_per_point`
+  paid; voiding the payment reverses them in the void's transaction; staff
+  spend or correct them (`adjust`, never below zero).
+
+### Pipeline, feedback, segments, campaigns
+
+- A lead moves freely between the five open stages, to `lost` with a reason,
+  and back; `won` is reached only by `convertLead`, which opens a company
+  account (terms, credit limit, approval overrides, the `dealer` tag when the
+  lead was one, consent recorded with its channel) and moves the lead's tasks
+  to it.
+- Feedback: when a payment pays an invoice off in full, the customer is asked
+  once (`ManageFeedback::requestFor`, through the Messenger, so consent-checked).
+  `Nps::summarize` scores promoters (9–10) less detractors (0–6).
+- A segment's filters AND together; a list matches any of its values
+  (`SegmentFilter`: spend, last visit, make, size class, tier, branch, account
+  type, tag). Only active accounts are ever members.
+- A campaign sends one MARKETING template to a segment. `crm:run campaigns`
+  (every five minutes) fixes the audience as sending begins and advances it by
+  the hourly limit; skips do not use the allowance; every recipient is a
+  `messages` row (sent, or skipped with the reason).
+
+### Capabilities and endpoints (Phase 11)
+
+`crm:view` and `crm:work` for provider_admin, branch_manager, service_advisor
+and cashier; `crm:manage` for provider_admin and branch_manager; never the
+technician or a portal role. Under `/crm`: `options`, `customers` (+
+`{account}`, `/benefits`, `/notes`, `/membership`, `/points`), `tasks` (+
+`/status`), `leads` (+ `/stage`, `/convert`), `settings`, `templates`,
+`reminder-rules/{kind}`, `reminders/run`, `messages`, `feedback`, `tiers`,
+`prepaid-plans`, `prepaid-packages` (+ `/redeem`), `segments` (+ `/preview`,
+`/members`), `campaigns` (+ `/status`). Public, by token:
+`/public/crm/reminders/{token}` (+ `/book`), `/public/crm/feedback/{token}`,
+`/public/crm/unsubscribe/{token}`.
+
+### Demo data (Phase 11)
+
+`CrmSeed`: settings, six templates and the four rules (all on), tiers VIP (10%,
+priority; the source's VIP perks) and Fleet Partner (5%), the Wash Pass plan
+(5 × The Essential, ₱5,000, 180 days; The Essential repeats every 14 days),
+three leads, a pinned note and a task on Actimed, two segments and a draft
+campaign. **It sends nothing, sells nothing and enrols nobody**, so no earlier
+phase's figure moves. The `crm` module is on for both branches.
+
 ## Rules that bite
 
 - **Tests use `RefreshApiDatabase`, never `DatabaseTruncation`.** The
@@ -1687,6 +1839,34 @@ phase's figure moves.
 - **A JSON response writes `3.0` as `3`.** A feature test comparing a float
   read back from the API uses `toEqual`, not `toBe`.
 
+- **Only `Messenger::queue` writes `messages`.** A new kind of outbound
+  message is a new caller of it, never a direct insert or a direct `Mail::`:
+  that is the one place consent, opt-out, the cooldown and quiet hours are
+  held.
+- **Store an instant in UTC.** Eloquent writes a zoned date as its wall-clock
+  time (the connection's format has no offset), so an instant given with
+  `+08:00` and saved as it is lands eight hours off. Parse request instants
+  with `CarbonImmutable::parse(...)->utc()` before `forceFill` (this bit
+  `send_after`, a campaign's `scheduled_at`, a task's `remind_at`, and Phase
+  10's `used_at` / `performed_at`).
+- **Scheduled CRM work runs AS the organization** (`CrmContexts::as`), not in a
+  bare system context: inside `system()` the tenant scope is lifted and a
+  query without an explicit organization filter reads every tenant.
+- **The CRM crosses branches on purpose, never organizations.** Customer 360
+  shows a branch-pinned member of staff the customer's records at every branch.
+  Do not add `visibleTo` to its queries, and do not reuse them for a
+  branch-scoped screen.
+- **A prepaid sale and a redemption each post once** (`journal_entries` is
+  unique on event + source): the package id for the sale, the redemption id for
+  the credit. Unearned Revenue must equal the sum of `Prepaid::unearnedCents`
+  over the packages; `GET /crm/prepaid-packages` returns that sum.
+- **VAT is not split on prepaid packages.** The brief's postings are Dr Cash /
+  Cr Unearned and Dr Unearned / Cr Sales, gross; no Output VAT line and no
+  invoice is raised for a redeemed job. Review before a VAT-registered branch
+  sells them for real.
+- **`repeat_interval_days` drives a reminder, nothing else.** It does not book
+  anything (recurring schedules are still stored preferences only).
+
 ## Running it
 
 Prerequisites: PHP 8.4 with `pdo_pgsql` (plus `mbstring`, `intl`, `bcmath`,
@@ -1775,7 +1955,7 @@ audit rows). Fill in the rest from the phase plan.
 - [x] **8**: General ledger (chart of accounts, posting rules, balanced append-only journal posted in the event's transaction, monthly periods and the close checklist, reports, journal export, backfill)
 - [x] **9**: Detailing (the Samahuzai app ported as the `detailing` module: per-branch menu priced per size, the booking engine with its source characterization, job card, inspection with damage map and photos, materials consumed from stock, booking → invoice and counter checkout, after-commit broadcast with display tokens, public booking)
 - [x] **10**: Equipment monitoring on the Phase 2 maintenance engine (the source's detailing-equipment register and monitor as the `equipment` module: tools, usage and service logs, package profiles; derived meters; the source's formulas with their characterization; parts from stock on a service entry, posted to Equipment Repairs & Maintenance; equipment alerts on `GET /alerts`).
-- [ ] **11**: *(title not provided)*
+- [x] **11**: CRM (the `crm` module: messaging with one consent / opt-out / cooldown / quiet-hours gate and a full message log; Customer 360 with a timeline built on read; notes and tasks; service reminders from the maintenance engine, detailing repeat intervals, document expiries and lapsed customers; memberships, prepaid packages posted through Unearned Revenue, optional loyalty points; the B2B pipeline with conversion to a company account; post-payment feedback; segments and campaigns).
 - [ ] **12**: *(title not provided)*
 - [ ] **13**: *(title not provided)*
 - [ ] **14**: *(title not provided)*
@@ -1965,3 +2145,32 @@ and rated life, not "down for repair"; a purchase date anchors the days limit
 at its UTC midnight, as the source did; the source's 10 open hours a day for
 utilisation is kept although the booking grid here opens at 8:00; the "usage
 hours per job" flat rate the source retired is not carried over.
+
+Phase 11 status: done locally (gates green: Pest 1,445 tests, Larastan max,
+Pint, `openapi.json` regenerated; isolation and parity suites pass). Not done: the screens were
+type-checked, linted and built but not driven in a browser; no Playwright
+coverage; no SMS provider is bound (SMS is written to the log). **The brief
+arrived without its item 1**; it was taken to be the messaging foundation
+(templates, message log, opt-out, quiet hours), for review. Decisions taken
+here, for review: CRM records are the organization's and are not held to a
+member of staff's branches, and Customer 360 shows every branch's jobs,
+invoices, payments and bookings to anyone with `crm:view`; `crm:view` and
+`crm:work` for provider admin, branch manager, service advisor and cashier,
+`crm:manage` for provider admin and branch manager; one reminder per VEHICLE
+(not per due item), and a lapsed-customer reminder only when nothing else is
+going to that customer; a reminder's booking link opens the branch's online
+booking page where one applies and otherwise leaves a booking request on the
+staff's task list (there is no public booking for repair work to link to);
+feedback needs the `service_reminders` consent (the ledger has no purpose of
+its own for it); unsubscribing both suppresses the address and withdraws the
+consent; a refused message is logged once per cooldown; campaigns fix their
+audience when sending begins; a membership discount applies to detailing
+invoices only and priority booking is displayed, not enforced; a prepaid
+credit pays for one whole detailing job (its add-ons included) and settles it
+without an invoice; prepaid postings are gross with no VAT line, as the brief
+gave them; a voided payment takes back the points it earned even if they were
+spent (the balance can go negative); the espresso-style "coffee" perk of the
+source's VIP is a line of text on the tier, not an add-on; dealers are the
+`dealer` tag on the account, and "reconditioning batches" have no document of
+their own yet. Also fixed here: Phase 10 stored a usage or service time given
+with an offset eight hours off (see "Store an instant in UTC").

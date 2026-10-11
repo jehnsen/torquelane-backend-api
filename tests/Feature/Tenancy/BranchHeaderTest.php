@@ -21,7 +21,7 @@ it('selects an allowed branch named in X-Branch-Id', function () {
 
     me($repair)->assertOk()
         ->assertJsonPath('data.branches.selected', $repair)
-        ->assertJsonPath('data.modules.active', ['repair_pms']);
+        ->assertJsonPath('data.modules.active', ['repair_pms', 'crm']);
 });
 
 it('accepts "all" for multi-branch staff', function () {

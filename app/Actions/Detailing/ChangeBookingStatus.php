@@ -56,6 +56,9 @@ final class ChangeBookingStatus
             if ($to !== BookingStatus::Completed && $locked->load('invoiceLinks')->standingInvoiceLink() !== null) {
                 throw new InvalidTransitionException("{$locked->reference} is on an invoice; void the invoice before changing the booking.");
             }
+            if ($to !== BookingStatus::Completed && $locked->prepaidRedemption()->exists()) {
+                throw new InvalidTransitionException("{$locked->reference} was settled with a prepaid credit; it stays completed.");
+            }
             if ($to === BookingStatus::OnGoing) {
                 $this->requireInspection($locked, $inspectionOverride);
             }

@@ -58,7 +58,7 @@ enum RuleKey: string
             self::GoodsReceivedClearing => 'Goods received, not yet billed',
             self::OutputVat => 'VAT charged on sales',
             self::CustomerDeposits => 'Customer payments not yet applied',
-            self::UnearnedRevenue => 'Billed ahead of the work',
+            self::UnearnedRevenue => 'Paid ahead of the work (prepaid packages)',
             self::OpeningBalanceEquity => 'Opening stock balances',
             self::SalesLabour => 'Labour sales',
             self::SalesParts => 'Parts sales',
