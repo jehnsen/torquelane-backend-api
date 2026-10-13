@@ -24,6 +24,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $debit_cents
  * @property int $credit_cents
  * @property string|null $customer_account_id
+ * @property string|null $vendor_id
  * @property string|null $stock_move_id
  * @property string $memo
  * @property CarbonImmutable $created_at

@@ -5,12 +5,17 @@ declare(strict_types=1);
 namespace App\Actions\Crm;
 
 use App\Actions\Audit\AuditTrail;
+use App\Actions\Billing\InvoiceParties;
 use App\Actions\Ledger\Ledger;
 use App\Actions\Numbering\DocumentNumbers;
 use App\Domain\Crm\Loyalty;
 use App\Domain\Crm\MembershipBenefits;
 use App\Domain\Crm\Prepaid;
 use App\Domain\Detailing\BookingStatus;
+use App\Domain\Invoicing\InvoiceLineDraft;
+use App\Domain\Invoicing\InvoiceLineKind;
+use App\Domain\Invoicing\Invoicing;
+use App\Domain\Invoicing\VatTreatment;
 use App\Domain\Ledger\Postings\Postings;
 use App\Domain\Ledger\Postings\PrepaidRedemptionFacts;
 use App\Domain\Ledger\Postings\PrepaidSaleFacts;
@@ -43,10 +48,12 @@ use Illuminate\Validation\ValidationException;
  *
  * **Prepaid packages are money.** A sale takes the price in and owes it as
  * service: Dr the cash-side account of the payment method / Cr Unearned
- * Revenue, posted in the sale's transaction. Each credit redeemed earns its
- * share (`Prepaid::redemptionCents`): Dr Unearned Revenue / Cr Sales –
- * Detailing. A package's redemptions add up to its price, to the centavo, so
- * Unearned Revenue always equals what is still owed. Redemptions are
+ * Revenue, posted in the sale's transaction. The price is VAT-inclusive: a
+ * VAT-registered branch credits Output VAT for the VAT inside it there and
+ * then (Phase 12), and Unearned Revenue for the rest. Each credit redeemed
+ * earns its share of that net (`Prepaid::redemptionCents`): Dr Unearned
+ * Revenue / Cr Sales – Detailing. A package's redemptions add up to its net
+ * price, to the centavo, so Unearned Revenue always equals what is still owed. Redemptions are
  * append-only (R7); the package's reference is numbered in its transaction
  * (R8).
  */
@@ -58,6 +65,7 @@ final class ManageLoyalty
         private readonly DocumentNumbers $numbers,
         private readonly Ledger $ledger,
         private readonly CrmSettings $settings,
+        private readonly InvoiceParties $parties,
     ) {}
 
     /* ------------------------------------------------------------ memberships */
@@ -205,6 +213,9 @@ final class ManageLoyalty
             $now = CarbonImmutable::now();
             $today = Calendar::toDate($now);
             $actor = $this->actor();
+            // A package is sold VAT-inclusive: a VAT-registered branch owes the VAT inside the price when it is sold.
+            $vat = $this->parties->vat($branch, $account);
+            $vatCents = $vat->vatRegistered ? Invoicing::totals([new InvoiceLineDraft(InvoiceLineKind::Manual, $plan->name, '1', $plan->price_cents)], new VatTreatment(true, true, $vat->vatRatePct))->vatAmountCents : 0;
 
             $package = new PrepaidPackage;
             $package->forceFill([
@@ -215,6 +226,8 @@ final class ManageLoyalty
                 'reference' => $this->numbers->issue($account->organization_id, null, DocumentType::PrepaidPackage, $now)->formatted,
                 'plan_name' => $plan->name,
                 'price_cents' => $plan->price_cents,
+                'vat_cents' => $vatCents,
+                'vat_rate_pct' => $vat->vatRegistered ? $vat->vatRatePct : '0',
                 'credits_total' => $plan->credits,
                 'detailing_package_id' => $plan->detailing_package_id,
                 'sold_on' => $today,
@@ -226,7 +239,7 @@ final class ManageLoyalty
             ])->save();
 
             $this->ledger->post($account->organization_id, Postings::postingsFor(new PrepaidSaleFacts(
-                $package->id, $package->reference, $branch->id, $account->id, $account->display_name, $today, $package->price_cents, $method,
+                $package->id, $package->reference, $branch->id, $account->id, $account->display_name, $today, $package->price_cents, $method, $vatCents,
             )));
             $this->audit->record($package, 'sold', null, AuditTrail::snapshot($package));
 
@@ -265,7 +278,8 @@ final class ManageLoyalty
                 throw $refuse("{$job->reference} is already settled.", 'already_settled');
             }
 
-            $amount = Prepaid::redemptionCents($locked->price_cents, $locked->credits_total, $locked->credits_used, 1);
+            // What a credit earns is its share of the price BEFORE VAT: the VAT was charged when the package was sold.
+            $amount = Prepaid::redemptionCents($locked->netPriceCents(), $locked->credits_total, $locked->credits_used, 1);
             $redemption = new PrepaidRedemption;
             $redemption->forceFill([
                 'organization_id' => $locked->organization_id,

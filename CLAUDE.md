@@ -312,7 +312,9 @@ from rbac.json). API additions:
 | `billing:manage` (raise, edit, issue invoices; record and allocate payments) — Phase 7 | provider_admin, branch_manager, service_advisor, cashier |
 | `billing:void` (void invoices and payments) — Phase 7 | provider_admin, branch_manager |
 | `ledger:view` (the chart, the journal, the periods and the accounting reports, within the caller's branches) — Phase 8 | provider_admin, branch_manager |
-| `ledger:manage` (edit the chart, the posting rules and the export mappings; close months) — Phase 8 | provider_admin |
+| `ledger:manage` (edit the chart, the posting rules and the export mappings; close months; post vouchers, reconcile banks, close years) — Phase 8, 12 | provider_admin |
+| `payables:view` (vendor bills, payments to vendors, payables aging, within the caller's branches) — Phase 12 | provider_admin, branch_manager |
+| `payables:manage` (record and void vendor bills and payments to vendors) — Phase 12 | provider_admin, branch_manager |
 
 | Role (new, staff) | Grants |
 |---|---|
@@ -832,7 +834,7 @@ in every branch. Staff with `billing:view` read the branches they work in;
 `billing:manage` raises and issues invoices and records payments;
 `billing:void` voids. A portal user with `billing:view` sees their own
 account's ISSUED invoices (never a draft), its payments, balance and
-statement, and prints them; nothing else.
+statement; nothing else. (The frontend prints them from that JSON.)
 
 ### Tables (Phase 7)
 
@@ -911,7 +913,7 @@ allocations of its payments that still stand.
   (issued by then, not voided by then, less allocations dated by then from
   payments not voided by then) in current / 1–30 / 31–60 / 61–90 / over 90
   days past due (`Aging`), with each account's unallocated credit.
-- `GET /customer-accounts/{id}/statement?from=&to=` (+ `/pdf`): balance
+- `GET /customer-accounts/{id}/statement?from=&to=`: balance
   brought forward, then each invoice (charge), payment (credit) and void (its
   reversal, on the day it was voided) with the running balance (`Statement`).
 - `GET /customer-accounts/{id}/balance`: outstanding, overdue, credit, the
@@ -928,11 +930,16 @@ allocations of its payments that still stand.
 
 ### Documents and events
 
-- PDFs (`App\Documents\BillingPdf`, dompdf, Blade in `resources/views/pdf`,
-  remote resources off): the invoice (a draft prints as not issued, a void one
-  stamped), the payment's ACKNOWLEDGMENT RECEIPT (says it is not an invoice and
-  not valid for input tax) and the statement of account. Behind the same
-  policies as the records. No document or screen claims BIR accreditation;
+- **The API prints nothing** (the PDF endpoints, `BillingPdf`, its Blade
+  templates and dompdf were removed in Phase 12: the frontend renders every
+  document). What a printed copy carries is data: an invoice's `seller` (with
+  `tin_printed`, the TIN and branch code as BIR documents print them, and the
+  branch's `header` / `footer`), `buyer`, `totals` and `non_vat_notice`; a
+  payment's `seller`, `buyer` and `notices` (its acknowledgment receipt says
+  it is not an invoice and not valid for input tax); a statement's `seller`
+  and `notices`. The parties and the wording are the API's
+  (`InvoiceParties`, `Invoicing::NOT_AN_INVOICE` / `NON_VAT_NOTICE`), the
+  layout the frontend's (R2). No document or screen claims BIR accreditation;
   permit and series wording comes from the branch's own header / footer.
 - `invoice.issued`, `invoice.voided`, `payment.received`
   (`App\Events\*`, `ShouldDispatchAfterCommit`): announced only once the
@@ -942,9 +949,10 @@ allocations of its payments that still stand.
 ### Endpoints (Phase 7)
 
 `GET /billing/queue`; `/invoices` (+ `PATCH`, `DELETE` a draft, `/issue`,
-`/void`, `/pdf`); `/payments` (+ `/allocations`, `/void`, `/pdf`);
+`/void`); `/payments` (+ `/allocations`, `/void`);
 `/receivables/aging`, `/receivables/revenue`;
-`/customer-accounts/{id}/balance`, `/statement`, `/statement/pdf`.
+`/customer-accounts/{id}/balance`, `/statement`. (Phase 7's three `/pdf`
+endpoints were removed in Phase 12.)
 `POST /invoices` and `POST /payments/{id}/allocations` take an optional
 Idempotency-Key; `/invoices/{id}/issue` and `POST /payments` require one.
 
@@ -1050,9 +1058,12 @@ entry and appends it.
   (2) open invoices (the AR subledger) = the Accounts Receivable account;
   (3) the stock room's valuation (replayed through `StockLedger` for a past date)
   = Inventory; (4) unapplied payments = Customer Deposits; (5) debits = credits.
+  Phase 12 adds two (open vendor bills = Accounts Payable; unbilled goods
+  receipts = GR/IR Clearing) and counts credit notes, withholding and refunds
+  in (2) and (4).
   `POST /ledger/periods/close` needs the month over, every earlier month with
-  entries closed, all five passing, `ledger:manage`, and a session that is not
-  branch-limited. Closing is final (no reopen).
+  entries closed, every check passing, `ledger:manage`, and a session that is
+  not branch-limited. Closing is final (no reopen).
 
 ### Reports (`LedgerQueries`, over the caller's branches; a report with no branch picked and none pinned is the consolidated one)
 
@@ -1540,6 +1551,215 @@ three leads, a pinned note and a task on Actimed, two segments and a draft
 campaign. **It sends nothing, sells nothing and enrols nobody**, so no earlier
 phase's figure moves. The `crm` module is on for both branches.
 
+## Payables, credits, tax and the close (Phase 12)
+
+TODO: confirm the ATC list (`App\Domain\Tax\Atc`) and every tax layout (`App\Actions\Tax\TaxQueries`: 2550Q figures, SLS / SLP, 1601-EQ's QAP, SAWT, 2307) with the accountant against the current BIR forms before go-live.
+
+What an accountant needs beyond order-to-cash and the journal: what vendors
+bill and are paid (accounts payable, input VAT, expanded withholding), the
+ways an issued invoice is settled other than by money (credit notes,
+creditable withholding) and money going back (refunds), journal vouchers, bank
+reconciliation, the year-end close, the tax working papers, and VAT on prepaid
+packages. API only: no screen exists yet. Every document here posts in its
+own transaction (R3) and is immutable once made (R7): corrected by a void,
+never an edit.
+
+### Tables (Phase 12)
+
+| Table | Notes |
+|---|---|
+| `vendors` (altered) | `registered_name`, `tin`, `address`, `is_vat_registered` (default true), `payment_terms_days`, `default_atc_code` + `default_withholding_rate_pct` (both or neither, CHECKed): what a bill, a 2307 and the purchases list print, and what the shop usually withholds. |
+| `vendor_bills` | Branch + vendor (composite FKs); `number` (`VB-YYYY-NNNN` from the `vendor_bill` series at creation); `status` `posted`/`partially_paid`/`paid`/`void`; `vendor_invoice_no` (unique per vendor among standing bills, any case); `bill_date`, `due_date`; vendor snapshot (name, TIN, address, VAT registration); `prices_include_vat`, `vat_rate_pct`; totals `vatable_purchases_cents`, `vat_exempt_purchases_cents`, `zero_rated_purchases_cents`, `non_vat_purchases_cents`, `input_vat_cents`, `total_cents`; `atc_code`, `withholding_rate_pct`, `withholding_base_cents`, `withholding_cents`; `payable_cents` (= total − withholding, CHECKed); `paid_cents`. Trigger: only status, `paid_cents` and the void stamp move; a void bill is final; never deleted. |
+| `vendor_bill_lines` | **Append-only.** `kind` `goods` (names a `goods_receipt_line_id`) or `expense` (names an `account_id`); quantity, `unit_cost_cents`, `tax_class`, `line_total_cents` (CHECK = round(qty × cost)), `net_cents` (its share of the bill net of VAT: what it debits), `received_value_cents` (a stocked goods line: what its receipt credited GR/IR with). Trigger: a receipt line is on at most ONE standing bill, and only while its receipt stands. |
+| `vendor_payments`, `vendor_payment_allocations` | The cash-out voucher (`PV-YYYY-NNNN`, series `vendor_payment`): method (all but cash carry a reference), amount, `paid_on`; never edited, voided once. Allocations are **append-only**, to bills of the SAME vendor (composite FKs), never past the payment (trigger). Deferred triggers check at COMMIT that a bill's `paid_cents` is what its standing payments allocate. |
+| `journal_lines` (altered) | `vendor_id`: the payables subledger key, beside `customer_account_id`. |
+| `invoices` (altered) | `credited_cents`, `withheld_cents`. CHECKs rewritten: paid + credited + withheld ≤ total, and the status follows their sum. `invoice_settlement_holds` now checks all three at COMMIT. |
+| `credit_notes`, `credit_note_lines` | Against ONE issued invoice of the same account (composite FK); `CN-YYYY-NNNN` (series `credit_note`) at issue; the invoice's VAT treatment repeated; totals by VAT category; `applied_cents` (came off the invoice) + `credit_cents` (became the customer's credit) = `total_cents` (CHECK). Voided once, never edited; lines append-only. |
+| `refunds` | `RF-YYYY-NNNN` (series `refund`); method, amount, `refunded_on`, reason; exactly one source, `payment_id` or `credit_note_id` (CHECK). Trigger: never more than the source still holds. Voided once. |
+| `withholding_certificates` | A 2307 received: invoice (same account, composite FK), `atc_code`, `rate_pct`, `tax_base_cents`, `amount_cents`, `received_on`, the period it covers, `certificate_no`. Posted, voided once. |
+| `manual_journals` | The document behind a typed-in entry: branch, `entry_date`, reference, memo, `total_cents`, `status` `posted`/`reversed`. Its lines are its journal entry's. |
+| `bank_reconciliations`, `bank_reconciliation_lines` | One statement of one cash-side account: `statement_date`, `statement_balance_cents` (signed), `status` `open`/`completed`, and what it came to when completed. A journal line clears on ONE reconciliation (unique); lines change only while it is open; one open at a time per account (partial unique index); a completed one is final. |
+| `fiscal_years` | One row per closed calendar year (unique per organization): `net_income_cents` (signed), who and when. Never edited or deleted (trigger). |
+| `prepaid_packages` (altered) | `vat_cents` (the VAT inside the price; < price, CHECKed), `vat_rate_pct`. |
+| `document_series` | `doc_type` gains `vendor_bill` (`VB`), `vendor_payment` (`PV`), `credit_note` (`CN`), `refund` (`RF`). |
+
+### Accounts payable (`App\Domain\Payables`, `App\Actions\Payables`)
+
+- **A bill is recorded, numbered and posted in one step** (`ManageVendorBills::record`,
+  `Idempotency-Key` required): there are no drafts. A `goods` line bills a
+  goods receipt line of one of that vendor's shop purchase orders at the
+  bill's branch, whole and once; an `expense` line charges an active expense
+  or asset account that is not a control account. Every total is the API's
+  (`Payables::totals`): input VAT on top (prices exclusive, the default) or
+  extracted (inclusive); none for a vendor that is not VAT-registered, whose
+  bill is all `non_vat_purchases`; expanded withholding = round(net purchases
+  × rate / 100), from the request's `withholding`, else the vendor's default,
+  or none (`withholding: false`). Each line's `net_cents` is its share of its
+  VAT bucket by largest remainder, so the lines always add up.
+- **Goods clear GR/IR, never stock.** A stocked receipt line debits GR/IR for
+  exactly what the receipt credited (`StockLedger::moveValue` of its stock
+  quantity and unit cost); what the vendor charged above or below that is a
+  Purchase Price Variance. Goods bought for one job (no item, never on the
+  shelf) posted nothing at receipt, so their bill debits COGS – Parts.
+  Receive goods at their cost before VAT, or the VAT ends up in the variance.
+- **Payments** (`PayVendors`): one vendor, one branch, allocated in full as
+  recorded (to the bills named, or oldest due first). There are no advances to
+  vendors: money that pays no bill is refused. `BillSettlement::refresh` is
+  the only writer of `paid_cents` and the bill's status. A bill may be paid as
+  it is recorded (`payment`): the expense voucher of a petty-cash purchase is
+  a bill plus its cash-out voucher in one transaction.
+- **Voids**: a bill only with nothing paid; a goods receipt only once the bill
+  that names it is void (`ReceiveGoods::void` refuses otherwise); a vendor with
+  bills or payments is deactivated, never deleted.
+
+### Credit notes, refunds, withholding (`App\Actions\Billing`)
+
+- **An invoice is settled by three things**: payments allocated (`paid_cents`),
+  credit notes applied (`credited_cents`), tax withheld at source
+  (`withheld_cents`). `InvoiceSettlement::refresh` is still the ONLY writer;
+  the status follows their sum, so a withheld or credited invoice becomes
+  `paid` (and its jobs collected) when the sum reaches the total.
+  `Invoice::balanceCents()` and every "outstanding" figure subtract all three.
+- **Credit note** (`ManageCreditNotes`, `billing:void`): issued against a
+  standing invoice under THAT invoice's VAT treatment. A line credits an
+  invoice line (never more than that line billed, across standing notes) or
+  is an allowance. The notes on an invoice never exceed its total. It comes
+  off the invoice as far as the invoice still owed; the rest is credit the
+  shop holds for the customer. Void only while none of its credit is refunded.
+- **Refund** (`ManageRefunds`, `billing:void`): pays out credit the customer
+  already holds, from ONE source: a payment's unallocated part, or a credit
+  note's credit. To refund money already applied to an invoice, credit the
+  invoice first. A payment's allocations and refunds together never exceed it
+  (`payment_allocations_fit`, `refunds_fit`); a refunded payment or note is
+  not voided until its refunds are.
+- **Withholding certificate** (`ManageWithholding`, `billing:manage` to record,
+  `billing:void` to void): amount = round(tax base × rate / 100), the base
+  being the invoice's sales before VAT unless a smaller one is given; never
+  more than the invoice still owes.
+- **The customer's credit** (`CreditPosition`, aging, the balance tab) =
+  unallocated payments + credit-note credit − standing refunds. The statement
+  shows credit notes and withholding as credits and refunds as charges.
+
+### What each event posts (Phase 12; `SubledgerPostings`, pure)
+
+| Event | Dr | Cr |
+|---|---|---|
+| vendor bill | GR/IR Clearing (stocked goods, at the receipt's value), the line's account, Purchase Price Variance (billed above the receipt), Input VAT | Accounts Payable (total less withholding), Withholding Tax Payable, Purchase Price Variance (billed below the receipt) |
+| vendor payment | Accounts Payable | the cash-side account of the method |
+| credit note | Sales Returns & Allowances (net), Output VAT | Accounts Receivable (`applied_cents`), Customer Deposits (`credit_cents`) |
+| refund | Customer Deposits | the cash-side account of the method |
+| 2307 received | Creditable Withholding Tax | Accounts Receivable |
+| journal voucher | as typed | as typed |
+| year closed | every revenue account | every expense account; Retained Earnings takes each branch's difference |
+| prepaid package sold | the cash-side account (the price) | Unearned Revenue (price − VAT), Output VAT (the VAT inside it) |
+
+Each void posts the mirror entry, dated today (`Ledger::reverse`). New rule
+keys and accounts: `sales.returns` (4910, revenue on the debit side),
+`tax.creditable_withholding` (1310), `tax.withholding_payable` (2210),
+`equity.retained_earnings` (3100). The lean chart also gains Other Income
+(4800) and six expense accounts (6010 Bank Charges, 6100 Rent, 6110 Utilities,
+6120 Supplies, 6130 Professional Fees, 6190 Miscellaneous). **A chart
+installed before this gets the accounts its new rules need the first time it
+posts** (`PostingRules::install`): a code already taken by something else is
+left alone and the new account takes the next free code.
+
+`RuleKey::isControl()` names the accounts a subledger stands behind
+(receivables, inventory, customer deposits, payables, GR/IR, unearned
+revenue). Only their own documents post to them: a voucher line or a bill's
+expense line on one is 422.
+
+### The close
+
+- **Seven checks, not five.** `CloseChecklist` adds: open vendor bills =
+  Accounts Payable (`Reconciliation::payablesSubledger`), and goods received
+  and not yet billed = GR/IR Clearing (`unbilledReceipts`: receipts received,
+  less receipts voided and receipt lines billed, plus bills voided, each by its
+  own date). Receivables and Customer Deposits now count credit notes,
+  withholding and refunds. "Unposted" counts the five new document kinds and
+  their voids.
+- **Journal vouchers** (`ManageManualJournals`, `ledger:manage`): at least two
+  lines, a debit or a credit each, debits = credits, never a control account,
+  never in a closed month. Reversed once, by a mirror entry dated today.
+- **Bank reconciliation** (`ManageBankReconciliations`, `BankStatement`):
+  open a statement for an asset account that is not a control account; tick
+  the journal lines it shows; complete only when statement balance = cleared
+  before + ticked now (409 `statement_does_not_agree` with the difference).
+  What is in the books and not on the statement is outstanding and carries
+  over. Whole-organization: not from a branch-limited sign-in.
+- **Year end** (`CloseYear`, fiscal year = calendar year): posts ONE entry
+  (`year_closed`, source the `fiscal_years` row) that turns every revenue and
+  expense account back to zero, branch by branch, with each branch's
+  difference to Retained Earnings; then closes December through `ClosePeriod`,
+  in the same transaction. Needs the year over, every earlier year with
+  entries closed, and December's own close passing (so January to November
+  closed first). Final. The profit and loss report leaves `year_closed`
+  entries out (`LedgerQueries::balances(beforeClosing: true)`), so a closed
+  year still reads as it was earned; the balance sheet includes them, so
+  current earnings restart at zero.
+
+### Tax working papers (`App\Actions\Tax\TaxQueries`, `App\Domain\Tax`)
+
+All `ledger:view`, over the caller's branches, for `from`..`to` or a calendar
+quarter (`year`, `quarter`; default: this quarter). Read off the documents, on
+the books' own dating: a document counts on its business date, and a void or
+a credit note is a negative on the day it happened.
+
+- `GET /tax/vat`: sales by VAT category and output VAT (invoices, credit
+  notes, prepaid packages sold), purchases and input VAT (vendor bills), VAT
+  payable; `ledger` is the Output and Input VAT accounts' movement over the
+  same period, which must agree.
+- `GET /tax/sales`, `/tax/purchases`: one row per customer / vendor (SLS, SLP).
+- `GET /tax/withholding/expanded`: what the shop withheld from vendors, per
+  vendor and ATC (the QAP behind 1601-EQ). `…/creditable`: the 2307s customers
+  handed over, per customer and ATC (SAWT).
+- `GET /tax/withholding/certificates/{vendor}`: one vendor's quarter laid out
+  as form 2307 (per ATC, the income payments of months 1, 2 and 3, the tax
+  withheld; payor = the selected branch, else the organization). Data, not a
+  printed form.
+- `file=csv` downloads the four lists. Nothing files a return, and no layout
+  is claimed to be BIR-accredited.
+
+### Prepaid packages carry VAT
+
+A package is sold VAT-inclusive. A VAT-registered branch owes the VAT inside
+the price when the package is sold: `vat_cents` = round(price × r / (100 + r))
+at the account's effective rate there, credited to Output VAT; Unearned
+Revenue takes the rest. Each credit earns its share of `netPriceCents()`
+(price − VAT), so Unearned Revenue still equals the sum of
+`Prepaid::unearnedCents` over the packages, now on the net. A package sold
+before this, or by a branch that is not VAT-registered, has `vat_cents` 0 and
+behaves as it did. A redeemed job still raises no invoice.
+
+### Capabilities and endpoints (Phase 12)
+
+`payables:view` and `payables:manage` (new, API only, never a portal role):
+provider_admin and branch_manager, within their branches. Everything else
+uses capabilities that existed: credit notes and refunds `billing:void`,
+recording a 2307 `billing:manage`, vouchers / bank reconciliation / year end
+`ledger:manage`, the tax papers `ledger:view`. Credit notes, refunds and
+withholding certificates are account-owned: a portal user with `billing:view`
+reads their own account's.
+
+`/vendor-bills` (+ `/unbilled-receipts`, `/{id}/void`), `/vendor-payments`
+(+ `/{id}/void`), `/payables/aging`; `/credit-notes` (+ `/{id}/void`),
+`POST /invoices/{id}/credit-notes`; `/refunds` (+ `/{id}/void`);
+`/withholding-certificates` (+ `/{id}/void`), `POST /invoices/{id}/withholding`;
+`/ledger/vouchers` (+ `/{id}/reverse`); `/ledger/bank-reconciliations`
+(+ `/{id}/lines`, `/{id}/complete`, `DELETE`); `GET /ledger/years`,
+`POST /ledger/years/close` (both whole-organization: not from a
+branch-limited sign-in); `/tax/{options,vat,sales,purchases}`,
+`/tax/withholding/{expanded,creditable,certificates/{vendor}}`. Creating a
+bill, a vendor payment, a credit note, a refund or a voucher requires an
+`Idempotency-Key`.
+
+### Demo data (Phase 12)
+
+None in the demo organization: the seed holds no bill, credit note, refund,
+certificate, voucher or reconciliation, so no earlier phase's figure moves
+(the seeded GR-2026-0001 simply waits in GR/IR, which the new check
+reconciles). `tests/Support/World` gives the RIVAL organization one of each,
+for the isolation probes.
+
 ## Rules that bite
 
 - **Tests use `RefreshApiDatabase`, never `DatabaseTruncation`.** The
@@ -1732,9 +1952,10 @@ phase's figure moves. The `crm` module is on for both branches.
 - **Billing is core and branch-owned**: a pinned staff member sees only their
   branches' invoices and payments (404 otherwise); the balance's credit
   position (amounts only) is the account's, across branches.
-- **PDF tests render HTML** (`BillingPdf::invoiceHtml` etc.) to assert wording;
-  dompdf's output is compressed. Render inside a tenant or system context:
-  the lines lazy-load.
+- **This API returns JSON (and CSV exports), never a rendered document.** No
+  Blade template, no PDF library, no HTML: `resources/views` is empty on
+  purpose. A document that must be printed gets its parties, totals and
+  required wording as fields; the frontend lays it out.
 - **`composer openapi` needs more than 128 MB** since Phase 7
   (`php -d memory_limit=1G artisan scramble:export --path=openapi.json`).
 
@@ -1859,11 +2080,75 @@ phase's figure moves. The `crm` module is on for both branches.
 - **A prepaid sale and a redemption each post once** (`journal_entries` is
   unique on event + source): the package id for the sale, the redemption id for
   the credit. Unearned Revenue must equal the sum of `Prepaid::unearnedCents`
-  over the packages; `GET /crm/prepaid-packages` returns that sum.
-- **VAT is not split on prepaid packages.** The brief's postings are Dr Cash /
-  Cr Unearned and Dr Unearned / Cr Sales, gross; no Output VAT line and no
-  invoice is raised for a redeemed job. Review before a VAT-registered branch
-  sells them for real.
+  over the packages' NET price (`PrepaidPackage::netPriceCents()`);
+  `GET /crm/prepaid-packages` returns that sum.
+- **A prepaid package's VAT is charged when it is sold** (Phase 12; Phase 11
+  posted gross). The price is VAT-inclusive: a VAT-registered branch credits
+  Output VAT for the VAT inside it and Unearned Revenue for the rest, and each
+  credit earns its share of the net. Never compute a redemption or an unearned
+  figure from `price_cents`. No invoice is raised for a redeemed job.
+- **Payables move money only through `ManageVendorBills` and `PayVendors`.**
+  `paid_cents` on a bill is written by `BillSettlement::refresh` alone; the
+  deferred triggers fail the COMMIT otherwise. A bill and a vendor payment are
+  immutable once recorded: correct with a void.
+- **A bill is inserted once, total and all**, then its lines: there is no
+  draft bill, and the trigger refuses any later change but status, paid and
+  the void stamp.
+- **Bill a receipt at what it was received at, or accept the variance.** The
+  Inventory account moved at the RECEIPT's cost and never moves again for that
+  receipt; the bill clears GR/IR at that same value and books the vendor's
+  price difference to Purchase Price Variance. Do not "fix" stock from a bill.
+- **A billed goods receipt is not voided**; void the bill first. Otherwise
+  GR/IR would be debited twice for the same goods.
+- **An invoice's balance is total − paid − credited − withheld.** Never
+  `total_due_cents - paid_cents` again: use `Invoice::settledCents()` /
+  `balanceCents()`, and in SQL subtract all three (`BillingQueries::creditPosition`).
+  An `OpenInvoice` is built with the settled figure in its `paidCents`.
+- **A payment's credit is amount − allocations − standing refunds.**
+  `Payment::unallocatedCents()` reads BOTH relations: load `allocations` and
+  `refunds` before calling it (strict mode throws on a lazy load).
+- **Voids go outermost-in**: a refund before its credit note or payment; a
+  credit note, a 2307 and the payments before the invoice. Each action
+  refuses (409) rather than cascade.
+- **A credit note is issued once, applied once.** `applied_cents` and
+  `credit_cents` are fixed when it is issued and never recomputed, even if the
+  invoice's payments are voided afterwards: the credit it left stays credit.
+  It is not allocated to another invoice (refund it, or void and re-issue).
+- **Control accounts take no hand postings** (`RuleKey::isControl`,
+  `PostingRules::controlAccountIds`): a new document type that posts to one
+  must also join its side of the close checklist, or closing breaks.
+- **A new document that posts gets its line in `Reconciliation::unposted`**
+  (the `$documents` table there): table, date column, posted and void events.
+  `BackfillLedger` does not know the Phase 12 documents: they have never
+  existed without their entry.
+- **`CloseChecklist::evaluate` takes the payables and GR/IR pairs** before the
+  trial balance. A caller of it passes seven checks' worth of figures.
+- **Read revenue and expense balances with `beforeClosing: true` for a profit
+  figure.** After a year-end close those accounts are zero on the balance
+  sheet side of things; `LedgerQueries::profitAndLoss` and `CloseYear` both
+  leave `year_closed` entries out.
+- **December closes with its year.** Once a later month needs closing, the
+  year-end close comes first (the monthly close refuses while an earlier month
+  with entries is open). A December closed by the monthly close before the
+  year was closed still works: the closing entry is dated the first open day
+  and its memo says so.
+- **Bank reconciliation is whole-organization, and a line clears once.** A
+  difference is fixed in the books (a voucher, a missing payment), never by
+  editing the statement figure to fit; a completed reconciliation is final.
+- **Tax figures follow document dates, voids as negatives on their own day.**
+  Do not "restate" a period by dropping a document voided later: the VAT
+  answer would stop agreeing with the VAT accounts (`ledger` in `GET /tax/vat`).
+- **Inside `TenantManager::system()` the tenant scope is lifted even under a
+  nested `actingAs`.** A lookup by anything but id there (an account by code,
+  a vendor by name) reads every organization: filter by `organization_id`
+  yourself. `ManageVendorBills` and `ManageManualJournals` re-check an
+  account's organization for that reason.
+- **Array keys that look like numbers are ints.** A chart keyed by code
+  (`'3100'`) compares with `(string) $code`, not `=== '3100'`.
+- **Larastan's parallel workers can exhaust a small machine's memory**
+  ("paging file is too small"). Run it with
+  `parameters: parallel: maximumNumberOfProcesses: 2` from a scratch config
+  that includes `phpstan.neon`; do not lower the level.
 - **`repeat_interval_days` drives a reminder, nothing else.** It does not book
   anything (recurring schedules are still stored preferences only).
 
@@ -1951,12 +2236,12 @@ audit rows). Fill in the rest from the phase plan.
 - [x] **4**: Parts, purchasing, analytics and API parity (vendors, fleet parts, purchase orders, forecast, analytics, purpose-built reads, docs/frontend-parity.md)
 - [ ] **5**: *(title not provided)*
 - [x] **6**: Shop inventory (items, branch stock, the append-only stock ledger, receiving against purchase orders, work-order issues, counts, transfers, reorder)
-- [x] **7**: Order-to-cash (invoices with VAT and BIR snapshots, payments and allocations, receivables: aging, statements, credit limit; PDFs; billing events)
+- [x] **7**: Order-to-cash (invoices with VAT and BIR snapshots, payments and allocations, receivables: aging, statements, credit limit; billing events; its PDFs were removed in Phase 12)
 - [x] **8**: General ledger (chart of accounts, posting rules, balanced append-only journal posted in the event's transaction, monthly periods and the close checklist, reports, journal export, backfill)
 - [x] **9**: Detailing (the Samahuzai app ported as the `detailing` module: per-branch menu priced per size, the booking engine with its source characterization, job card, inspection with damage map and photos, materials consumed from stock, booking → invoice and counter checkout, after-commit broadcast with display tokens, public booking)
 - [x] **10**: Equipment monitoring on the Phase 2 maintenance engine (the source's detailing-equipment register and monitor as the `equipment` module: tools, usage and service logs, package profiles; derived meters; the source's formulas with their characterization; parts from stock on a service entry, posted to Equipment Repairs & Maintenance; equipment alerts on `GET /alerts`).
 - [x] **11**: CRM (the `crm` module: messaging with one consent / opt-out / cooldown / quiet-hours gate and a full message log; Customer 360 with a timeline built on read; notes and tasks; service reminders from the maintenance engine, detailing repeat intervals, document expiries and lapsed customers; memberships, prepaid packages posted through Unearned Revenue, optional loyalty points; the B2B pipeline with conversion to a company account; post-payment feedback; segments and campaigns).
-- [ ] **12**: *(title not provided)*
+- [x] **12**: Payables, credits, tax and the close (*not a phase brief: filed here, renumber if the plan differs*): vendor bills against goods receipts and expenses with input VAT and expanded withholding, payments to vendors, payables aging; credit notes, refunds and creditable withholding (2307) settling invoices; journal vouchers, bank reconciliation, the year-end close to Retained Earnings; VAT, SLS / SLP, withholding alphalists and a vendor's 2307 as working papers; VAT split on prepaid packages.
 - [ ] **13**: *(title not provided)*
 - [ ] **14**: *(title not provided)*
 - [ ] **15**: *(title not provided)*
@@ -2174,3 +2459,56 @@ source's VIP is a line of text on the tier, not an add-on; dealers are the
 `dealer` tag on the account, and "reconditioning batches" have no document of
 their own yet. Also fixed here: Phase 10 stored a usage or service time given
 with an offset eight hours off (see "Store an instant in UTC").
+
+Phase 12 status: done locally (gates green: see the test count in the commit;
+Larastan max; Pint; `openapi.json` regenerated, 41 new operations; isolation
+and parity suites pass). **This work did not arrive as a phase brief.** It was
+asked for as a list of gaps (no vendor bills, so goods received sit in GR/IR;
+no input VAT, expense or cash-out documents; no credit notes or refunds; no
+withholding tax, BIR reports, bank reconciliation or year-end close; no VAT
+split on prepaid sales) and is filed here as Phase 12: renumber it if the
+plan's Phase 12 is something else. API only: no frontend screen was built or
+driven. **Removed here, at the user's instruction (2026-10-13): Phase 7's
+three PDF endpoints** (`/invoices/{id}/pdf`, `/payments/{id}/pdf`,
+`/customer-accounts/{id}/statement/pdf`), `BillingPdf`, the Blade templates
+and the `dompdf/dompdf` dependency: this is a JSON API and the frontend
+renders every document. The frontend's three download buttons have nothing to
+call until it prints from JSON; `seller`, `buyer` and `notices` were added to
+the payment and statement responses (and `seller.tin_printed` to the
+invoice's) so it has everything the PDFs printed. Not done: no remittance document for the tax withheld (1601-EQ
+is paid outside the system, so Withholding Tax Payable only grows until a
+voucher clears it); no vendor advances or debit notes; no live BIR filing; the
+demo seed has none of the new documents; `BackfillLedger` was not extended.
+The TODOs at the top of the Phase 7, Phase 8 and Phase 12 sections stand.
+Decisions taken here, for review: bills have no draft state (recorded =
+numbered = posted); a goods receipt line is billed whole and once, and its
+vendor's price difference is a Purchase Price Variance, never a revaluation of
+stock; goods bought for a job are expensed to COGS – Parts when billed (they
+posted nothing at receipt); expanded withholding is taken at the BILL (accrual),
+on the purchases before VAT, at one ATC and rate per bill; a vendor payment
+pays one vendor's bills at one branch and must be allocated in full (no
+advances); `payables:view` / `payables:manage` for provider admin and branch
+manager only; credit notes and refunds need `billing:void`, recording a 2307
+`billing:manage`; a credit note reverses sales through a contra account (Sales
+Returns & Allowances), not the original sales accounts; what a credit note
+credits beyond the invoice's open balance becomes Customer Deposits and is
+refunded, not re-allocated to another invoice; a fully credited or fully
+withheld invoice reads `paid` and stamps its jobs collected, so the shop
+reports recognise a credited job's revenue (review before relying on those
+reports for a shop that credits often); creditable withholding is one
+certificate per recording against one invoice, its amount computed from base ×
+rate; journal vouchers exist (they were not on the list) because a bank
+reconciliation needs a way to book a bank charge or a wallet swept to the
+bank, and they cannot touch a control account; bank reconciliation is per
+ledger account, with no statement import; the fiscal year is the calendar
+year, closes once and never reopens, and its closing entry is one entry over
+every branch; the close checklist gained two checks (payables, GR/IR), which
+every existing month must also pass; a prepaid package's price is
+VAT-inclusive and its VAT is due at the sale, which **changes Phase 11's
+figures for a VAT-registered branch** (the ₱5,000 Wash Pass now earns ₱4,464.29
+over its five credits and posts ₱535.71 to Output VAT; `tests/Feature/Crm/LoyaltyTest`
+was updated); the tax reports are working papers over the caller's branches
+(a branch is a BIR registration), not accredited forms. Environment notes from
+this machine: `vendor/` was out of date with `composer.lock` (15 pre-existing
+failures until `composer install`), PHP's `pdo_pgsql` was not enabled in `php.ini`, and
+the full suite takes about 25 minutes here.

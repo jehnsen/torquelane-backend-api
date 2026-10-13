@@ -68,14 +68,16 @@ it('books a prepaid package to Unearned Revenue when sold, and earns it credit b
     $sold = sellPass()->assertCreated()->json('data');
     expect($sold)->toMatchArray([
         'reference' => 'PP-2026-0001', 'plan_name' => 'Wash Pass (5 × The Essential)', 'price_cents' => 500_000,
-        'credits_total' => 5, 'credits_used' => 0, 'credits_left' => 5, 'unearned_cents' => 500_000,
+        'vat_cents' => 53_571, 'net_price_cents' => 446_429,
+        'credits_total' => 5, 'credits_used' => 0, 'credits_left' => 5, 'unearned_cents' => 446_429,
         'sold_on' => '2026-10-12', 'expires_on' => '2027-04-10', 'usable' => true, 'payment_method' => 'cash', 'sold_by_name' => 'Liza Samonte',
     ]);
     // A retried click replays the sale; it does not sell a second package.
     expect(sellPass()->json('data.id'))->toBe($sold['id']);
 
-    // Sale: Dr Cash on Hand / Cr Unearned Revenue. Nothing is earned yet.
-    expect(journalOf('prepaid_sold'))->toBe([[['1000', 500_000, 0], ['2400', 0, 500_000]]]);
+    // Sale: Dr Cash on Hand / Cr Unearned Revenue (before VAT), Cr Output VAT (the VAT inside the price, 5,000 × 12 / 112).
+    // Nothing is earned yet.
+    expect(journalOf('prepaid_sold'))->toBe([[['1000', 500_000, 0], ['2400', 0, 446_429], ['2200', 0, 53_571]]]);
 
     // The balance the counter sees when the customer books.
     $benefits = $this->getJson("/api/v1/crm/customers/{$this->walkIn}/benefits")->assertOk()->json('data');
@@ -85,14 +87,15 @@ it('books a prepaid package to Unearned Revenue when sold, and earns it credit b
     $booking = finishedWash('2026-10-13', '09:00');
     expect($this->getJson("/api/v1/detailing/bookings/{$booking}")->json('data.next'))->toMatchArray(['can_invoice' => true, 'can_redeem' => true]);
     $redeemed = $this->postJson("/api/v1/crm/prepaid-packages/{$sold['id']}/redeem", ['detailing_booking_id' => $booking], ['Idempotency-Key' => 'redeem-1'])->assertCreated()->json('data');
-    expect($redeemed)->toMatchArray(['credits_used' => 1, 'credits_left' => 4, 'unearned_cents' => 400_000])
-        ->and($redeemed['redemption'])->toMatchArray(['detailing_booking_id' => $booking, 'amount_cents' => 100_000, 'redeemed_on' => '2026-10-13']);
+    expect($redeemed)->toMatchArray(['credits_used' => 1, 'credits_left' => 4, 'unearned_cents' => 357_144])
+        ->and($redeemed['redemption'])->toMatchArray(['detailing_booking_id' => $booking, 'amount_cents' => 89_285, 'redeemed_on' => '2026-10-13']);
 
-    // Redemption: Dr Unearned Revenue / Cr Sales – Detailing, for one fifth of the price.
-    expect(journalOf('prepaid_redeemed'))->toBe([[['2400', 100_000, 0], ['4020', 0, 100_000]]]);
+    // Redemption: Dr Unearned Revenue / Cr Sales – Detailing, for one fifth of the price before VAT (rounded down;
+    // the last credit earns what is left).
+    expect(journalOf('prepaid_redeemed'))->toBe([[['2400', 89_285, 0], ['4020', 0, 89_285]]]);
 
     $job = $this->getJson("/api/v1/detailing/bookings/{$booking}")->assertOk()->json('data');
-    expect($job['prepaid'])->toMatchArray(['reference' => 'PP-2026-0001', 'amount_cents' => 100_000])
+    expect($job['prepaid'])->toMatchArray(['reference' => 'PP-2026-0001', 'amount_cents' => 89_285])
         ->and($job['next'])->toMatchArray(['can_invoice' => false, 'can_check_out' => false, 'can_redeem' => false, 'locked_by_invoice' => true]);
     // Settled is settled: no invoice, no second credit, no going back to "on going".
     $this->postJson("/api/v1/detailing/bookings/{$booking}/invoice", [], ['Idempotency-Key' => 'inv'])->assertStatus(409);
@@ -101,11 +104,11 @@ it('books a prepaid package to Unearned Revenue when sold, and earns it credit b
 
     // What the packages still owe is what Unearned Revenue holds.
     $list = $this->getJson('/api/v1/crm/prepaid-packages')->assertOk()->json();
-    expect($list['summary'])->toBe(['sold' => 1, 'sold_cents' => 500_000, 'unearned_cents' => 400_000])
+    expect($list['summary'])->toBe(['sold' => 1, 'sold_cents' => 500_000, 'unearned_cents' => 357_144])
         ->and($list['data'][0]['customer_name'])->not->toBeNull();
     Sanctum::actingAs($this->world->user('owner@mekanikomore.ph'));
     $unearned = collect($this->getJson('/api/v1/ledger/accounts?as_of=2026-10-31')->assertOk()->json('data'))->firstWhere('code', '2400');
-    expect($unearned['balance_cents'])->toBe(400_000);
+    expect($unearned['balance_cents'])->toBe(357_144);
 });
 
 it('refuses a sale or a redemption that does not add up', function () {

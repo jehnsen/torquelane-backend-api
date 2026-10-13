@@ -31,6 +31,9 @@ final class Invoicing
     /** What an invoice of a branch that is not VAT-registered must say. */
     public const string NON_VAT_NOTICE = 'THIS DOCUMENT IS NOT VALID FOR CLAIM OF INPUT TAX.';
 
+    /** What a payment's acknowledgment receipt and a statement of account must say. */
+    public const string NOT_AN_INVOICE = 'This is not an invoice.';
+
     /**
      * @param  list<InvoiceLineDraft>  $lines
      */

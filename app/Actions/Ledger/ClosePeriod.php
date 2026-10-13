@@ -22,7 +22,8 @@ use Illuminate\Support\Facades\DB;
  * Closing a month (R7: a closed period is final). Allowed only once the month
  * is over and every earlier month with activity is closed, and only if the
  * checklist passes: nothing unposted, receivables = AR, stock valuation =
- * Inventory, unapplied credit = Customer Deposits, trial balance balanced.
+ * Inventory, unapplied credit = Customer Deposits, open bills = Accounts
+ * Payable, unbilled receipts = GR/IR, trial balance balanced.
  *
  * The period row is locked FOR UPDATE; every posting holds it FOR SHARE until
  * it commits, so a close waits for postings in flight and then no new one

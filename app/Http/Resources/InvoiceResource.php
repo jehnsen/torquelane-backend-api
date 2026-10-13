@@ -4,16 +4,19 @@ declare(strict_types=1);
 
 namespace App\Http\Resources;
 
+use App\Actions\Billing\InvoiceParties;
 use App\Domain\Access\Capability;
 use App\Domain\Invoicing\InvoiceStatus;
 use App\Domain\Invoicing\Invoicing;
 use App\Domain\Receivables\Aging;
 use App\Domain\Receivables\PaymentStatus;
 use App\Domain\Shared\Calendar;
+use App\Models\CreditNote;
 use App\Models\Invoice;
 use App\Models\InvoiceLine;
 use App\Models\InvoiceWorkOrder;
 use App\Models\PaymentAllocation;
+use App\Models\WithholdingCertificate;
 use App\Tenancy\TenantManager;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
@@ -40,7 +43,7 @@ final class InvoiceResource extends JsonResource
     public function toArray(Request $request): array
     {
         $invoice = $this->resource;
-        $invoice->loadMissing(['lines', 'workOrderLinks.workOrder', 'allocations.payment', 'customerAccount']);
+        $invoice->loadMissing(['lines', 'workOrderLinks.workOrder', 'allocations.payment', 'creditNotes', 'withholdingCertificates', 'customerAccount']);
         $context = app(TenantManager::class)->context();
         $staff = $context?->isStaff() ?? false;
         $can = fn (Capability $capability): bool => $staff && $context->can($capability);
@@ -71,6 +74,8 @@ final class InvoiceResource extends JsonResource
                 'name' => $invoice->seller_name,
                 'business_style' => $invoice->seller_business_style,
                 'tin' => $invoice->seller_tin,
+                // With the branch code, as an invoice prints it.
+                'tin_printed' => InvoiceParties::printedTin($invoice->seller_tin, $invoice->seller_branch_code),
                 'branch_code' => $invoice->seller_branch_code,
                 'address' => $invoice->seller_address,
                 'vat_registered' => $invoice->seller_vat_registered,
@@ -83,6 +88,10 @@ final class InvoiceResource extends JsonResource
             'non_vat_notice' => $invoice->seller_vat_registered ? null : Invoicing::NON_VAT_NOTICE,
             'totals' => $invoice->totals()->toArray() + ['net_sales_cents' => $invoice->totals()->netSalesCents()],
             'paid_cents' => $invoice->paid_cents,
+            // Taken off by standing credit notes, and withheld at source on a 2307: they settle the invoice as money does.
+            'credited_cents' => $invoice->credited_cents,
+            'withheld_cents' => $invoice->withheld_cents,
+            'settled_cents' => $invoice->settledCents(),
             'balance_cents' => $invoice->balanceCents(),
             'notes' => $invoice->notes,
             'lines' => array_values($invoice->lines->map(fn (InvoiceLine $line): array => [
@@ -120,6 +129,26 @@ final class InvoiceResource extends JsonResource
                 'payment_status' => $allocation->payment->status->value,
                 'counts' => $allocation->payment->status === PaymentStatus::Posted,
             ])->all()),
+            'credit_notes' => array_values($invoice->creditNotes->map(fn (CreditNote $note): array => [
+                'id' => $note->id,
+                'number' => $note->number,
+                'issued_on' => $note->issued_on->toDateString(),
+                'total_cents' => $note->total_cents,
+                'applied_cents' => $note->applied_cents,
+                'credit_cents' => $note->credit_cents,
+                'status' => $note->status,
+                'counts' => $note->isStanding(),
+            ])->all()),
+            'withholding' => array_values($invoice->withholdingCertificates->map(fn (WithholdingCertificate $certificate): array => [
+                'id' => $certificate->id,
+                'certificate_no' => $certificate->certificate_no,
+                'atc_code' => $certificate->atc_code,
+                'rate_pct' => (string) $certificate->rate_pct->strippedOfTrailingZeros(),
+                'amount_cents' => $certificate->amount_cents,
+                'received_on' => $certificate->received_on->toDateString(),
+                'status' => $certificate->status->value,
+                'counts' => $certificate->isStanding(),
+            ])->all()),
             'created_by_name' => $invoice->created_by_name,
             'issued_at' => $invoice->issued_at?->toIso8601ZuluString(),
             'issued_by_name' => $invoice->issued_by_name,
@@ -130,6 +159,8 @@ final class InvoiceResource extends JsonResource
             'can_issue' => $invoice->status === InvoiceStatus::Draft && $can(Capability::BillingManage),
             'can_void' => $invoice->status === InvoiceStatus::Issued && $can(Capability::BillingVoid),
             'can_record_payment' => $invoice->status->isOpen() && $can(Capability::BillingManage),
+            'can_credit' => $invoice->status->isStanding() && $can(Capability::BillingVoid),
+            'can_record_withholding' => $invoice->status->isOpen() && $can(Capability::BillingManage),
             'created_at' => $invoice->created_at->toIso8601ZuluString(),
             'updated_at' => $invoice->updated_at->toIso8601ZuluString(),
         ];

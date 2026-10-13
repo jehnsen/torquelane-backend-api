@@ -37,6 +37,26 @@ enum LedgerEvent: string
     case PrepaidSold = 'prepaid_sold';
     /** A prepaid credit used: its share of the price is earned. */
     case PrepaidRedeemed = 'prepaid_redeemed';
+    /** A vendor's bill recorded: an expense or received goods become a payable (Phase 12). */
+    case VendorBillPosted = 'vendor_bill_posted';
+    case VendorBillVoided = 'vendor_bill_voided';
+    /** Money paid out to a vendor against its bills. */
+    case VendorPaymentMade = 'vendor_payment_made';
+    case VendorPaymentVoided = 'vendor_payment_voided';
+    /** A credit note against an issued invoice: sales and VAT go back. */
+    case CreditNoteIssued = 'credit_note_issued';
+    case CreditNoteVoided = 'credit_note_voided';
+    /** A customer's credit paid back to them. */
+    case RefundPaid = 'refund_paid';
+    case RefundVoided = 'refund_voided';
+    /** Tax a customer withheld at source, certified on a BIR 2307. */
+    case WithholdingReceived = 'withholding_received';
+    case WithholdingVoided = 'withholding_voided';
+    /** A typed-in journal voucher. */
+    case ManualJournal = 'manual_journal';
+    case ManualJournalReversed = 'manual_journal_reversed';
+    /** The year-end closing entry: profit or loss moved to Retained Earnings. */
+    case YearClosed = 'year_closed';
 
     public function label(): string
     {
@@ -59,6 +79,19 @@ enum LedgerEvent: string
             self::StockMaintenanceReturn => 'Parts returned from equipment',
             self::PrepaidSold => 'Prepaid package sold',
             self::PrepaidRedeemed => 'Prepaid credit redeemed',
+            self::VendorBillPosted => 'Vendor bill recorded',
+            self::VendorBillVoided => 'Vendor bill voided',
+            self::VendorPaymentMade => 'Vendor paid',
+            self::VendorPaymentVoided => 'Vendor payment voided',
+            self::CreditNoteIssued => 'Credit note issued',
+            self::CreditNoteVoided => 'Credit note voided',
+            self::RefundPaid => 'Refund paid',
+            self::RefundVoided => 'Refund voided',
+            self::WithholdingReceived => 'Withholding certificate received',
+            self::WithholdingVoided => 'Withholding certificate voided',
+            self::ManualJournal => 'Journal voucher',
+            self::ManualJournalReversed => 'Journal voucher reversed',
+            self::YearClosed => 'Year-end close',
         };
     }
 
@@ -71,6 +104,13 @@ enum LedgerEvent: string
             self::CreditApplied, self::CreditReversed => 'payment_allocation',
             self::PrepaidSold => 'prepaid_package',
             self::PrepaidRedeemed => 'prepaid_redemption',
+            self::VendorBillPosted, self::VendorBillVoided => 'vendor_bill',
+            self::VendorPaymentMade, self::VendorPaymentVoided => 'vendor_payment',
+            self::CreditNoteIssued, self::CreditNoteVoided => 'credit_note',
+            self::RefundPaid, self::RefundVoided => 'refund',
+            self::WithholdingReceived, self::WithholdingVoided => 'withholding_certificate',
+            self::ManualJournal, self::ManualJournalReversed => 'manual_journal',
+            self::YearClosed => 'fiscal_year',
             default => 'stock_move',
         };
     }
@@ -79,7 +119,9 @@ enum LedgerEvent: string
     public function isReversal(): bool
     {
         return match ($this) {
-            self::InvoiceVoided, self::PaymentVoided, self::CreditReversed => true,
+            self::InvoiceVoided, self::PaymentVoided, self::CreditReversed,
+            self::VendorBillVoided, self::VendorPaymentVoided, self::CreditNoteVoided, self::RefundVoided,
+            self::WithholdingVoided, self::ManualJournalReversed => true,
             default => false,
         };
     }

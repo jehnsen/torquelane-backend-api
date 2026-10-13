@@ -10,11 +10,13 @@ use App\Http\Controllers\Api\V1\ApprovalSettingsController;
 use App\Http\Controllers\Api\V1\Auth\InvitationAcceptanceController;
 use App\Http\Controllers\Api\V1\Auth\PasswordController;
 use App\Http\Controllers\Api\V1\Auth\SessionController;
+use App\Http\Controllers\Api\V1\BankReconciliationController;
 use App\Http\Controllers\Api\V1\BayController;
 use App\Http\Controllers\Api\V1\BranchController;
 use App\Http\Controllers\Api\V1\CheckInController;
 use App\Http\Controllers\Api\V1\ConsentController;
 use App\Http\Controllers\Api\V1\ContactController;
+use App\Http\Controllers\Api\V1\CreditNoteController;
 use App\Http\Controllers\Api\V1\CrmCampaignController;
 use App\Http\Controllers\Api\V1\CrmCustomerController;
 use App\Http\Controllers\Api\V1\CrmLoyaltyController;
@@ -30,6 +32,7 @@ use App\Http\Controllers\Api\V1\DisplayController;
 use App\Http\Controllers\Api\V1\DocumentController;
 use App\Http\Controllers\Api\V1\DocumentFileController;
 use App\Http\Controllers\Api\V1\EquipmentController;
+use App\Http\Controllers\Api\V1\FiscalYearController;
 use App\Http\Controllers\Api\V1\FleetPartController;
 use App\Http\Controllers\Api\V1\FleetSummaryController;
 use App\Http\Controllers\Api\V1\GoodsReceiptController;
@@ -39,6 +42,7 @@ use App\Http\Controllers\Api\V1\InvoiceController;
 use App\Http\Controllers\Api\V1\ItemController;
 use App\Http\Controllers\Api\V1\JournalController;
 use App\Http\Controllers\Api\V1\LedgerReportController;
+use App\Http\Controllers\Api\V1\ManualJournalController;
 use App\Http\Controllers\Api\V1\MeterReadingController;
 use App\Http\Controllers\Api\V1\ModuleController;
 use App\Http\Controllers\Api\V1\OrganizationController;
@@ -49,16 +53,21 @@ use App\Http\Controllers\Api\V1\PublicBookingController;
 use App\Http\Controllers\Api\V1\PublicCrmController;
 use App\Http\Controllers\Api\V1\PurchaseOrderController;
 use App\Http\Controllers\Api\V1\ReceivablesController;
+use App\Http\Controllers\Api\V1\RefundController;
 use App\Http\Controllers\Api\V1\ServiceTaskController;
 use App\Http\Controllers\Api\V1\ShopController;
 use App\Http\Controllers\Api\V1\ShopPurchaseOrderController;
 use App\Http\Controllers\Api\V1\StockController;
 use App\Http\Controllers\Api\V1\StockCountController;
 use App\Http\Controllers\Api\V1\StockTransferController;
+use App\Http\Controllers\Api\V1\TaxReportController;
 use App\Http\Controllers\Api\V1\TechnicianController;
 use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\VehicleController;
+use App\Http\Controllers\Api\V1\VendorBillController;
 use App\Http\Controllers\Api\V1\VendorController;
+use App\Http\Controllers\Api\V1\VendorPaymentController;
+use App\Http\Controllers\Api\V1\WithholdingCertificateController;
 use App\Http\Controllers\Api\V1\WorkOrderController;
 use Illuminate\Support\Facades\Route;
 
@@ -256,20 +265,46 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::delete('invoices/{invoice}', [InvoiceController::class, 'destroy'])->name('invoices.destroy');
     Route::post('invoices/{invoice}/issue', [InvoiceController::class, 'issue'])->middleware('idempotent:required')->name('invoices.issue');
     Route::post('invoices/{invoice}/void', [InvoiceController::class, 'void'])->name('invoices.void');
-    Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'pdf'])->name('invoices.pdf');
 
     Route::get('payments', [PaymentController::class, 'index'])->name('payments.index');
     Route::post('payments', [PaymentController::class, 'store'])->middleware('idempotent:required')->name('payments.store');
     Route::get('payments/{payment}', [PaymentController::class, 'show'])->name('payments.show');
     Route::post('payments/{payment}/allocations', [PaymentController::class, 'allocate'])->middleware('idempotent')->name('payments.allocate');
     Route::post('payments/{payment}/void', [PaymentController::class, 'void'])->name('payments.void');
-    Route::get('payments/{payment}/pdf', [PaymentController::class, 'pdf'])->name('payments.pdf');
 
     Route::get('receivables/aging', [ReceivablesController::class, 'aging'])->name('receivables.aging');
     Route::get('receivables/revenue', [ReceivablesController::class, 'revenue'])->name('receivables.revenue');
     Route::get('customer-accounts/{customer_account}/balance', [ReceivablesController::class, 'balance'])->name('customer-accounts.balance');
     Route::get('customer-accounts/{customer_account}/statement', [ReceivablesController::class, 'statement'])->name('customer-accounts.statement');
-    Route::get('customer-accounts/{customer_account}/statement/pdf', [ReceivablesController::class, 'statementPdf'])->name('customer-accounts.statement-pdf');
+
+    // Credit notes, refunds and withholding certificates received (Phase 12): the other ways an invoice is
+    // settled, and money going back. Core, like billing.
+    Route::get('credit-notes', [CreditNoteController::class, 'index'])->name('credit-notes.index');
+    Route::post('invoices/{invoice}/credit-notes', [CreditNoteController::class, 'store'])->middleware('idempotent:required')->name('credit-notes.store');
+    Route::get('credit-notes/{credit_note}', [CreditNoteController::class, 'show'])->name('credit-notes.show');
+    Route::post('credit-notes/{credit_note}/void', [CreditNoteController::class, 'void'])->name('credit-notes.void');
+
+    Route::get('refunds', [RefundController::class, 'index'])->name('refunds.index');
+    Route::post('refunds', [RefundController::class, 'store'])->middleware('idempotent:required')->name('refunds.store');
+    Route::get('refunds/{refund}', [RefundController::class, 'show'])->name('refunds.show');
+    Route::post('refunds/{refund}/void', [RefundController::class, 'void'])->name('refunds.void');
+
+    Route::get('withholding-certificates', [WithholdingCertificateController::class, 'index'])->name('withholding-certificates.index');
+    Route::post('invoices/{invoice}/withholding', [WithholdingCertificateController::class, 'store'])->middleware('idempotent')->name('withholding-certificates.store');
+    Route::get('withholding-certificates/{withholding_certificate}', [WithholdingCertificateController::class, 'show'])->name('withholding-certificates.show');
+    Route::post('withholding-certificates/{withholding_certificate}/void', [WithholdingCertificateController::class, 'void'])->name('withholding-certificates.void');
+
+    // Accounts payable (Phase 12): what vendors bill the shop and what it pays them. Core, staff-only.
+    Route::get('vendor-bills', [VendorBillController::class, 'index'])->name('vendor-bills.index');
+    Route::get('vendor-bills/unbilled-receipts', [VendorBillController::class, 'unbilled'])->name('vendor-bills.unbilled');
+    Route::post('vendor-bills', [VendorBillController::class, 'store'])->middleware('idempotent:required')->name('vendor-bills.store');
+    Route::get('vendor-bills/{vendor_bill}', [VendorBillController::class, 'show'])->name('vendor-bills.show');
+    Route::post('vendor-bills/{vendor_bill}/void', [VendorBillController::class, 'void'])->name('vendor-bills.void');
+    Route::get('vendor-payments', [VendorPaymentController::class, 'index'])->name('vendor-payments.index');
+    Route::post('vendor-payments', [VendorPaymentController::class, 'store'])->middleware('idempotent:required')->name('vendor-payments.store');
+    Route::get('vendor-payments/{vendor_payment}', [VendorPaymentController::class, 'show'])->name('vendor-payments.show');
+    Route::post('vendor-payments/{vendor_payment}/void', [VendorPaymentController::class, 'void'])->name('vendor-payments.void');
+    Route::get('payables/aging', [VendorPaymentController::class, 'aging'])->name('payables.aging');
 
     // The books (Phase 8): chart, posting rules, journal, periods, reports, export. Core, staff-only.
     Route::get('ledger/accounts', [AccountController::class, 'index'])->name('ledger.accounts.index');
@@ -291,6 +326,29 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::get('ledger/reports/profit-and-loss', [LedgerReportController::class, 'profitAndLoss'])->name('ledger.reports.profit-and-loss');
     Route::get('ledger/reports/balance-sheet', [LedgerReportController::class, 'balanceSheet'])->name('ledger.reports.balance-sheet');
     Route::get('ledger/reports/daily-sales', [LedgerReportController::class, 'dailySales'])->name('ledger.reports.daily-sales');
+
+    // Closing the books (Phase 12): journal vouchers, bank reconciliation, the year end.
+    Route::get('ledger/vouchers', [ManualJournalController::class, 'index'])->name('ledger.vouchers.index');
+    Route::post('ledger/vouchers', [ManualJournalController::class, 'store'])->middleware('idempotent:required')->name('ledger.vouchers.store');
+    Route::get('ledger/vouchers/{manual_journal}', [ManualJournalController::class, 'show'])->name('ledger.vouchers.show');
+    Route::post('ledger/vouchers/{manual_journal}/reverse', [ManualJournalController::class, 'reverse'])->name('ledger.vouchers.reverse');
+    Route::get('ledger/bank-reconciliations', [BankReconciliationController::class, 'index'])->name('ledger.bank-reconciliations.index');
+    Route::post('ledger/bank-reconciliations', [BankReconciliationController::class, 'store'])->middleware('idempotent')->name('ledger.bank-reconciliations.store');
+    Route::get('ledger/bank-reconciliations/{bank_reconciliation}', [BankReconciliationController::class, 'show'])->name('ledger.bank-reconciliations.show');
+    Route::put('ledger/bank-reconciliations/{bank_reconciliation}/lines', [BankReconciliationController::class, 'lines'])->name('ledger.bank-reconciliations.lines');
+    Route::post('ledger/bank-reconciliations/{bank_reconciliation}/complete', [BankReconciliationController::class, 'complete'])->name('ledger.bank-reconciliations.complete');
+    Route::delete('ledger/bank-reconciliations/{bank_reconciliation}', [BankReconciliationController::class, 'destroy'])->name('ledger.bank-reconciliations.destroy');
+    Route::get('ledger/years', [FiscalYearController::class, 'index'])->name('ledger.years.index');
+    Route::post('ledger/years/close', [FiscalYearController::class, 'close'])->name('ledger.years.close');
+
+    // Tax working papers (Phase 12): VAT, the summary lists, withholding, a vendor's 2307. Staff-only.
+    Route::get('tax/options', [TaxReportController::class, 'options'])->name('tax.options');
+    Route::get('tax/vat', [TaxReportController::class, 'vat'])->name('tax.vat');
+    Route::get('tax/sales', [TaxReportController::class, 'sales'])->name('tax.sales');
+    Route::get('tax/purchases', [TaxReportController::class, 'purchases'])->name('tax.purchases');
+    Route::get('tax/withholding/expanded', [TaxReportController::class, 'expanded'])->name('tax.withholding.expanded');
+    Route::get('tax/withholding/creditable', [TaxReportController::class, 'creditable'])->name('tax.withholding.creditable');
+    Route::get('tax/withholding/certificates/{vendor}', [TaxReportController::class, 'certificate'])->name('tax.withholding.certificate');
 
     // Detailing (Phase 9): the `detailing` module, staff only. A branch's menu and settings, its
     // bookings and job cards, its schedule and shop monitor.

@@ -6,21 +6,26 @@ namespace App\Actions\Billing;
 
 use App\Domain\Invoicing\InvoiceStatus;
 use App\Domain\Receivables\PaymentStatus;
+use App\Models\CreditNote;
 use App\Models\Invoice;
 use App\Models\InvoiceWorkOrder;
 use App\Models\PaymentAllocation;
+use App\Models\WithholdingCertificate;
 use App\Models\WorkOrder;
 use Carbon\CarbonImmutable;
 
 /**
- * The ONLY writer of an invoice's `paid_cents` and its paid status, and of
- * its work orders' `collected_at`. Called, in the caller's transaction and
- * with the invoice locked, whenever money moves on it: an allocation, a
- * payment void, the issue itself (nothing due is paid at once).
+ * The ONLY writer of an invoice's `paid_cents`, `credited_cents`,
+ * `withheld_cents` and its paid status, and of its work orders'
+ * `collected_at`. Called, in the caller's transaction and with the invoice
+ * locked, whenever something moves on it: an allocation, a payment void, a
+ * credit note, a withholding certificate, the issue itself (nothing due is
+ * paid at once).
  *
- * paid = the allocations of its payments that still stand (re-summed, never
- * incremented); the status follows (`InvoiceStatus::settled`). The database
- * checks the same sum at commit.
+ * paid = the allocations of its payments that still stand; credited = what
+ * its standing credit notes applied to it; withheld = its standing 2307s.
+ * Each is re-summed, never incremented; the status follows their total
+ * (`InvoiceStatus::settled`). The database checks the same sums at commit.
  *
  * `collected_at` is the Phase 3 field the shop reports read as "revenue
  * recognised": kept as a derived compatibility field, it is stamped on every
@@ -42,11 +47,13 @@ final class InvoiceSettlement
             ->where('payment_allocations.invoice_id', $invoice->id)
             ->where('payments.status', PaymentStatus::Posted->value)
             ->sum('payment_allocations.amount_cents');
-        $status = InvoiceStatus::settled($paid, $invoice->total_due_cents);
+        $credited = (int) CreditNote::query()->where('invoice_id', $invoice->id)->where('status', CreditNote::ISSUED)->sum('applied_cents');
+        $withheld = (int) WithholdingCertificate::query()->where('invoice_id', $invoice->id)->where('status', PaymentStatus::Posted->value)->sum('amount_cents');
+        $status = InvoiceStatus::settled($paid + $credited + $withheld, $invoice->total_due_cents);
         $wasPaid = $invoice->status === InvoiceStatus::Paid;
 
-        if ($paid !== $invoice->paid_cents || $status !== $invoice->status) {
-            $invoice->forceFill(['paid_cents' => $paid, 'status' => $status])->save();
+        if ($paid !== $invoice->paid_cents || $credited !== $invoice->credited_cents || $withheld !== $invoice->withheld_cents || $status !== $invoice->status) {
+            $invoice->forceFill(['paid_cents' => $paid, 'credited_cents' => $credited, 'withheld_cents' => $withheld, 'status' => $status])->save();
         }
 
         if ($status === InvoiceStatus::Paid && ! $wasPaid) {

@@ -7,6 +7,7 @@ namespace App\Actions\Billing;
 use App\Actions\WorkOrders\WorkOrderQueries;
 use App\Actions\WorkOrders\WorkOrderView;
 use App\Domain\Invoicing\InvoiceStatus;
+use App\Domain\Invoicing\Invoicing;
 use App\Domain\Receivables\Aging;
 use App\Domain\Receivables\CreditPosition;
 use App\Domain\Receivables\OpenInvoice;
@@ -15,11 +16,14 @@ use App\Domain\Receivables\Statement;
 use App\Domain\Receivables\StatementEntry;
 use App\Domain\Shared\Calendar;
 use App\Domain\WorkOrders\WorkOrderStatus;
+use App\Models\CreditNote;
 use App\Models\CustomerAccount;
 use App\Models\Invoice;
 use App\Models\InvoiceWorkOrder;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
+use App\Models\Refund;
+use App\Models\WithholdingCertificate;
 use App\Tenancy\TenantManager;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -37,13 +41,16 @@ use Illuminate\Support\Facades\DB;
  */
 final class BillingQueries
 {
-    public const array INVOICE_RELATIONS = ['lines', 'workOrderLinks.workOrder', 'allocations.payment', 'customerAccount'];
+    public const array INVOICE_RELATIONS = ['lines', 'workOrderLinks.workOrder', 'allocations.payment', 'creditNotes', 'withholdingCertificates', 'customerAccount'];
 
-    public const array PAYMENT_RELATIONS = ['allocations.invoice', 'customerAccount'];
+    public const array PAYMENT_RELATIONS = ['allocations.invoice', 'refunds', 'customerAccount', 'branch'];
+
+    public const array CREDIT_NOTE_RELATIONS = ['lines', 'refunds', 'invoice', 'customerAccount'];
 
     public function __construct(
         private readonly TenantManager $tenancy,
         private readonly WorkOrderQueries $orders,
+        private readonly InvoiceParties $parties,
     ) {}
 
     /**
@@ -72,6 +79,68 @@ final class BillingQueries
         }
 
         return $query;
+    }
+
+    /**
+     * @return Builder<CreditNote>
+     */
+    public function creditNotes(): Builder
+    {
+        $context = $this->tenancy->require();
+        $query = CreditNote::query()->visibleTo($context);
+        if ($context->isStaff()) {
+            $query->whereIn('branch_id', $context->branchFilter());
+        }
+
+        return $query;
+    }
+
+    /**
+     * @return Builder<Refund>
+     */
+    public function refunds(): Builder
+    {
+        $context = $this->tenancy->require();
+        $query = Refund::query()->visibleTo($context);
+        if ($context->isStaff()) {
+            $query->whereIn('branch_id', $context->branchFilter());
+        }
+
+        return $query;
+    }
+
+    /**
+     * @return Builder<WithholdingCertificate>
+     */
+    public function withholdingCertificates(): Builder
+    {
+        $context = $this->tenancy->require();
+        $query = WithholdingCertificate::query()->visibleTo($context);
+        if ($context->isStaff()) {
+            $query->whereIn('branch_id', $context->branchFilter());
+        }
+
+        return $query;
+    }
+
+    /**
+     * Credit notes, refunds or withholding certificates, newest first.
+     *
+     * @template TModel of CreditNote|Refund|WithholdingCertificate
+     *
+     * @param  Builder<TModel>  $query
+     * @param  array{status?: string, customer_account_id?: string, branch_id?: string, invoice_id?: string}  $filters
+     * @return LengthAwarePaginator<int, TModel>
+     */
+    public function settlementPage(Builder $query, array $filters, string $dated, int $perPage): LengthAwarePaginator
+    {
+        foreach (['status', 'customer_account_id', 'branch_id', 'invoice_id'] as $column) {
+            if (isset($filters[$column])) {
+                $query->where($column, $filters[$column]);
+            }
+        }
+
+        return $query->orderByDesc($dated)->orderByDesc('id')->paginate($perPage);
     }
 
     /**
@@ -150,15 +219,16 @@ final class BillingQueries
 
     /**
      * Open items as of a business date: every invoice issued on or before it
-     * and not voided by then, with what had been paid against it by then
-     * (allocations dated on or before it, from payments not voided by then).
+     * and not voided by then, with what had been settled against it by then
+     * (allocations dated on or before it, from payments not voided by then;
+     * credit notes and withholding certificates dated by then and standing).
      *
      * @return list<OpenInvoice>
      */
     public function openItems(string $asOf, ?string $customerAccountId = null): array
     {
         $query = $this->invoices()
-            ->with(['allocations.payment'])
+            ->with(['allocations.payment', 'creditNotes', 'withholdingCertificates'])
             ->where('status', '<>', InvoiceStatus::Draft->value)
             ->where('issue_date', '<=', $asOf);
         if ($customerAccountId !== null) {
@@ -176,6 +246,16 @@ final class BillingQueries
                 $standing = $payment->status === PaymentStatus::Posted || ($payment->voided_at !== null && Calendar::toDate($payment->voided_at) > $asOf);
                 if ($standing && $allocation->allocated_on->toDateString() <= $asOf) {
                     $paid += $allocation->amount_cents;
+                }
+            }
+            foreach ($invoice->creditNotes as $note) {
+                if ($note->issued_on->toDateString() <= $asOf && ($note->voided_at === null || Calendar::toDate($note->voided_at) > $asOf)) {
+                    $paid += $note->applied_cents;
+                }
+            }
+            foreach ($invoice->withholdingCertificates as $certificate) {
+                if ($certificate->received_on->toDateString() <= $asOf && ($certificate->voided_at === null || Calendar::toDate($certificate->voided_at) > $asOf)) {
+                    $paid += $certificate->amount_cents;
                 }
             }
             $items[] = new OpenInvoice($invoice->id, (string) $invoice->number, $invoice->customer_account_id, (string) $invoice->issue_date?->toDateString(), (string) $invoice->due_date?->toDateString(), $invoice->total_due_cents, $paid);
@@ -214,7 +294,7 @@ final class BillingQueries
         $outstanding = (int) Invoice::query()
             ->where('customer_account_id', $account->id)
             ->whereIn('status', [InvoiceStatus::Issued->value, InvoiceStatus::PartiallyPaid->value])
-            ->sum(DB::raw('total_due_cents - paid_cents'));
+            ->sum(DB::raw('total_due_cents - paid_cents - credited_cents - withheld_cents'));
 
         return new CreditPosition($account->credit_limit_cents?->getMinorAmount()->toInt(), $outstanding, $this->allCredit($account->id));
     }
@@ -260,8 +340,8 @@ final class BillingQueries
 
     /**
      * A statement of account over [from, to]: the balance brought forward,
-     * every invoice, payment and void in the range with the running balance,
-     * and the closing balance.
+     * every invoice, payment, credit note, refund, withholding certificate and
+     * void in the range with the running balance, and the closing balance.
      *
      * @return array<string, mixed>
      */
@@ -283,6 +363,27 @@ final class BillingQueries
             }
         }
 
+        foreach ($this->creditNotes()->where('customer_account_id', $account->id)->get() as $note) {
+            $entries[] = new StatementEntry($note->issued_on->toDateString(), StatementEntry::CREDIT_NOTE, $note->id, $note->number, 'Credit note '.$note->number, 0, $note->total_cents, $note->created_at->toIso8601ZuluString().$note->id);
+            if ($note->voided_at !== null) {
+                $entries[] = new StatementEntry(Calendar::toDate($note->voided_at), StatementEntry::CREDIT_NOTE_VOID, $note->id, $note->number, 'Credit note '.$note->number.' voided', $note->total_cents, 0, $note->voided_at->toIso8601ZuluString().$note->id);
+            }
+        }
+        foreach ($this->refunds()->where('customer_account_id', $account->id)->get() as $refund) {
+            $label = sprintf('Refund %s (%s%s)', $refund->number, $refund->method->label(), $refund->reference_no === null ? '' : ' '.$refund->reference_no);
+            $entries[] = new StatementEntry($refund->refunded_on->toDateString(), StatementEntry::REFUND, $refund->id, $refund->number, $label, $refund->amount_cents, 0, $refund->created_at->toIso8601ZuluString().$refund->id);
+            if ($refund->voided_at !== null) {
+                $entries[] = new StatementEntry(Calendar::toDate($refund->voided_at), StatementEntry::REFUND_VOID, $refund->id, $refund->number, 'Refund '.$refund->number.' voided', 0, $refund->amount_cents, $refund->voided_at->toIso8601ZuluString().$refund->id);
+            }
+        }
+        foreach ($this->withholdingCertificates()->where('customer_account_id', $account->id)->get() as $certificate) {
+            $reference = $certificate->certificate_no ?? $certificate->atc_code;
+            $entries[] = new StatementEntry($certificate->received_on->toDateString(), StatementEntry::WITHHOLDING, $certificate->id, $reference, "Tax withheld at source ({$certificate->atc_code}, BIR 2307)", 0, $certificate->amount_cents, $certificate->created_at->toIso8601ZuluString().$certificate->id);
+            if ($certificate->voided_at !== null) {
+                $entries[] = new StatementEntry(Calendar::toDate($certificate->voided_at), StatementEntry::WITHHOLDING_VOID, $certificate->id, $reference, 'Withholding certificate voided', $certificate->amount_cents, 0, $certificate->voided_at->toIso8601ZuluString().$certificate->id);
+            }
+        }
+
         $statement = Statement::build($entries, $from, $to);
 
         return [
@@ -290,6 +391,9 @@ final class BillingQueries
             'customer_name' => $account->registered_name ?? $account->display_name,
             'customer_tin' => $account->tin,
             'customer_address' => $account->address,
+            // What the printed statement carries: who it is from (the organization) and what it is not.
+            'seller' => $this->parties->seller($account->organization_id, null),
+            'notices' => [Invoicing::NOT_AN_INVOICE],
             'from' => $from,
             'to' => $to,
             'opening_balance_cents' => $statement['opening_balance_cents'],
@@ -311,8 +415,10 @@ final class BillingQueries
 
     /**
      * Revenue two ways over [from, to]: ACCRUAL (invoices issued in the range
-     * and still standing: net sales, VAT, total) and CASH (payments received
-     * in the range that still stand, by method).
+     * and still standing: net sales, VAT, total; and the standing credit notes
+     * issued in the range, which come off them) and CASH (payments received in
+     * the range that still stand, by method; and the standing refunds paid in
+     * the range, which come off them).
      *
      * @return array<string, mixed>
      */
@@ -341,12 +447,30 @@ final class BillingQueries
         }
         ksort($byMethod);
 
+        $notes = $this->creditNotes()->where('status', CreditNote::ISSUED)->whereBetween('issued_on', [$from, $to])->get();
+        $credited = ['credit_notes' => $notes->count(), 'net_sales_cents' => 0, 'vat_cents' => 0, 'total_cents' => 0];
+        foreach ($notes as $note) {
+            $credited['net_sales_cents'] += $note->netCents();
+            $credited['vat_cents'] += $note->vat_amount_cents;
+            $credited['total_cents'] += $note->total_cents;
+        }
+        $refunded = (int) $this->refunds()->where('status', PaymentStatus::Posted->value)->whereBetween('refunded_on', [$from, $to])->sum('amount_cents');
+
         return [
             'from' => $from,
             'to' => $to,
-            'accrual' => ['invoices' => $issued->count(), 'net_sales_cents' => $net, 'vat_cents' => $vat, 'total_cents' => $total],
+            'accrual' => [
+                'invoices' => $issued->count(),
+                'net_sales_cents' => $net,
+                'vat_cents' => $vat,
+                'total_cents' => $total,
+                'credited' => $credited,
+                'net_of_credits_cents' => $net - $credited['net_sales_cents'],
+            ],
             'cash' => [
                 'payments' => $received->count(),
+                'refunded_cents' => $refunded,
+                'net_received_cents' => array_sum($byMethod) - $refunded,
                 'received_cents' => array_sum($byMethod),
                 'by_method' => array_map(fn (string $method, int $cents): array => ['method' => $method, 'received_cents' => $cents], array_keys($byMethod), array_values($byMethod)),
             ],
@@ -354,7 +478,9 @@ final class BillingQueries
     }
 
     /**
-     * Unallocated credit per account, over the caller's visible payments.
+     * The credit each account holds, over the caller's visible payments and
+     * credit notes: what payments have neither allocated nor refunded, and
+     * what credit notes left over and have not refunded.
      *
      * @param  list<string>  $accountIds
      * @return array<string, int>
@@ -365,14 +491,17 @@ final class BillingQueries
             return [];
         }
         $credits = [];
-        foreach ($this->payments()->with('allocations')->whereIn('customer_account_id', $accountIds)->where('status', PaymentStatus::Posted->value)->get() as $payment) {
+        foreach ($this->payments()->with(['allocations', 'refunds'])->whereIn('customer_account_id', $accountIds)->where('status', PaymentStatus::Posted->value)->get() as $payment) {
             $credits[$payment->customer_account_id] = ($credits[$payment->customer_account_id] ?? 0) + $payment->unallocatedCents();
+        }
+        foreach ($this->creditNotes()->with('refunds')->whereIn('customer_account_id', $accountIds)->where('status', CreditNote::ISSUED)->where('credit_cents', '>', 0)->get() as $note) {
+            $credits[$note->customer_account_id] = ($credits[$note->customer_account_id] ?? 0) + $note->refundableCents();
         }
 
         return $credits;
     }
 
-    /** An account's unallocated credit over every branch. */
+    /** The credit an account holds over every branch: unallocated payments and credit-note credit, less refunds. */
     private function allCredit(string $accountId): int
     {
         $paid = (int) Payment::query()->where('customer_account_id', $accountId)->where('status', PaymentStatus::Posted->value)->sum('amount_cents');
@@ -381,7 +510,10 @@ final class BillingQueries
             ->where('payment_allocations.customer_account_id', $accountId)
             ->where('payments.status', PaymentStatus::Posted->value)
             ->sum('payment_allocations.amount_cents');
+        $credited = (int) CreditNote::query()->where('customer_account_id', $accountId)->where('status', CreditNote::ISSUED)->sum('credit_cents');
+        // A refund stands only while its source does: voiding a payment or a credit note needs its refunds voided first.
+        $refunded = (int) Refund::query()->where('customer_account_id', $accountId)->where('status', PaymentStatus::Posted->value)->sum('amount_cents');
 
-        return $paid - $allocated;
+        return $paid - $allocated + $credited - $refunded;
     }
 }

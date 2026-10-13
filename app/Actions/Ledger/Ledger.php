@@ -104,6 +104,7 @@ final class Ledger
                 'debit_cents' => $line->debitCents,
                 'credit_cents' => $line->creditCents,
                 'customer_account_id' => $line->customerAccountId,
+                'vendor_id' => $line->vendorId,
                 'stock_move_id' => $line->stockMoveId,
                 'memo' => mb_substr($line->memo, 0, 200),
                 'created_at' => $now,
@@ -129,6 +130,7 @@ final class Ledger
             $line->customer_account_id,
             null,
             $line->memo,
+            $line->vendor_id,
         ))->all());
 
         // Say so when the entry it undoes sits in a month that is already closed.

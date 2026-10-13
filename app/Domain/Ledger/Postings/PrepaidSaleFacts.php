@@ -19,6 +19,8 @@ final readonly class PrepaidSaleFacts implements PostingFacts
         public string $soldOn,
         public int $priceCents,
         public PaymentMethod $method,
+        /** The VAT inside the price (a package is sold VAT-inclusive); none for a branch that is not VAT-registered. */
+        public int $vatCents = 0,
     ) {}
 
     public function event(): LedgerEvent

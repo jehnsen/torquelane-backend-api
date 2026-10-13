@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Actions\Billing\InvoiceParties;
 use App\Actions\Ledger\Ledger;
 use App\Database\EnsureSchemaExists;
 use App\Database\SchemaMacros;
@@ -46,6 +47,9 @@ class AppServiceProvider extends ServiceProvider
 
         // One journal writer per request: the backfill marks the entries it makes through it.
         $this->app->scoped(Ledger::class);
+
+        // One per request: it remembers the organization a list of receipts is printed from.
+        $this->app->scoped(InvoiceParties::class);
 
         // Until an SMS provider is chosen, text messages are written to the log (Phase 11).
         $this->app->bind(SmsGateway::class, LogSmsGateway::class);

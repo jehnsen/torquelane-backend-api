@@ -302,7 +302,9 @@ final class ManageInvoices
             match ($locked->status) {
                 InvoiceStatus::Draft => throw new InvalidTransitionException('A draft has no number to void; discard it instead.'),
                 InvoiceStatus::Void => throw new InvalidTransitionException("Invoice {$locked->number} is already void."),
-                InvoiceStatus::PartiallyPaid, InvoiceStatus::Paid => throw new InvalidTransitionException("Invoice {$locked->number} has payments against it; void those payments first."),
+                InvoiceStatus::PartiallyPaid, InvoiceStatus::Paid => throw new InvalidTransitionException($locked->credited_cents + $locked->withheld_cents > 0
+                    ? "Invoice {$locked->number} has credit notes or withholding against it; void those first."
+                    : "Invoice {$locked->number} has payments against it; void those payments first."),
                 InvoiceStatus::Issued => null,
             };
             $before = BillingJournal::invoiceSnapshot($locked);

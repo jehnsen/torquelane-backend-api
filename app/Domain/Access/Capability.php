@@ -64,6 +64,10 @@ enum Capability: string
     case CrmWork = 'crm:work';
     /** Set up templates, reminder rules, tiers, plans, segments and campaigns; change CRM settings (staff only). */
     case CrmManage = 'crm:manage';
+    /** See vendor bills, payments to vendors and what is owed (staff only, Phase 12). */
+    case PayablesView = 'payables:view';
+    /** Record and void vendor bills and payments to vendors (staff only). */
+    case PayablesManage = 'payables:manage';
 
     /** Shown in denial reasons. The ported labels are verbatim from the frontend. */
     public function label(): string
@@ -99,6 +103,8 @@ enum Capability: string
             self::CrmView => 'See customer records, tasks and the pipeline',
             self::CrmWork => 'Keep notes and tasks, work leads, sell packages',
             self::CrmManage => 'Set up reminders, templates, tiers and campaigns',
+            self::PayablesView => 'View vendor bills and payments',
+            self::PayablesManage => 'Record vendor bills and pay vendors',
         };
     }
 
@@ -110,7 +116,8 @@ enum Capability: string
             self::BillingView, self::BillingManage, self::BillingVoid, self::LedgerView, self::LedgerManage,
             self::DetailingView, self::DetailingBook, self::DetailingWork, self::DetailingQc, self::DetailingManage,
             self::EquipmentView, self::EquipmentManage,
-            self::CrmView, self::CrmWork, self::CrmManage => true,
+            self::CrmView, self::CrmWork, self::CrmManage,
+            self::PayablesView, self::PayablesManage => true,
             default => false,
         };
     }

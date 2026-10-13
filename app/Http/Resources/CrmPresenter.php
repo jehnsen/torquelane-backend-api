@@ -214,11 +214,14 @@ final class CrmPresenter
             'plan_id' => $p->plan_id,
             'plan_name' => $p->plan_name,
             'price_cents' => $p->price_cents,
+            // The VAT inside the price, charged when it was sold; the rest is what its credits earn.
+            'vat_cents' => $p->vat_cents,
+            'net_price_cents' => $p->netPriceCents(),
             'credits_total' => $p->credits_total,
             'credits_used' => $p->credits_used,
             'credits_left' => $p->credits_total - $p->credits_used,
             // What is still owed as service: this package's share of Unearned Revenue.
-            'unearned_cents' => Prepaid::unearnedCents($p->price_cents, $p->credits_total, $p->credits_used),
+            'unearned_cents' => Prepaid::unearnedCents($p->netPriceCents(), $p->credits_total, $p->credits_used),
             'detailing_package_id' => $p->detailing_package_id,
             'sold_on' => $p->sold_on->toDateString(),
             'expires_on' => $p->expires_on?->toDateString(),

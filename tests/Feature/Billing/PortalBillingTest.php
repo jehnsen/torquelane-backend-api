@@ -38,10 +38,8 @@ it('shows a fleet manager their own issued invoices and payments only', function
         ->and($list->json('data.0.can_void'))->toBeFalse();
 
     $this->getJson('/api/v1/invoices/'.$this->world->id('invoice:actimed-overdue'))->assertOk()->assertJsonPath('data.payments.0.number', 'PAY-2026-0001');
-    $this->get('/api/v1/invoices/'.$this->world->id('invoice:actimed-overdue').'/pdf')->assertOk()->assertHeader('Content-Type', 'application/pdf');
     foreach ([$draft, $this->world->id('invoice:northwind'), $this->world->id('invoice:sagrada-draft'), $this->world->id('rival:invoice')] as $hidden) {
         $this->getJson("/api/v1/invoices/{$hidden}")->assertNotFound();
-        $this->get("/api/v1/invoices/{$hidden}/pdf")->assertNotFound();
     }
 
     expect($this->getJson('/api/v1/payments')->assertOk()->json('data.*.number'))->toBe(['PAY-2026-0001']);

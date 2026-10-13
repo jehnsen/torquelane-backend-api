@@ -8,7 +8,6 @@ use App\Actions\Billing\BillingBranch;
 use App\Actions\Billing\BillingQueries;
 use App\Actions\Billing\RecordPayment;
 use App\Actions\Fleet\FleetQueries;
-use App\Documents\BillingPdf;
 use App\Http\Requests\AllocatePaymentRequest;
 use App\Http\Requests\ListPaymentsRequest;
 use App\Http\Requests\RecordPaymentRequest;
@@ -17,7 +16,6 @@ use App\Http\Resources\PaymentCollection;
 use App\Http\Resources\PaymentResource;
 use App\Models\Payment;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
 
 /**
@@ -94,18 +92,5 @@ final class PaymentController
         Gate::authorize('void', $payment);
 
         return new PaymentResource($record->void($payment, $request->reason()));
-    }
-
-    /**
-     * Acknowledgment receipt PDF
-     *
-     * The printed acknowledgment of the payment (`application/pdf`): what was
-     * received and which invoices it went to. Not an invoice.
-     */
-    public function pdf(Payment $payment, BillingPdf $pdf): Response
-    {
-        Gate::authorize('view', $payment);
-
-        return $pdf->payment($payment);
     }
 }

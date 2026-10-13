@@ -1,0 +1,1171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TorqueLane API: workflow demo</title>
+<style>
+:root{
+  --bg:#f5f2ec; --surface:#fffdf9; --sunk:#ece7dd; --ink:#1d1b17; --muted:#6d685e; --line:#ddd6c8;
+  --accent:#c2410c; --accent-ink:#fff; --accent-soft:#fbe6d6;
+  --ok:#166534; --ok-soft:#dcefe0; --warn:#a16207; --warn-soft:#f6ecc9;
+  --bad:#b42318; --bad-soft:#f9dcd8; --info:#1e4fa3; --info-soft:#dbe6f7;
+  --mono:ui-monospace,"Cascadia Code","SF Mono",Menlo,Consolas,monospace;
+  --sans:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --r:10px;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#151410; --surface:#1e1c17; --sunk:#27241b; --ink:#ece7dc; --muted:#a09a8c; --line:#3a352a;
+    --accent:#f08a4b; --accent-ink:#1a1206; --accent-soft:#3a2415;
+    --ok:#6fcf8a; --ok-soft:#173022; --warn:#e3b341; --warn-soft:#352b10;
+    --bad:#f2877b; --bad-soft:#3b1b17; --info:#8fb4f2; --info-soft:#18263f;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#151410; --surface:#1e1c17; --sunk:#27241b; --ink:#ece7dc; --muted:#a09a8c; --line:#3a352a;
+  --accent:#f08a4b; --accent-ink:#1a1206; --accent-soft:#3a2415;
+  --ok:#6fcf8a; --ok-soft:#173022; --warn:#e3b341; --warn-soft:#352b10;
+  --bad:#f2877b; --bad-soft:#3b1b17; --info:#8fb4f2; --info-soft:#18263f;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+h1,h2,h3,p{margin:0}
+code,pre,.mono{font-family:var(--mono);font-size:.86em}
+button,input,select{font:inherit;color:inherit}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;border-bottom:1px solid var(--line);background:var(--surface);position:sticky;top:0;z-index:20}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:36px;height:36px;border-radius:9px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-weight:700;letter-spacing:.02em}
+.brand strong{display:block;line-height:1.2}
+.brand span.sub{color:var(--muted);font-size:13px}
+.shell{display:grid;grid-template-columns:250px minmax(0,1fr);max-width:1320px;margin:0 auto}
+.nav{position:sticky;top:61px;align-self:start;padding:18px 12px;display:flex;flex-direction:column;gap:4px;max-height:calc(100vh - 61px);overflow:auto}
+.nav button{display:grid;grid-template-columns:26px 1fr;gap:2px 8px;text-align:left;background:none;border:0;border-radius:8px;padding:8px 10px;cursor:pointer}
+.nav button:hover{background:var(--sunk)}
+.nav button .n{grid-row:1/3;font:600 12px var(--mono);color:var(--muted);padding-top:3px}
+.nav button b{font-weight:600}
+.nav button small{color:var(--muted);font-size:12.5px}
+.nav button.on{background:var(--accent-soft)}
+.nav button.on .n,.nav button.on b{color:var(--accent)}
+main{padding:26px 28px 80px;min-width:0}
+.scene{display:none;scroll-margin-top:140px}
+.scene.on{display:block;animation:rise .35s ease both}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+h2{font-size:26px;letter-spacing:-.01em;line-height:1.2}
+.lede{color:var(--muted);max-width:68ch;margin:6px 0 18px}
+h3{font-size:13px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:0 0 8px;font-weight:600}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
+.grid2{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px;align-items:start}
+.grid2.even{grid-template-columns:repeat(2,minmax(0,1fr))}
+.stack{display:flex;flex-direction:column;gap:16px;min-width:0}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 14px}
+.bar label{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13.5px}
+.btn{border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);border-radius:8px;padding:7px 13px;cursor:pointer;font-weight:600;font-size:14px;transition:transform .08s,filter .15s}
+.btn:hover{filter:brightness(1.07)}
+.btn:active{transform:translateY(1px)}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+.btn.ghost:hover{background:var(--sunk);filter:none}
+.btn.sm{padding:3px 9px;font-size:12.5px}
+.btn.hot{box-shadow:0 0 0 3px var(--accent-soft)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+input[type=number],select,input[type=text]{background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:6px 8px;min-width:0}
+input[type=number]{width:92px}
+input[type=range]{accent-color:var(--accent);width:100%}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 12px;cursor:pointer;font-size:13.5px}
+.chip:hover{background:var(--sunk)}
+.chip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.pill{display:inline-block;border-radius:999px;padding:1px 9px;font-size:12px;font-weight:600;white-space:nowrap;background:var(--sunk);color:var(--muted)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)} .pill.info{background:var(--info-soft);color:var(--info)}
+.pill.acc{background:var(--accent-soft);color:var(--accent)}
+.rule{border-left:3px solid var(--accent);background:var(--accent-soft);padding:9px 12px;border-radius:0 8px 8px 0;font-size:13.5px;margin-top:14px}
+.rule b{color:var(--accent)}
+.src{color:var(--muted);font:12.5px var(--mono);margin-top:16px;word-break:break-word}
+pre{margin:0;background:var(--sunk);border-radius:8px;padding:12px;overflow:auto;line-height:1.45;white-space:pre-wrap;word-break:break-word}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th{text-align:left;font-weight:600;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.05em}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
+.scroll{overflow-x:auto}
+.flash{animation:flash .9s ease}
+@keyframes flash{0%{background:var(--accent-soft)}100%{background:transparent}}
+.shake{animation:shake .4s}
+@keyframes shake{20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.kpi{background:var(--sunk);border-radius:8px;padding:10px 12px}
+.kpi span{display:block;color:var(--muted);font-size:12px}
+.kpi b{font-size:18px;font-variant-numeric:tabular-nums}
+
+/* 1 pipeline */
+.req{background:var(--sunk);padding:5px 9px;border-radius:7px;margin-left:auto;max-width:100%;overflow-wrap:anywhere}
+.stages{list-style:none;margin:0;padding:0 0 0 34px;position:relative}
+.stages::before{content:"";position:absolute;left:10px;top:14px;bottom:14px;width:2px;background:var(--line)}
+.st{position:relative;padding:7px 10px;border-radius:0 8px 8px 0;transition:opacity .3s,background .3s}
+.st .node{position:absolute;left:-30px;top:11px;width:14px;height:14px;border-radius:50%;background:var(--surface);border:2px solid var(--line);transition:all .25s}
+.st b{font-weight:600} .st small{color:var(--muted);margin-left:8px;font:12px var(--mono)}
+.st .note{font-size:13.5px;color:var(--muted);max-height:0;overflow:hidden;opacity:0;transition:max-height .35s,opacity .35s}
+.st.active .note,.st.done .note,.st.fail .note,.st.replay .note{max-height:160px;opacity:1}
+.st.tx{box-shadow:inset 3px 0 0 var(--txc,var(--line));background:color-mix(in srgb,var(--txc,transparent) 7%,transparent)}
+.st.active .node{border-color:var(--accent);background:var(--accent);box-shadow:0 0 0 5px var(--accent-soft)}
+.st.done .node{border-color:var(--ok);background:var(--ok)}
+.st.fail .node{border-color:var(--bad);background:var(--bad);box-shadow:0 0 0 5px var(--bad-soft)}
+.st.fail .note{color:var(--bad)}
+.st.replay .node{border-color:var(--info);background:var(--info)}
+.st.skip{opacity:.35}
+.txlabel{float:right;font:600 11px var(--mono);color:var(--txc,var(--muted));letter-spacing:.05em}
+.stages.tx-open{--txc:var(--accent)} .stages.tx-commit{--txc:var(--ok)} .stages.tx-rollback{--txc:var(--bad)}
+.packet{position:absolute;left:5px;top:0;width:12px;height:12px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft);transition:transform .42s cubic-bezier(.5,0,.2,1),opacity .2s;opacity:0;z-index:2}
+.resp{position:sticky;top:80px}
+.resp .status{font:700 20px var(--mono);margin-bottom:8px}
+.resp .hdr{font:12.5px var(--mono);color:var(--muted);margin-bottom:8px}
+
+/* 2 tenancy */
+.matrix th.col{text-transform:none;letter-spacing:0;font-size:12.5px;vertical-align:bottom;color:var(--ink);min-width:86px}
+.matrix th.col small{display:block;color:var(--muted);font:11px var(--mono)}
+.matrix td.who{min-width:190px} .matrix td.who b{display:block;font-weight:600;white-space:nowrap} .matrix td.who small{color:var(--muted);font-size:12px}
+.cell{width:100%;border:1px solid transparent;border-radius:6px;padding:5px 0;font:600 13px var(--mono);cursor:pointer}
+.cell.s200{background:var(--ok-soft);color:var(--ok)} .cell.s403{background:var(--warn-soft);color:var(--warn)} .cell.s404{background:var(--sunk);color:var(--muted)}
+.cell.on{border-color:var(--ink);box-shadow:0 0 0 2px var(--ink)}
+.chain{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.chain li{display:grid;grid-template-columns:22px 1fr;gap:8px;align-items:start;padding:7px 9px;border-radius:8px;background:var(--sunk);opacity:0;animation:rise .3s ease forwards}
+.chain .dot{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;color:#fff;margin-top:2px}
+.chain .pass .dot{background:var(--ok)} .chain .fail .dot{background:var(--bad)} .chain .skip .dot{background:var(--line);color:var(--muted)}
+.chain .skip{opacity:.5!important}
+.chain small{display:block;color:var(--muted)}
+.chain .fail small{color:var(--bad)}
+
+/* 3 work order */
+.wo-svg{width:100%;max-width:900px;height:auto;display:block;margin:0 auto;min-width:560px}
+#wo-diagram{overflow-x:auto}
+.decide{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.wo-svg .nd rect{fill:var(--surface);stroke:var(--line);stroke-width:1.5;transition:all .25s}
+.wo-svg .nd text{fill:var(--muted);font:600 11.5px var(--sans);text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.wo-svg .nd{cursor:pointer}
+.wo-svg .nd.next rect{stroke:var(--accent);stroke-dasharray:5 4;animation:dash 1s linear infinite}
+.wo-svg .nd.next text{fill:var(--accent)}
+.wo-svg .nd.cur rect{fill:var(--accent);stroke:var(--accent)}
+.wo-svg .nd.cur text{fill:var(--accent-ink)}
+.wo-svg .ed{fill:none;stroke:var(--line);stroke-width:1.5;transition:stroke .25s}
+.wo-svg .ed.live{stroke:var(--accent);stroke-width:2;stroke-dasharray:6 5;animation:dash 1s linear infinite}
+.wo-svg .ah{fill:var(--line)} .wo-svg .ahl{fill:var(--accent)}
+.wo-svg .lbl{fill:var(--muted);font:10.5px var(--sans)}
+@keyframes dash{to{stroke-dashoffset:-22}}
+.stagebar{display:flex;flex-wrap:wrap;gap:4px;margin-top:10px}
+.stagebar span{flex:1 1 auto;text-align:center;font-size:12px;padding:4px 6px;border-radius:6px;background:var(--sunk);color:var(--muted);transition:all .3s;white-space:nowrap}
+.stagebar span.on{background:var(--accent);color:var(--accent-ink);font-weight:600}
+.stagebar span.past{background:var(--ok-soft);color:var(--ok)}
+.band{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:8px}
+.band div{padding:7px 8px;border-radius:7px;background:var(--sunk);font-size:12.5px;color:var(--muted);transition:all .3s}
+.band div b{display:block;color:inherit}
+.band div.on{background:var(--accent-soft);color:var(--accent);box-shadow:inset 0 0 0 1.5px var(--accent)}
+.log{list-style:none;margin:0;padding:0;max-height:300px;overflow:auto;display:flex;flex-direction:column;gap:5px}
+.log li{font-size:13.5px;padding:6px 9px;border-radius:7px;background:var(--sunk);animation:rise .3s ease}
+.tag{font:600 11px var(--mono);padding:1px 6px;border-radius:5px;margin-right:6px;background:var(--line);color:var(--ink);white-space:nowrap}
+.tag.t403,.tag.t422{background:var(--warn-soft);color:var(--warn)} .tag.t409{background:var(--bad-soft);color:var(--bad)}
+.tag.tok{background:var(--ok-soft);color:var(--ok)} .tag.tinfo{background:var(--info-soft);color:var(--info)}
+
+/* 4 maintenance */
+.ctl{display:grid;grid-template-columns:150px 1fr 96px;gap:10px;align-items:center;margin-bottom:8px;font-size:13.5px}
+.ctl output{font:600 13px var(--mono);text-align:right}
+.tl{position:relative;height:150px;margin:6px 14px 0}
+.tl .track{position:absolute;left:0;right:0;top:74px;height:8px;border-radius:4px;background:var(--sunk)}
+.tl .elapsed{position:absolute;left:0;top:74px;height:8px;border-radius:4px 0 0 4px;background:var(--muted);opacity:.45;transition:width .35s}
+.tl .zone{position:absolute;top:70px;height:16px;border-radius:4px;background:var(--warn-soft);border:1px dashed var(--warn);transition:left .35s,width .35s}
+.tl .mk{position:absolute;top:0;bottom:0;width:0;transition:left .35s}
+.tl .mk i{position:absolute;left:-1px;width:2px;background:var(--muted)}
+.tl .mk span{position:absolute;white-space:nowrap;font-size:12px;transform:translateX(-50%);background:var(--surface);padding:0 4px;border-radius:4px}
+.tl .mk.today i{top:22px;bottom:40px;background:var(--ink)} .tl .mk.today span{top:2px;font-weight:700}
+.tl .mk.dist i{top:44px;height:40px} .tl .mk.dist span{top:26px}
+.tl .mk.cal i{top:72px;height:40px} .tl .mk.cal span{top:114px}
+.tl .mk.last i{top:66px;height:24px} .tl .mk.last span{top:96px;transform:none;left:0;color:var(--muted)}
+.tl .mk.gov i{background:var(--accent);width:3px} .tl .mk.gov span{color:var(--accent);font-weight:700}
+.ring{--p:100;width:120px;height:120px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--rc,var(--ok)) calc(var(--p)*1%),var(--sunk) 0);transition:--p .5s}
+@property --p{syntax:"<number>";inherits:false;initial-value:100}
+.ring div{width:92px;height:92px;border-radius:50%;background:var(--surface);display:grid;place-items:center;font:700 30px var(--sans)}
+.cyc{cursor:pointer;border:0}
+
+/* 5 stock + 6 books */
+.taccs{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.tacc{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.tacc h4{margin:0;padding:6px 8px;font-size:12.5px;border-bottom:2px solid var(--ink);text-align:center}
+.tacc .cols{display:grid;grid-template-columns:1fr 1fr}
+.tacc .cols div{padding:6px 8px;font:13px var(--mono);text-align:right;min-height:30px}
+.tacc .cols div:first-child{border-right:2px solid var(--ink)}
+.tacc .cols small{display:block;font:10.5px var(--sans);color:var(--muted);text-align:left;text-transform:uppercase;letter-spacing:.05em}
+.tacc .bal{border-top:1px solid var(--line);padding:4px 8px;font-size:12px;color:var(--muted);text-align:center}
+.je{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;animation:rise .3s ease;background:var(--surface)}
+.je header{display:flex;justify-content:space-between;gap:8px;margin-bottom:4px;flex-wrap:wrap}
+.je .ln{display:grid;grid-template-columns:1fr 92px 92px;font-family:var(--mono);font-size:12.5px}
+.je .ln span:nth-child(n+2){text-align:right}
+.je .ln.cr span:first-child{padding-left:18px}
+.jes{display:flex;flex-direction:column;gap:6px;max-height:560px;overflow:auto}
+.checks{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+
+/* 7 detailing */
+.dgrid{display:grid;grid-template-columns:64px repeat(4,minmax(0,1fr));gap:3px;font-size:11.5px}
+.dgrid .hd{font-weight:600;text-align:center;padding:4px 0;font-size:12.5px}
+.dgrid .tm{color:var(--muted);text-align:right;padding-right:6px;line-height:20px;font-family:var(--mono)}
+.slot{height:20px;border-radius:4px;border:1px solid var(--line);background:var(--surface);display:flex;align-items:center;justify-content:center;gap:3px;cursor:pointer;padding:0}
+.slot.late{background:var(--sunk);border-style:dashed;opacity:.6}
+.slot.blocked{background:repeating-linear-gradient(45deg,var(--sunk),var(--sunk) 4px,var(--line) 4px,var(--line) 8px)}
+.slot.plan{border-color:var(--accent);background:var(--accent-soft);animation:pop .3s ease backwards}
+.slot.tight{border-color:var(--bad);background:var(--bad-soft)}
+@keyframes pop{from{transform:scale(.6);opacity:0}}
+.pip{width:7px;height:7px;border-radius:50%;border:1.5px solid var(--muted)}
+.pip.used{background:var(--muted)} .pip.new{background:var(--accent);border-color:var(--accent)}
+.lunch{grid-column:1/-1;text-align:center;color:var(--muted);font-size:11px;padding:1px 0}
+
+/* 8 gate */
+.gate{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:6px 0 14px}
+.gate div{border:1.5px solid var(--line);border-radius:10px;padding:10px 8px;text-align:center;font-size:13px;background:var(--surface);opacity:0;animation:rise .3s ease forwards}
+.gate b{display:block}
+.gate small{color:var(--muted);font-size:12px}
+.gate .pass{border-color:var(--ok);background:var(--ok-soft)} .gate .fail{border-color:var(--bad);background:var(--bad-soft)}
+.gate .hold{border-color:var(--warn);background:var(--warn-soft)} .gate .skip{opacity:.4!important}
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 18px;margin-bottom:12px}
+.opts label{display:flex;align-items:center;gap:8px;font-size:14px}
+.opts label.col{flex-direction:column;align-items:stretch;gap:3px}
+.opts label.col span{color:var(--muted);font-size:12.5px}
+.foot{margin-top:34px;padding-top:14px;border-top:1px solid var(--line);color:var(--muted);font-size:13px;max-width:78ch}
+
+@media (max-width:900px){
+  .shell{grid-template-columns:minmax(0,1fr)}
+  .nav{position:sticky;top:61px;flex-direction:row;overflow-x:auto;max-height:none;padding:8px 12px;background:var(--bg);border-bottom:1px solid var(--line);z-index:10}
+  .nav button{grid-template-columns:auto;white-space:nowrap;padding:6px 10px}
+  .nav button .n,.nav button small{display:none}
+  main{padding:18px 16px 60px}
+  .grid2,.grid2.even{grid-template-columns:1fr}
+  .resp{position:static}
+  .ctl{grid-template-columns:1fr 84px}
+  .ctl span{grid-column:1/-1}
+  .gate{grid-template-columns:repeat(2,1fr)}
+  .req{margin-left:0}
+  .band{grid-template-columns:1fr}
+  .dgrid{grid-template-columns:52px repeat(4,minmax(0,1fr))}
+  .dgrid .hd{font-size:11px}
+  h2{font-size:22px}
+}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <div class="logo">TL</div>
+    <div><strong>TorqueLane API</strong><span class="sub">Workflows and business rules, runnable</span></div>
+  </div>
+  <button class="btn ghost" id="theme" type="button">Dark</button>
+</header>
+
+<div class="shell">
+<nav class="nav" id="nav" aria-label="Scenes"></nav>
+<main>
+
+<!-- 1 -->
+<section class="scene" id="pipeline">
+  <h2>Request pipeline</h2>
+  <p class="lede">Every write takes the same path through the API. Pick a request, press Play, and see which layer answers it. A refusal inside the transaction leaves nothing behind.</p>
+  <div class="chips" id="pl-scen"></div>
+  <div class="bar">
+    <button class="btn" id="pl-play" type="button">Play</button>
+    <button class="btn ghost" id="pl-step" type="button">Step</button>
+    <button class="btn ghost" id="pl-reset" type="button">Reset</button>
+    <code class="req" id="pl-req"></code>
+  </div>
+  <div class="grid2">
+    <ol class="stages" id="pl-stages"></ol>
+    <aside class="card resp" id="pl-resp"></aside>
+  </div>
+  <p class="rule"><b>Rule R3.</b> Controllers hold no business rules. The Action owns one <code>DB::transaction</code> and locks the rows it reads. Events and jobs are dispatched only after the commit.</p>
+  <p class="src">bootstrap/app.php · app/Http/Middleware · app/Http/Requests · app/Policies · app/Actions · app/Domain · app/Http/Resources · app/Http/Errors/ApiExceptionRenderer.php</p>
+</section>
+
+<!-- 2 -->
+<section class="scene" id="tenancy">
+  <h2>Tenancy and access</h2>
+  <p class="lede">The same URL answers differently depending on who asks. Click a cell to see the checks run in the order that record's policy runs them. A record outside the caller's scope is always 404, so a 403 never confirms that it exists.</p>
+  <div class="stack">
+    <div class="card scroll"><table class="matrix" id="tn-matrix"></table></div>
+    <div class="card" id="tn-detail"></div>
+  </div>
+  <p class="rule"><b>Demo tenant.</b> MekanikoMoR-Biñan has <code>repair_pms</code> switched on. Samahuzai-Biñan has <code>detailing</code> and <code>equipment</code>. Staff with no branch pins work in every branch.</p>
+  <p class="src">app/Tenancy/BelongsToOrganization.php · app/Tenancy/ModuleGate.php · app/Policies/TenantPolicy.php · WorkOrderPolicy.php · InvoicePolicy.php · VehiclePolicy.php · DetailingPolicy.php · JournalEntryPolicy.php · app/Domain/Access/AccessMatrix.php</p>
+</section>
+
+<!-- 3 -->
+<section class="scene" id="workorder">
+  <h2>Work order lifecycle</h2>
+  <p class="lede">One job from quote to settlement. Choose who you are, then press the actions or click a status in the diagram. Refusals appear in the log with the code the API returns.</p>
+  <div class="bar">
+    <label>Acting as <select id="wo-role"></select></label>
+    <label>Decision note <input type="text" id="wo-note" placeholder="needed to decline a critical line" size="30"></label>
+    <button class="btn ghost" id="wo-reset" type="button" style="margin-left:auto">Reset job</button>
+  </div>
+  <div class="stack">
+    <div class="card">
+      <h3>Status machine <span class="pill" id="wo-ref"></span></h3>
+      <div id="wo-diagram"></div>
+      <div class="stagebar" id="wo-stages"></div>
+      <div class="bar" id="wo-actions" style="margin:12px 0 0"></div>
+    </div>
+    <div class="grid2">
+      <div class="card scroll">
+        <h3>Lines</h3>
+        <table id="wo-lines"></table>
+        <div class="band" id="wo-band"></div>
+        <div class="kpis" id="wo-totals" style="margin-top:10px"></div>
+      </div>
+      <div class="card">
+        <h3>What was written</h3>
+        <ul class="log" id="wo-log"></ul>
+      </div>
+    </div>
+  </div>
+  <p class="rule"><b>Rules shown.</b> The number is issued when a draft is sent, never at creation. Approval statuses are derived from the lines and never set directly. A line's stored cost is <code>round(qty × rate)</code>, half up, and approval bands read the pre-tax amount.</p>
+  <p class="src">app/Domain/WorkOrders/WorkOrderMachine.php · app/Domain/Approvals/Approvals.php · app/Domain/Billing/Billing.php · app/Actions/WorkOrders/{SendForApproval,DecideLines,ScheduleWorkOrder,CompleteWorkOrder}.php</p>
+</section>
+
+<!-- 4 -->
+<section class="scene" id="maintenance">
+  <h2>Maintenance engine</h2>
+  <p class="lede">A service item falls due on whichever limit arrives first. The engine turns the distance limit into a date using the vehicle's average daily use, so both limits can be compared on one calendar.</p>
+  <div class="grid2">
+    <div class="card">
+      <h3>One item: last serviced at 40,000 km</h3>
+      <div id="mt-ctl"></div>
+      <label style="font-size:13.5px"><input type="checkbox" id="mt-crit"> Safety-critical task</label>
+    </div>
+    <div class="stack">
+      <div class="card">
+        <h3>Result <span id="mt-band"></span></h3>
+        <div class="kpis" id="mt-kpis"></div>
+      </div>
+      <div class="card" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+        <div class="ring" id="mt-ring"><div id="mt-score">100</div></div>
+        <div style="flex:1;min-width:220px">
+          <h3>Vehicle health score</h3>
+          <table id="mt-tasks"></table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h3>Both limits on one calendar</h3>
+    <div class="tl" id="mt-tl"></div>
+  </div>
+  <p class="rule"><b>Rules shown.</b> Due soon within 750 km or 21 days. Health starts at 100 and loses 25 per overdue critical task, 15 per other overdue task, 8 per critical task due soon and 4 per other task due soon. A reading older than 14 days is flagged stale. Click a status in the task list to change it.</p>
+  <p class="src">app/Domain/Maintenance/IntervalEngine.php · app/Domain/Fleet/{IntervalStatus,Pms,FleetThresholds}.php · app/Domain/Maintenance/MeterRate.php · app/Domain/Shared/{JsMath,Calendar}.php</p>
+</section>
+
+<!-- 5 -->
+<section class="scene" id="stock">
+  <h2>Stock ledger</h2>
+  <p class="lede">The shop's stock room is an append-only list of moves. The balance and its moving average cost are worked out from them, and every move posts its own journal entry in the same transaction.</p>
+  <div class="bar">
+    <label>Quantity <input type="number" id="sk-q" value="10" min="0" step="1"></label>
+    <label>Unit cost ₱ <input type="number" id="sk-c" value="55.25" min="0" step="0.01"></label>
+    <button class="btn" data-sk="receipt" type="button">Receive</button>
+    <button class="btn" data-sk="issue" type="button">Issue to a job</button>
+    <button class="btn ghost" data-sk="count" type="button">Post a count of this quantity</button>
+    <button class="btn ghost" data-sk="tamper" type="button">Try to edit a move</button>
+    <button class="btn ghost" data-sk="reset" type="button">Reset</button>
+  </div>
+  <div class="chips" id="sk-policy"></div>
+  <div class="grid2">
+    <div class="stack">
+      <div class="card">
+        <h3>Balance <span class="pill ok" id="sk-recon"></span></h3>
+        <div class="kpis" id="sk-kpis"></div>
+        <p id="sk-msg" style="margin-top:10px;font-size:13.5px;min-height:20px"></p>
+      </div>
+      <div class="card scroll">
+        <h3>stock_moves (append-only)</h3>
+        <table id="sk-moves"></table>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Journal entries posted</h3>
+      <div class="jes" id="sk-jes"></div>
+    </div>
+  </div>
+  <p class="rule"><b>Rules shown.</b> Inbound goods blend into the average, rounded half up to a centavo. Outbound goods leave at the average, which does not change. The Inventory line is the change in book value, so any rounding difference is posted as its own visible line.</p>
+  <p class="src">app/Domain/Inventory/StockLedger.php · app/Actions/Inventory/PostStockMove.php · app/Domain/Ledger/Postings.php · app/Database/AppendOnly.php</p>
+</section>
+
+<!-- 6 -->
+<section class="scene" id="books">
+  <h2>Invoice to books</h2>
+  <p class="lede">An invoice for ₱6,830.00 of parts and ₱1,820.00 of labour. Issue it, take payments, and watch the accounts move. Money received is a customer deposit first, and each allocation moves it to the receivable.</p>
+  <div class="chips" id="bk-vat"></div>
+  <div class="bar">
+    <button class="btn" id="bk-issue" type="button">Issue invoice</button>
+    <label>Amount ₱ <input type="number" id="bk-amt" value="5000" min="1" step="100"></label>
+    <label>Method <select id="bk-method"></select></label>
+    <button class="btn" id="bk-pay" type="button">Record payment</button>
+    <button class="btn ghost" id="bk-voidpay" type="button">Void last payment</button>
+    <button class="btn ghost" id="bk-voidinv" type="button">Void invoice</button>
+    <button class="btn ghost" id="bk-reset" type="button">Reset</button>
+  </div>
+  <div class="grid2">
+    <div class="stack">
+      <div class="card" id="bk-inv"></div>
+      <div class="card">
+        <h3>Accounts</h3>
+        <div class="taccs" id="bk-taccs"></div>
+        <div class="checks" id="bk-checks"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Journal</h3>
+      <div class="jes" id="bk-jes"></div>
+    </div>
+  </div>
+  <p class="rule"><b>Rules shown.</b> VAT is rounded once per total, never per line. An issued invoice is frozen and can only be voided, and only when nothing is paid against it. <code>paid_cents</code> is re-summed from the standing allocations, never incremented. A work order's <code>collected_at</code> is stamped when its invoice becomes paid.</p>
+  <p class="src">app/Domain/Invoicing/Invoicing.php · app/Actions/Billing/{ManageInvoices,RecordPayment,InvoiceSettlement}.php · app/Domain/Ledger/Postings.php · app/Actions/Ledger/{Ledger,LedgerPostings}.php</p>
+</section>
+
+<!-- 7 -->
+<section class="scene" id="detailing">
+  <h2>Detailing booking</h2>
+  <p class="lede">A booking is a budget of 30-minute slots that fills working days one after another. The branch has a pool of detailers, and each booking reserves heads on every slot it touches. Click a slot to block or unblock it.</p>
+  <div class="grid2">
+    <div class="stack">
+      <div class="card" id="dt-ctl"></div>
+      <div class="card" id="dt-result"></div>
+      <div class="bar" style="margin:0">
+        <button class="btn" id="dt-book" type="button">Take this booking</button>
+        <button class="btn ghost" id="dt-clear" type="button">Reset the sheet</button>
+      </div>
+    </div>
+    <div class="card scroll"><div class="dgrid" id="dt-grid"></div></div>
+  </div>
+  <p class="rule"><b>Rules shown.</b> The first day starts at the nearest slot, with ties going forward. Closing only caps where a day's work may start, and the rest rolls to the next morning. The tightest slot must have the package's minimum free, and the reservation is trimmed to what is free.</p>
+  <p class="src">app/Domain/Detailing/{SlotGrid,DayPlanner,BookingCapacity,ServiceDuration}.php · app/Actions/Detailing/TakeBooking.php</p>
+</section>
+
+<!-- 8 -->
+<section class="scene" id="gate">
+  <h2>Message gate</h2>
+  <p class="lede">Every reminder, campaign message and feedback request passes one gate before it is sent. Change the facts and see whether the message goes, waits or is skipped. A skipped message is still logged with its reason.</p>
+  <div class="card">
+    <div class="opts" id="gt-opts"></div>
+    <div class="gate" id="gt-chain"></div>
+    <pre id="gt-row"></pre>
+  </div>
+  <p class="rule"><b>Rules shown.</b> Refusals are reported in this order: no address, no consent, opted out, recently sent. Quiet hours (21:00 to 08:00 Manila by default) never refuse a message, they hold it until the window ends.</p>
+  <p class="src">app/Domain/Crm/Reminders/ReminderGate.php · app/Domain/Crm/QuietHours.php · app/Actions/Crm (Messenger::queue) · app/Jobs/SendMessage.php</p>
+</section>
+
+<p class="foot">This page re-implements the rules in JavaScript so they can run in a browser. The PHP in <code>app/Domain</code> is the authority, and the golden tests in <code>tests/Golden</code> hold it to the recorded behaviour. Document numbers and response bodies here are trimmed examples.</p>
+</main>
+</div>
+
+<script>
+"use strict";
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const peso=c=>(c<0?"−":"")+"₱"+(Math.abs(c)/100).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+// Integer division rounded half up, away from zero (what Billing::roundCents and StockLedger do).
+const divRound=(n,d)=>{const s=n<0?-1:1;n=Math.abs(n);return s*Math.floor((2*n+d)/(2*d));};
+const reduced=matchMedia("(prefers-reduced-motion: reduce)").matches;
+const sleep=ms=>new Promise(r=>setTimeout(r,reduced?0:ms));
+const num=n=>n.toLocaleString("en-US");
+const DAY=864e5;
+const NOW=new Date();
+const TODAY=new Date(Date.UTC(NOW.getFullYear(),NOW.getMonth(),NOW.getDate()));
+const addDays=(d,n)=>new Date(d.getTime()+n*DAY);
+const diffDays=(a,b)=>Math.round((a-b)/DAY);
+// date-fns addMonths: clamps to the last day of the target month.
+const addMonths=(d,n)=>{const y=d.getUTCFullYear(),m=d.getUTCMonth()+n,last=new Date(Date.UTC(y,m+1,0)).getUTCDate();return new Date(Date.UTC(y,m,Math.min(d.getUTCDate(),last)));};
+const fmtDate=d=>d.toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric",timeZone:"UTC"});
+
+/* ---------- shell ---------- */
+const SCENES=[
+  ["pipeline","Request pipeline","How every write travels"],
+  ["tenancy","Tenancy and access","Who sees what, and why 404"],
+  ["workorder","Work order","Quote, approval, job, bill"],
+  ["maintenance","Maintenance engine","Which limit trips first"],
+  ["stock","Stock ledger","Moving average, append-only"],
+  ["books","Invoice to books","VAT, payments, journal"],
+  ["detailing","Detailing booking","Day-fill and capacity"],
+  ["gate","Message gate","Consent, cooldown, quiet hours"],
+];
+$("#nav").innerHTML=SCENES.map(([id,t,s],i)=>`<button type="button" data-go="${id}"><span class="n">0${i+1}</span><b>${t}</b><small>${s}</small></button>`).join("");
+function go(id){
+  if(!SCENES.some(s=>s[0]===id)) id="pipeline";
+  $$(".scene").forEach(s=>s.classList.toggle("on",s.id===id));
+  $$("#nav button").forEach(b=>b.classList.toggle("on",b.dataset.go===id));
+  history.replaceState(null,"","#"+id);
+  const on=$("#nav button.on"); if(on&&on.scrollIntoView) on.scrollIntoView({block:"nearest",inline:"center"});
+}
+$("#nav").addEventListener("click",e=>{const b=e.target.closest("button");if(b){go(b.dataset.go);scrollTo({top:0});}});
+const themeBtn=$("#theme");
+function isDark(){const t=document.documentElement.dataset.theme;return t?t==="dark":matchMedia("(prefers-color-scheme: dark)").matches;}
+function paintTheme(){themeBtn.textContent=isDark()?"Light":"Dark";}
+themeBtn.addEventListener("click",()=>{document.documentElement.dataset.theme=isDark()?"light":"dark";paintTheme();});
+paintTheme();
+
+/* ---------- 1 pipeline ---------- */
+(function(){
+  const STAGES=[
+    {k:"route",t:"Route and middleware",d:"/api/v1 · auth:sanctum · throttle · idempotent"},
+    {k:"tenant",t:"Tenant context",d:"ResolveTenantContext · X-Branch-Id"},
+    {k:"request",t:"FormRequest",d:"shape and type of input"},
+    {k:"policy",t:"Policy",d:"scope, side, capability, module"},
+    {k:"action",t:"Action",d:"DB::transaction · lockForUpdate",tx:1},
+    {k:"domain",t:"Domain rule",d:"plain PHP, no database",tx:1},
+    {k:"persist",t:"Persist and audit",d:"rows · document number · audit row",tx:1},
+    {k:"commit",t:"Commit",d:"deferred constraint triggers run",tx:1},
+    {k:"after",t:"After commit",d:"events and queued jobs"},
+    {k:"resource",t:"Resource",d:"snake_case JSON · integer cents"},
+  ];
+  const SEND="POST /api/v1/work-orders/01K7…/send";
+  const OKNOTES={
+    route:"Session cookie accepted. Bearer tokens are never read.",
+    tenant:"Organization MekanikoMoR, staff, branch MekanikoMoR-Biñan.",
+    request:"Nothing malformed in the body.",
+    policy:"The order is in scope, the role holds workorder:update, repair_pms is on in the order's branch.",
+    action:"Transaction opens. The work order row is locked.",
+    domain:"WorkOrderMachine::checkTransition(draft → pending_approval) allows it. Approvals::requiredApprover says operations.",
+    persist:"WO-2026-1656 drawn from document_series. Status event, approval_log row and audit row written.",
+    commit:"Everything lands together.",
+    after:"Listeners and jobs run now, never before the commit.",
+    resource:"WorkOrderResource renders what the caller's scope may see.",
+  };
+  const env=(code,message,details)=>JSON.stringify({error:Object.assign({code,message},details?{details}:{})},null,2);
+  const SC=[
+    {id:"ok",label:"Send a quote for approval",req:SEND,stop:null,notes:OKNOTES,status:"200 OK",
+      body:JSON.stringify({data:{reference:"WO-2026-1656",status:"pending_approval",approval:{waiting_hours:0,sla_breached:false,can_approve:false}}},null,2)},
+    {id:"unauth",label:"No session",req:SEND,stop:0,notes:{route:"auth:sanctum finds no session."},status:"401 Unauthorized",body:env("unauthenticated","Unauthenticated.")},
+    {id:"branch",label:"Branch not allowed",req:SEND+"   X-Branch-Id: (a branch the user is not pinned to)",stop:1,
+      notes:{route:OKNOTES.route,tenant:"The header names a branch outside the user's pins. It is refused, never ignored."},status:"403 Forbidden",
+      body:env("forbidden","You do not have access to this branch.",{reason:"branch_not_allowed"})},
+    {id:"validation",label:"Malformed input",req:"PUT /api/v1/work-orders/01K7…/lines   { quantity: \"two\" }",stop:2,
+      notes:{route:OKNOTES.route,tenant:OKNOTES.tenant,request:"The FormRequest rejects the shape. No stored state was consulted."},status:"422 Unprocessable Content",
+      body:env("validation","The given data was invalid.",{fields:{"lines.0.quantity":["The quantity must be a number."]}})},
+    {id:"notfound",label:"Another account's order",req:SEND,stop:3,
+      notes:{route:OKNOTES.route,tenant:"Portal user of a different customer account.",request:OKNOTES.request,policy:"Scope is checked first. Out of scope is 404, with a body identical to a missing record's."},status:"404 Not Found",
+      body:env("not_found","Not found.")},
+    {id:"forbidden",label:"Missing capability",req:SEND,stop:3,
+      notes:{route:OKNOTES.route,tenant:"Cashier, pinned to MekanikoMoR-Biñan.",request:OKNOTES.request,policy:"In scope, but the role does not hold workorder:update."},status:"403 Forbidden",
+      body:env("forbidden","Cashier doesn't have permission to update job status.")},
+    {id:"module",label:"Module switched off",req:"GET /api/v1/vehicles/01K7…/health",stop:3,
+      notes:{route:OKNOTES.route,tenant:"Branch manager pinned to Samahuzai-Biñan.",request:OKNOTES.request,policy:"The vehicle is in scope, then ModuleGate::ensure(repair_pms) throws."},status:"403 Forbidden",
+      body:env("module_disabled","Repair & PMS is not enabled for this branch.")},
+    {id:"transition",label:"Illegal status change",req:SEND+"   (the order is already closed)",stop:5,
+      notes:Object.assign({},OKNOTES,{domain:"WorkOrderMachine refuses. The exception unwinds the transaction: no row changed and no number was drawn."}),status:"409 Conflict",
+      body:env("invalid_transition","A closed work order cannot become pending approval.")},
+    {id:"replay",label:"Retried with the same Idempotency-Key",req:"POST /api/v1/payments   Idempotency-Key: 7f3c…  (same body as before)",replay:1,
+      notes:{route:"EnforceIdempotency finds the key already claimed by this user for this path with the same body. The stored response is replayed and nothing runs again."},status:"201 Created",
+      hdr:"Idempotent-Replayed: true",body:JSON.stringify({data:{number:"PAY-2026-0002",status:"posted",amount_cents:500000}},null,2)},
+  ];
+  let cur=SC[0], run={id:0,pos:-1,done:false}, at=-1;
+  const list=$("#pl-stages"), resp=$("#pl-resp");
+  $("#pl-scen").innerHTML=SC.map(s=>`<button type="button" class="chip" data-s="${s.id}">${s.label}</button>`).join("");
+  function reset(){
+    run.id++; run.pos=-1; run.done=false; at=-1;
+    list.className="stages";
+    list.innerHTML=`<span class="packet"></span>`+STAGES.map((s,i)=>`<li class="st${s.tx?" tx":""}" data-i="${i}"><span class="node"></span>${s.k==="action"?`<span class="txlabel" id="pl-tx">TRANSACTION</span>`:""}<b>${s.t}</b><small>${s.d}</small><p class="note"></p></li>`).join("");
+    $("#pl-req").textContent=cur.req;
+    resp.innerHTML=`<h3>Response</h3><p style="color:var(--muted)">Press Play to send the request.</p>`;
+    $$("#pl-scen .chip").forEach(c=>c.classList.toggle("on",c.dataset.s===cur.id));
+  }
+  const row=i=>list.querySelector(`[data-i="${i}"]`);
+  function mark(i,cls){const r=row(i);r.classList.remove("active","done","fail","skip","replay");r.classList.add(cls);
+    const n=cur.notes[STAGES[i].k]; if(n&&cls!=="skip") r.querySelector(".note").textContent=n;
+    if(cls!=="skip"){at=i;follow();}}
+  function follow(){const until=performance.now()+480;(function tick(){place();if(performance.now()<until)requestAnimationFrame(tick);})();}
+  function place(){const r=at>=0&&row(at),p=list.querySelector(".packet");if(r&&p){p.style.opacity=1;p.style.transform=`translateY(${r.offsetTop+12}px)`;}}
+  list.addEventListener("transitionend",e=>{if(e.propertyName==="max-height")place();});
+  addEventListener("resize",place);
+  function tx(state,label){list.classList.remove("tx-open","tx-commit","tx-rollback");list.classList.add("tx-"+state);const l=$("#pl-tx");if(l)l.textContent=label;}
+  function finish(){
+    run.done=true;
+    const good=/^2/.test(cur.status);
+    resp.innerHTML=`<h3>Response</h3><div class="status" style="color:var(--${good?"ok":/^404/.test(cur.status)?"muted":"bad"})">${cur.status}</div>
+      <div class="hdr">X-Request-Id: 01K7F3Q2…${cur.hdr?"<br>"+cur.hdr:""}</div><pre>${esc(cur.body)}</pre>`;
+    resp.classList.remove("flash");void resp.offsetWidth;resp.classList.add("flash");
+  }
+  function step(){
+    if(run.done) return;
+    const i=++run.pos;
+    if(i>0) mark(i-1,"done");
+    if(cur.replay){mark(0,"replay");for(let j=1;j<STAGES.length;j++)mark(j,"skip");finish();return;}
+    if(i===cur.stop){mark(i,"fail");if(STAGES[i].tx)tx("rollback","ROLLBACK");for(let j=i+1;j<STAGES.length;j++)mark(j,"skip");finish();return;}
+    const k=STAGES[i].k;
+    if(k==="action")tx("open","TRANSACTION");
+    if(k==="commit")tx("commit","COMMIT");
+    if(i===STAGES.length-1){mark(i,"done");finish();return;}
+    mark(i,"active");
+  }
+  async function play(){if(run.done)reset();const my=++run.id;while(!run.done&&my===run.id){step();await sleep(560);}}
+  $("#pl-scen").addEventListener("click",e=>{const c=e.target.closest(".chip");if(!c)return;cur=SC.find(s=>s.id===c.dataset.s);reset();play();});
+  $("#pl-play").addEventListener("click",play);
+  $("#pl-step").addEventListener("click",()=>{run.id++;if(run.done)reset();step();});
+  $("#pl-reset").addEventListener("click",reset);
+  reset();
+})();
+
+/* ---------- 2 tenancy ---------- */
+(function(){
+  const MODS={mk:["repair_pms","crm"],sz:["detailing","equipment","crm"]};
+  const MODL={repair_pms:"Repair & PMS",detailing:"Detailing"};
+  const CAPL={"workorder:approve":"approve purchases within threshold","billing:view":"view invoices and payments","ledger:view":"view the books","detailing:view":"view detailing bookings"};
+  const A=[
+    {id:"owner",n:"Owner",sub:"Provider Admin · every branch",role:"Provider Admin",staff:1,org:"mk",br:null,caps:["workorder:approve","billing:view","ledger:view","detailing:view"]},
+    {id:"cashier",n:"Cashier",sub:"pinned to MekanikoMoR-Biñan",role:"Cashier",staff:1,org:"mk",br:["mk"],caps:["billing:view","detailing:view"]},
+    {id:"szmgr",n:"Samahuzai manager",sub:"Branch Manager · pinned to Samahuzai-Biñan",role:"Branch Manager",staff:1,org:"mk",br:["sz"],caps:["workorder:approve","billing:view","ledger:view","detailing:view"]},
+    {id:"actfm",n:"Actimed fleet manager",sub:"portal · own account only",role:"Fleet Manager",staff:0,org:"mk",acct:"actimed",caps:["workorder:approve","billing:view"]},
+    {id:"acttech",n:"Actimed technician",sub:"portal · own account only",role:"Technician",staff:0,org:"mk",acct:"actimed",caps:[]},
+    {id:"nwview",n:"Northwind viewer",sub:"portal · own account only",role:"Authorised Viewer",staff:0,org:"mk",acct:"northwind",caps:["billing:view"]},
+    {id:"bayani",n:"Bayani fleet manager",sub:"portal · account suspended",role:"Fleet Manager",staff:0,org:"mk",acct:"bayani",suspended:1,caps:["workorder:approve","billing:view"]},
+    {id:"rival",n:"Rival organization admin",sub:"a different tenant",role:"Provider Admin",staff:1,org:"rival",br:null,caps:["workorder:approve","billing:view","ledger:view","detailing:view"]},
+  ];
+  const R=[
+    {id:"veh",t:"Vehicle",req:"GET /vehicles/{id}",what:"an Actimed vehicle",acct:"actimed",order:["scope"]},
+    {id:"health",t:"PMS health",req:"GET /vehicles/{id}/health",what:"the same vehicle's PMS health",acct:"actimed",order:["scope","module:repair_pms"]},
+    {id:"decide",t:"Approve lines",req:"POST /work-orders/{id}/decisions",what:"an Actimed work order raised in MekanikoMoR-Biñan",acct:"actimed",branch:"mk",order:["scope","cap:workorder:approve","module:repair_pms@"]},
+    {id:"inv",t:"Invoice",req:"GET /invoices/{id}",what:"Northwind's issued invoice, raised in MekanikoMoR-Biñan",acct:"northwind",branch:"mk",order:["scope","cap:billing:view"]},
+    {id:"bk",t:"Detailing booking",req:"GET /detailing/bookings/{id}",what:"an Actimed booking at Samahuzai-Biñan",acct:"actimed",branch:"sz",staffScope:1,order:["side","scope","module:detailing@","cap:detailing:view"]},
+    {id:"je",t:"Journal",req:"GET /ledger/journal",what:"the organization's journal (a list)",list:1,order:["side","cap:ledger:view"]},
+  ];
+  function evaluate(a,r){
+    const steps=[]; let out=null;
+    const add=(label,pass,note,fail)=>{ if(out){steps.push({label,state:"skip",note:"not reached"});return;} steps.push({label,state:pass?"pass":"fail",note}); if(!pass) out=fail; };
+    add("Tenant context",!a.suspended,a.suspended?"The user's customer account is suspended: refused on every request and at login.":"Built from the user's stored row: organization, side, role, account, branches.",{status:403,code:"account_suspended",details:{reason:"account_suspended"},message:"This account is suspended."});
+    if(r.list) add("Organization scope",true,a.org==="rival"?"A list is filtered to the caller's own organization. The rival sees its own journal, never MekanikoMoR's.":"organization_id = the caller's organization, on every query.");
+    else add("Organization scope",a.org==="mk",a.org==="mk"?"The record belongs to the caller's organization.":"The global scope hides another tenant's rows. Route binding finds nothing.",{status:404,code:"not_found",message:"Not found."});
+    for(const o of r.order){
+      if(o==="scope"){
+        let pass,note;
+        if(!a.staff){ if(r.staffScope){pass=false;note="";} else {pass=a.acct===r.acct;note=pass?"The record belongs to the user's own customer account.":"The record belongs to a sibling account. It is hidden exactly like a missing one.";} }
+        else if(r.branch){pass=!a.br||a.br.includes(r.branch);note=pass?"The record's branch is one the user works in.":"The record's branch is outside the user's pins.";}
+        else{pass=true;note="Staff reach every customer account in their organization.";}
+        add("Scope",pass,note,{status:404,code:"not_found",message:"Not found."});
+      }else if(o==="side"){
+        add("Side",!!a.staff,a.staff?"A staff session.":"This screen has no portal side.",{status:403,code:"forbidden",message:"Only staff can do this."});
+      }else if(o.startsWith("cap:")){
+        const c=o.slice(4),pass=a.caps.includes(c);
+        add("Capability "+c,pass,pass?`${a.role} holds it.`:`${a.role} does not hold it.`,{status:403,code:"forbidden",message:`${a.role} doesn't have permission to ${CAPL[c]}.`});
+      }else if(o.startsWith("module:")){
+        const at=o.endsWith("@"),m=o.slice(7).replace("@","");
+        let branches;
+        if(at) branches=[r.branch];
+        else if(a.staff&&a.br&&a.br.length===1) branches=a.br;     // a single allowed branch is the selected one
+        else branches=["mk","sz"];                                  // "all" branches, or a portal user: active anywhere reachable
+        const pass=branches.some(b=>MODS[b].includes(m));
+        add("Module "+m,pass,pass?"Switched on for the organization and for the branch.":"Not switched on where this session works.",{status:403,code:"module_disabled",message:`${MODL[m]} is not enabled for this branch.`});
+      }
+    }
+    return Object.assign({steps},out||{status:200});
+  }
+  let sel={a:"nwview",r:"decide"};
+  function paint(){
+    $("#tn-matrix").innerHTML=`<thead><tr><th>Caller</th>${R.map(r=>`<th class="col">${r.t}<small>${r.req.split(" ")[0]}</small></th>`).join("")}</tr></thead><tbody>`+
+      A.map(a=>`<tr><td class="who"><b>${a.n}</b><small>${a.sub}</small></td>${R.map(r=>{const v=evaluate(a,r);return `<td><button type="button" class="cell s${v.status}${sel.a===a.id&&sel.r===r.id?" on":""}" data-a="${a.id}" data-r="${r.id}" aria-label="${a.n}, ${r.t}: ${v.status}">${v.status}</button></td>`;}).join("")}</tr>`).join("")+"</tbody>";
+    const a=A.find(x=>x.id===sel.a), r=R.find(x=>x.id===sel.r), v=evaluate(a,r);
+    const body=v.status===200?`{ "data": { … } }`:JSON.stringify({error:Object.assign({code:v.code,message:v.message},v.details?{details:v.details}:{})},null,2);
+    $("#tn-detail").innerHTML=`<h3>${esc(a.n)} asks for ${esc(r.what)}</h3><code>${esc(r.req)}</code>
+      <div class="grid2 even" style="margin-top:10px">
+      <ol class="chain" style="margin:0">${v.steps.map((s,i)=>`<li class="${s.state}" style="animation-delay:${reduced?0:i*110}ms"><span class="dot">${s.state==="pass"?"✓":s.state==="fail"?"✕":"·"}</span><div><b>${esc(s.label)}</b><small>${esc(s.note)}</small></div></li>`).join("")}</ol>
+      <div><p style="margin:0 0 6px"><span class="pill ${v.status===200?"ok":v.status===404?"":"warn"}">${v.status}${v.code?" "+v.code:""}</span></p><pre>${esc(body)}</pre></div></div>`;
+  }
+  $("#tn-matrix").addEventListener("click",e=>{const c=e.target.closest(".cell");if(c){sel={a:c.dataset.a,r:c.dataset.r};paint();}});
+  paint();
+})();
+
+/* ---------- 3 work order ---------- */
+(function(){
+  const SET={auto:500000,ops:5000000,vat:12};
+  const ROLE={
+    service_advisor:{l:"Service Advisor",staff:1,caps:["workorder:update","billing:manage"]},
+    provider_technician:{l:"Provider Technician",staff:1,caps:["workorder:update","workorder:complete"]},
+    provider_admin:{l:"Provider Admin",staff:1,caps:["workorder:update","workorder:complete","workorder:approve","billing:manage"]},
+    cashier:{l:"Cashier",staff:1,caps:["billing:manage"]},
+    fleet_manager:{l:"Fleet Manager (customer)",staff:0,caps:["workorder:update","workorder:complete","workorder:approve"]},
+    operations:{l:"Operations Staff (customer)",staff:0,caps:["workorder:update","workorder:complete","workorder:approve"]},
+  };
+  const CAPL={"workorder:update":"update job status","workorder:complete":"close work orders","workorder:approve":"approve purchases within threshold","billing:manage":"invoice and record payments"};
+  const NEXT={draft:["pending_approval","approved","cancelled"],pending_approval:["approved","partially_approved","declined","cancelled"],
+    approved:["scheduled","in_progress","cancelled"],partially_approved:["scheduled","in_progress","cancelled"],scheduled:["in_progress","cancelled"],
+    in_progress:["closed","cancelled"],declined:["draft","cancelled"],closed:[],cancelled:[]};
+  const CAPFOR={pending_approval:"workorder:update",scheduled:"workorder:update",in_progress:"workorder:update",cancelled:"workorder:update",
+    approved:"workorder:approve",partially_approved:"workorder:approve",declined:"workorder:approve",closed:"workorder:complete",draft:null};
+  const words=s=>s.replace(/_/g," ");
+  const STAGEOF={draft:"draft",pending_approval:"pending approval",approved:"approved",partially_approved:"approved",scheduled:"in progress",in_progress:"in progress",closed:"ready for billing",declined:"declined",cancelled:"cancelled"};
+  function check(from,lineCount,to){
+    if(from===to) return {ok:false,msg:`This work order is already ${STAGEOF[to]}.`};
+    if(!NEXT[from].includes(to)) return {ok:false,msg:`A ${words(from)} work order cannot become ${words(to)}.`};
+    if(to==="pending_approval"&&lineCount===0) return {ok:false,msg:"Add at least one line before sending this for approval."};
+    return {ok:true,cap:CAPFOR[to]};
+  }
+  const canApprove=(role,pending)=>["fleet_manager","provider_admin","branch_manager"].includes(role)||(["operations","purchasing_officer"].includes(role)&&pending<=SET.ops);
+  const band=p=>p<SET.auto?"auto":p<=SET.ops?"operations":"fleet_manager";
+  const fresh=()=>({status:"draft",ref:"",invoiced:false,settled:false,log:[],lines:[
+    {id:1,d:"Engine oil and filter",q:1000,pr:185000,h:500,lr:65000,crit:0,on:1,st:"pending"},
+    {id:2,d:"Front brake pads",q:1000,pr:420000,h:1500,lr:65000,crit:1,on:1,st:"pending"},
+    {id:3,d:"Cabin air filter",q:1000,pr:78000,h:300,lr:65000,crit:0,on:1,st:"pending"},
+    {id:4,d:"Transmission overhaul",q:1000,pr:4800000,h:12000,lr:65000,crit:0,on:0,st:"pending"}]});
+  let S=fresh(), role="service_advisor";
+  const part=l=>divRound(l.q*l.pr,1000), lab=l=>divRound(l.h*l.lr,1000), cost=l=>part(l)+lab(l);
+  const active=()=>S.lines.filter(l=>l.on);
+  const sum=st=>active().filter(l=>!st||l.st===st).reduce((t,l)=>t+cost(l),0);
+  function derive(){const s=active().map(l=>l.st);if(!s.length)return "approved";if(s.includes("pending"))return "pending_approval";const a=s.filter(x=>x==="approved").length;return a===s.length?"approved":a===0?"declined":"partially_approved";}
+  function stage(){const s=S.status;if(s==="closed")return S.settled?"completed":S.invoiced?"invoiced":"ready_for_billing";
+    return {draft:"draft",pending_approval:"pending_approval",approved:"approved",partially_approved:"approved",scheduled:"in_progress",in_progress:"in_progress",declined:"declined",cancelled:"cancelled"}[s];}
+  const log=(tag,cls,msg)=>{S.log.unshift({tag,cls,msg});if(S.log.length>40)S.log.pop();};
+  const need=(cap)=>{if(cap&&!ROLE[role].caps.includes(cap)){log("403 forbidden","t403",`${ROLE[role].l.replace(" (customer)","")} doesn't have permission to ${CAPL[cap]}.`);return false;}return true;};
+  const staffOnly=()=>{if(!ROLE[role].staff){log("403 forbidden","t403","Only staff can do this.");return false;}return true;};
+  function setStatus(to,who){S.status=to;log("work_order_events","tok",`${words(to)} · by ${who||ROLE[role].l}`);}
+
+  function send(){
+    const c=check(S.status,active().length,"pending_approval");
+    if(!c.ok) return log("409 invalid_transition","t409",c.msg);
+    if(!need(c.cap)) return;
+    if(!S.ref){S.ref="WO-2026-1656";log("document_series","tinfo","WO-2026-1656 issued inside the transaction. A rollback would return the number.");}
+    const p=sum("pending"), b=band(p);
+    log("approval_log","",`sent_for_approval · ${peso(p)} before tax`);
+    if(b==="auto"){active().forEach(l=>l.st="approved");log("approval_log","",`auto_approved · under ${peso(SET.auto)}, the system approves every line`);setStatus("approved","System");}
+    else{setStatus("pending_approval");log("rule","tinfo",`Approvals::requiredApprover → ${b==="operations"?"operations (up to "+peso(SET.ops)+")":"fleet manager (above "+peso(SET.ops)+")"}`);}
+  }
+  function decide(id,ans){
+    if(S.status!=="pending_approval") return log("409 invalid_transition","t409","Lines are decided only while the order is pending approval.");
+    if(!need("workorder:approve")) return;
+    const p=sum("pending");
+    if(!canApprove(role,p)) return log("403 forbidden","t403",`Approvals::canApprove is false: ${peso(p)} pending is above this role's ceiling of ${peso(SET.ops)}.`);
+    const l=S.lines.find(x=>x.id===id);
+    if(ans==="declined"&&l.crit&&!$("#wo-note").value.trim()) return log("422 validation","t422","Declining a safety-critical line needs a note. Type one in the box above.");
+    l.st=ans; log("approval_log","",`${ans} · ${l.d} · ${peso(cost(l))} at the time`);
+    const d=derive();
+    if(d!==S.status){setStatus(d);log("rule","tinfo","Status derived from the lines' answers (Approvals::deriveOrderStatus)."+(d!=="declined"?" Approved work is assigned to the order's branch.":""));}
+  }
+  function move(to,opt={}){
+    const c=check(S.status,active().length,to);
+    if(!c.ok) return log("409 invalid_transition","t409",c.msg);
+    if(opt.staff&&!staffOnly()) return;
+    if(!need(c.cap||opt.cap)) return;
+    setStatus(to);
+    if(to==="in_progress") log("rule","tinfo","Approved shop-stock lines now owe the shelf their quantity (SyncWorkOrderStock posts issue moves).");
+    if(to==="closed") log("rule","tinfo","Pms::applyCompletion: maintenance states reset, the odometer recorded as a reading, the vehicle back to active.");
+    if(to==="cancelled") log("rule","tinfo","Any stock issued to the job is returned.");
+    if(to==="draft"){active().forEach(l=>l.st="pending");log("rule","tinfo","A declined quote reopens as a draft and keeps its number.");}
+  }
+  function invoice(){
+    if(S.status!=="closed"||S.invoiced) return log("409 conflict","t409",S.invoiced?"A work order is on at most one standing invoice.":"Only a closed job can be invoiced.");
+    if(!staffOnly()||!need("billing:manage")) return;
+    S.invoiced=true; log("invoices","tok","Invoice raised from the stored approved line costs and issued: numbered at issue, then frozen.");
+    log("journal_entries","tinfo","Dr Accounts Receivable / Cr Sales and Output VAT, in the same transaction.");
+  }
+  function pay(){
+    if(!S.invoiced||S.settled) return log("409 conflict","t409",S.settled?"The invoice is already paid.":"There is no issued invoice to pay yet.");
+    if(!staffOnly()||!need("billing:manage")) return;
+    S.settled=true; log("payments","tok","Payment recorded and allocated. InvoiceSettlement marks the invoice paid and stamps collected_at on the order.");
+  }
+  const DERIVED=["approved","partially_approved","declined"];
+  function attempt(to){
+    if(to==="pending_approval") return send();
+    if(DERIVED.includes(to)){const c=check(S.status,active().length,to);
+      return c.ok?log("rule","tinfo",`${words(to)} is never set directly. It is derived from the lines: ${S.status==="draft"?"send the quote":"decide each line"}.`):log("409 invalid_transition","t409",c.msg);}
+    if(to==="scheduled") return move(to,{staff:1});
+    if(to==="draft") return move(to,{cap:"workorder:update"});
+    move(to);
+  }
+
+  const N={draft:[70,140,"Draft"],pending_approval:[225,140,"Pending approval"],approved:[400,60,"Approved"],partially_approved:[400,140,"Partially approved"],
+    declined:[400,225,"Declined"],scheduled:[565,60,"Scheduled"],in_progress:[640,140,"In progress"],closed:[775,140,"Closed"],cancelled:[640,225,"Cancelled"]};
+  const E=[["draft","pending_approval","M128,140 L164,140"],["draft","approved","M70,123 C70,30 260,34 339,52"],["pending_approval","approved","M283,128 L340,72"],
+    ["pending_approval","partially_approved","M283,140 L339,140"],["pending_approval","declined","M283,152 L340,213"],["approved","scheduled","M458,60 L504,60"],
+    ["approved","in_progress","M458,70 L588,124"],["partially_approved","scheduled","M458,130 L516,80"],["partially_approved","in_progress","M458,140 L579,140"],
+    ["scheduled","in_progress","M598,77 L622,120"],["in_progress","closed","M698,140 L714,140"],["declined","draft","M342,234 C210,276 70,236 70,160"],
+    ["declined","cancelled","M458,225 L579,225"],["in_progress","cancelled","M640,157 L640,205"]];
+  function diagram(){
+    const nx=NEXT[S.status];
+    return `<svg class="wo-svg" viewBox="0 0 840 262" role="img" aria-label="Work order status machine">
+      <defs><marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path class="ah" d="M0,0 L8,4 L0,8z"/></marker>
+      <marker id="ahl" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path class="ahl" d="M0,0 L8,4 L0,8z"/></marker></defs>
+      ${E.map(([f,t,d])=>{const live=f===S.status;return `<path class="ed${live?" live":""}" d="${d}" marker-end="url(#${live?"ahl":"ah"})"/>`;}).join("")}
+      <text class="lbl" x="150" y="38">inside the auto band</text><text class="lbl" x="150" y="258">reopened, keeps its number</text>
+      <text class="lbl" x="705" y="229">from any live status</text>
+      ${Object.entries(N).map(([k,[x,y,l]])=>`<g class="nd${k===S.status?" cur":nx.includes(k)?" next":""}" data-to="${k}" tabindex="0" role="button" aria-label="${l}"><rect x="${x-58}" y="${y-17}" width="116" height="34" rx="9"/><text x="${x}" y="${y}">${l}</text></g>`).join("")}
+    </svg>`;
+  }
+  const STG=[["draft","Draft"],["pending_approval","Pending approval"],["approved","Approved"],["in_progress","In progress"],["ready_for_billing","Ready for billing"],["invoiced","Invoiced"],["completed","Completed"]];
+  const PILL={pending:"",approved:"ok",declined:"bad",deferred:"warn"};
+  function paint(){
+    $("#wo-ref").textContent=S.ref||"no number yet";
+    $("#wo-diagram").innerHTML=diagram();
+    const st=stage(), idx=STG.findIndex(s=>s[0]===st);
+    $("#wo-stages").innerHTML=idx<0?`<span class="on">${st==="declined"?"Declined":"Cancelled"}</span>`:STG.map(([k,l],i)=>`<span class="${i===idx?"on":i<idx?"past":""}">${l}</span>`).join("");
+    const nx=NEXT[S.status], hot=k=>nx.includes(k)?" hot":"";
+    $("#wo-actions").innerHTML=[
+      ["send","Send for approval",hot("pending_approval")],["scheduled","Schedule",hot("scheduled")],["in_progress","Start work",hot("in_progress")],
+      ["closed","Close job",hot("closed")],["draft","Reopen as draft",hot("draft")],["cancelled","Cancel",""],
+      ["invoice","Raise and issue invoice",S.status==="closed"&&!S.invoiced?" hot":""],["pay","Record full payment",S.invoiced&&!S.settled?" hot":""],
+    ].map(([k,l,h])=>`<button type="button" class="btn ghost sm${h}" data-act="${k}">${l}</button>`).join("");
+    const draft=S.status==="draft", pend=S.status==="pending_approval";
+    $("#wo-lines").innerHTML=`<thead><tr><th></th><th>Line</th><th class="r">Qty</th><th class="r">Parts</th><th class="r">Labour</th><th class="r">Stored cost</th></tr></thead><tbody>`+
+      S.lines.map(l=>`<tr style="${l.on?"":"opacity:.45"}"><td><input type="checkbox" data-on="${l.id}" ${l.on?"checked":""} ${draft?"":"disabled"} aria-label="Include ${l.d}"></td>
+        <td>${l.d}${l.crit?` <span class="pill bad">critical</span>`:""}${l.on?` <span class="pill ${PILL[l.st]}">${l.st}</span>`:""}${pend&&l.on&&l.st==="pending"?`<div class="decide"><button type="button" class="btn sm" data-dec="${l.id}:approved">Approve</button><button type="button" class="btn ghost sm" data-dec="${l.id}:declined">Decline</button><button type="button" class="btn ghost sm" data-dec="${l.id}:deferred">Defer</button></div>`:""}</td>
+        <td class="r">${draft&&l.on?`<input type="number" data-q="${l.id}" value="${l.q/1000}" min="0.5" step="0.5" style="width:62px" aria-label="Quantity">`:l.q/1000}</td>
+        <td class="r">${peso(part(l))}</td><td class="r">${peso(lab(l))}</td><td class="r"><b>${peso(cost(l))}</b></td></tr>`).join("")+"</tbody>";
+    const p=draft?sum():sum("pending"), b=band(p), showBand=draft||pend;
+    $("#wo-band").innerHTML=[["auto","Automatic","under "+peso(SET.auto)],["operations","Operations","up to "+peso(SET.ops)],["fleet_manager","Fleet manager","above "+peso(SET.ops)]]
+      .map(([k,l,s])=>`<div class="${showBand&&b===k?"on":""}"><b>${l}</b>${s}</div>`).join("");
+    const sub=sum(), ap=sum("approved"), vat=c=>divRound(c*SET.vat,100);
+    $("#wo-totals").innerHTML=`<div class="kpi"><span>${draft?"Value to approve":"Still pending"}</span><b>${peso(p)}</b></div>
+      <div class="kpi"><span>Estimate with 12% VAT</span><b>${peso(sub+vat(sub))}</b></div>
+      <div class="kpi"><span>Approved with VAT</span><b>${peso(ap+vat(ap))}</b></div>`;
+    $("#wo-log").innerHTML=S.log.length?S.log.map(e=>`<li><span class="tag ${e.cls}">${esc(e.tag)}</span>${esc(e.msg)}</li>`).join(""):`<li style="color:var(--muted)">Nothing yet. The draft has no number.</li>`;
+  }
+  $("#wo-role").innerHTML=Object.entries(ROLE).map(([k,r])=>`<option value="${k}">${r.l}</option>`).join("");
+  $("#wo-role").addEventListener("change",e=>{role=e.target.value;});
+  $("#wo-reset").addEventListener("click",()=>{S=fresh();paint();});
+  $("#wo-actions").addEventListener("click",e=>{const b=e.target.closest("[data-act]");if(!b)return;const a=b.dataset.act;a==="send"?send():a==="invoice"?invoice():a==="pay"?pay():attempt(a);paint();});
+  $("#wo-diagram").addEventListener("click",e=>{const g=e.target.closest("[data-to]");if(g){attempt(g.dataset.to);paint();}});
+  $("#wo-diagram").addEventListener("keydown",e=>{const g=e.target.closest("[data-to]");if(g&&(e.key==="Enter"||e.key===" ")){e.preventDefault();attempt(g.dataset.to);paint();}});
+  $("#wo-lines").addEventListener("click",e=>{const b=e.target.closest("[data-dec]");if(b){const [id,a]=b.dataset.dec.split(":");decide(+id,a);paint();}});
+  $("#wo-lines").addEventListener("change",e=>{const t=e.target;
+    if(t.dataset.on){S.lines.find(l=>l.id===+t.dataset.on).on=t.checked?1:0;paint();}
+    if(t.dataset.q){const v=Math.max(0.5,parseFloat(t.value)||1);S.lines.find(l=>l.id===+t.dataset.q).q=Math.round(v*1000);paint();}});
+  paint();
+})();
+
+/* ---------- 4 maintenance ---------- */
+(function(){
+  const LAST=40000;
+  const C=[
+    {k:"km",l:"Distance interval",min:5000,max:20000,step:5000,v:10000,f:v=>num(v)+" km"},
+    {k:"months",l:"Calendar interval",min:3,max:12,step:3,v:6,f:v=>v+" months"},
+    {k:"ago",l:"Last service",min:0,max:400,step:5,v:120,f:v=>v+" days ago"},
+    {k:"odo",l:"Odometer reading",min:40000,max:62000,step:50,v:46400,f:v=>num(v)+" km"},
+    {k:"age",l:"Reading taken",min:0,max:40,step:1,v:3,f:v=>v+" days ago"},
+    {k:"rate",l:"Average daily use",min:0,max:200,step:5,v:55,f:v=>v+" km/day"},
+  ];
+  const P={}; C.forEach(c=>P[c.k]=c.v);
+  $("#mt-ctl").innerHTML=C.map(c=>`<label class="ctl"><span>${c.l}</span><input type="range" data-k="${c.k}" min="${c.min}" max="${c.max}" step="${c.step}" value="${c.v}"><output data-o="${c.k}"></output></label>`).join("");
+  const tasks=[{n:"Engine oil and filter (this item)",crit:0,st:"ok",bound:1},{n:"Brake inspection",crit:1,st:"ok"},{n:"Tyre rotation",crit:0,st:"ok"},{n:"Coolant flush",crit:0,st:"due_soon"},{n:"Timing belt",crit:1,st:"ok"}];
+  function evaluate(){
+    const last=addDays(TODAY,-P.ago), calDue=addMonths(last,P.months), rate=P.rate>0?P.rate:0;
+    const distDue=rate>0?addDays(last,Math.round(P.km/rate)):addMonths(last,P.months*100);
+    const age=Math.min(P.age,P.ago), est=Math.round(P.odo+age*rate), dueAt=LAST+P.km, remaining=dueAt-est;
+    let gov="distance", due=distDue; if(calDue<due){gov="time";due=calDue;}
+    const days=diffDays(due,TODAY), past=days<0||remaining<0, soon=days<=21||remaining<=750;
+    const intDays=diffDays(calDue,last), progress=Math.max(0,(est-LAST)/P.km,intDays>0?diffDays(TODAY,last)/intDays:0);
+    return {last,calDue,distDue,rate,est,dueAt,remaining,gov,due,days,band:past?"overdue":soon?"due_soon":"ok",progress,age};
+  }
+  const BL={ok:["On schedule","ok"],due_soon:["Due soon","warn"],overdue:["Overdue","bad"]};
+  function paint(){
+    C.forEach(c=>$(`[data-o="${c.k}"]`).textContent=c.f(P[c.k]));
+    const r=evaluate();
+    $("#mt-band").innerHTML=`<span class="pill ${BL[r.band][1]}">${BL[r.band][0]}</span>`;
+    $("#mt-kpis").innerHTML=`<div class="kpi"><span>Governed by</span><b>${r.gov==="time"?"Calendar":"Distance"}</b></div>
+      <div class="kpi"><span>Projected due</span><b>${fmtDate(r.due)}</b></div>
+      <div class="kpi"><span>${r.days<0?"Days overdue":"Days remaining"}</span><b>${Math.abs(r.days)}</b></div>
+      <div class="kpi"><span>${r.remaining<0?"Km overdue":"Km remaining"}</span><b>${num(Math.abs(r.remaining))}</b></div>
+      <div class="kpi"><span>Estimated odometer now</span><b>${num(r.est)}</b></div>
+      <div class="kpi"><span>Progress</span><b>${Math.round(r.progress*100)}%</b></div>`+
+      (r.age>14?`<div class="kpi" style="grid-column:1/-1;background:var(--warn-soft);color:var(--warn)"><span style="color:inherit">Stale reading</span>Older than 14 days: the estimate is rolled forward at the daily rate, and the screens say so.</div>`:"");
+    // timeline
+    const ends=[TODAY,r.calDue]; if(r.rate>0) ends.push(r.distDue);
+    const end=addDays(new Date(Math.max(...ends)),Math.max(12,Math.round(diffDays(new Date(Math.max(...ends)),r.last)*.08)));
+    const span=Math.max(1,end-r.last), pos=d=>Math.max(0,Math.min(100,(d-r.last)/span*100));
+    const zs=pos(addDays(r.due,-21)), ze=pos(r.due);
+    const al=p=>p>72?"transform:translateX(-100%)":p<28?"transform:none":"";
+    $("#mt-tl").innerHTML=`<div class="track"></div><div class="elapsed" style="width:${pos(TODAY)}%"></div>
+      <div class="zone" style="left:${zs}%;width:${Math.max(0,ze-zs)}%" title="Due-soon window: 21 days"></div>
+      <div class="mk last" style="left:0"><i></i><span>last service ${fmtDate(r.last)}</span></div>
+      <div class="mk today" style="left:${pos(TODAY)}%"><i></i><span style="${al(pos(TODAY))}">today</span></div>
+      ${r.rate>0?`<div class="mk dist${r.gov==="distance"?" gov":""}" style="left:${pos(r.distDue)}%"><i></i><span style="${al(pos(r.distDue))}">${num(r.dueAt)} km reached ${fmtDate(r.distDue)}${r.gov==="distance"?" · governs":""}</span></div>`
+        :`<div class="mk dist" style="left:100%"><i></i><span style="transform:translateX(-100%)">meter not moving: the calendar governs</span></div>`}
+      <div class="mk cal${r.gov==="time"?" gov":""}" style="left:${pos(r.calDue)}%"><i></i><span style="${al(pos(r.calDue))}">${P.months} months up ${fmtDate(r.calDue)}${r.gov==="time"?" · governs":""}</span></div>`;
+    // health
+    tasks[0].st=r.band; tasks[0].crit=$("#mt-crit").checked?1:0;
+    const pen=tasks.reduce((t,x)=>t+(x.st==="overdue"?(x.crit?25:15):x.st==="due_soon"?(x.crit?8:4):0),0), score=Math.round(Math.max(0,Math.min(100,100-pen)));
+    $("#mt-score").textContent=score;
+    const ring=$("#mt-ring"); ring.style.setProperty("--p",score); ring.style.setProperty("--rc",score>=80?"var(--ok)":score>=60?"var(--warn)":"var(--bad)");
+    $("#mt-tasks").innerHTML=tasks.map((x,i)=>{const pn=x.st==="overdue"?(x.crit?25:15):x.st==="due_soon"?(x.crit?8:4):0;
+      return `<tr><td>${x.n}${x.crit?` <span class="pill bad">critical</span>`:""}</td><td>${x.bound?`<span class="pill ${BL[x.st][1]}">${BL[x.st][0]}</span>`:`<button type="button" class="pill cyc ${BL[x.st][1]}" data-t="${i}">${BL[x.st][0]}</button>`}</td><td class="r">${pn?"−"+pn:""}</td></tr>`;}).join("");
+  }
+  $("#mt-ctl").addEventListener("input",e=>{const k=e.target.dataset.k;if(k){P[k]=+e.target.value;paint();}});
+  $("#mt-crit").addEventListener("change",paint);
+  $("#mt-tasks").addEventListener("click",e=>{const b=e.target.closest("[data-t]");if(b){const t=tasks[+b.dataset.t];t.st={ok:"due_soon",due_soon:"overdue",overdue:"ok"}[t.st];paint();}});
+  paint();
+})();
+
+/* ---------- shared: journal rendering ---------- */
+function jeHtml(e){
+  return `<div class="je"><header><b>${e.no}</b><span class="pill ${e.rev?"bad":"info"}">${esc(e.event)}</span></header>
+    ${e.memo?`<div style="color:var(--muted);margin-bottom:4px">${esc(e.memo)}</div>`:""}
+    ${e.lines.map(l=>`<div class="ln ${l.dr?"":"cr"}"><span>${esc(l.acc)}</span><span>${l.dr?peso(l.dr):""}</span><span>${l.cr?peso(l.cr):""}</span></div>`).join("")}</div>`;
+}
+
+/* ---------- 5 stock ---------- */
+(function(){
+  let S, policy="allow_and_flag";
+  function reset(){S={on:0,avg:0,moves:[],jes:[],n:0,msg:""};post("opening",24000,5000,"Opening balance");S.msg="";}
+  const value=(on,avg)=>divRound(on*avg,1000);
+  function post(type,qty,unit,memo){
+    const inbound=qty>0, before=value(S.on,S.avg), after=S.on+qty;
+    let avg=S.avg, cost;
+    if(inbound){
+      cost=unit==null?S.avg:unit;
+      avg=S.on<=0?(after>0?cost:S.avg):divRound(S.on*S.avg+qty*cost,after);
+    }else{
+      if(policy==="block"&&after<0){S.msg=`<span class="pill bad">409 conflict</span> insufficient_stock · on_hand ${S.on/1000}, requested ${-qty/1000}. The whole document rolls back.`;return false;}
+      cost=S.avg;
+    }
+    const neg=!inbound&&after<0;
+    S.on=after; S.avg=avg;
+    const delta=value(S.on,S.avg)-before, mv=divRound(Math.abs(qty)*cost,1000);
+    S.moves.push({i:S.moves.length+1,type,qty,cost,mv,neg});
+    const L=[]; const dr=(acc,a)=>a>0&&L.push({acc,dr:a}), cr=(acc,a)=>a>0&&L.push({acc,cr:a});
+    if(type==="adjustment"){ delta>=0?(dr("Inventory",delta),cr("Inventory Adjustments",delta)):(dr("Inventory Adjustments",-delta),cr("Inventory",-delta)); }
+    else if(inbound){
+      const other=type==="opening"?"Opening Balance Equity":"GR/IR Clearing";
+      dr("Inventory",delta); if(mv>delta) dr("Inventory Adjustments · average-cost rounding",mv-delta);
+      cr(other,mv); if(delta>mv) cr("Inventory Adjustments · average-cost rounding",delta-mv);
+    }else{
+      dr("COGS – Parts",mv); if(-delta>mv) dr("Inventory Adjustments · average-cost rounding",-delta-mv);
+      cr("Inventory",-delta); if(mv>-delta) cr("Inventory Adjustments · average-cost rounding",mv+delta);
+    }
+    if(L.length) S.jes.unshift({no:"JE-"+String(++S.n).padStart(4,"0"),event:"stock_"+type,memo,lines:L});
+    S.msg=neg?`<span class="pill warn">negative_flag</span> The move is posted and flagged, because this branch allows negative stock.`:"";
+    return true;
+  }
+  function paint(flashLast){
+    $("#sk-policy").innerHTML=`<span style="align-self:center;color:var(--muted);font-size:13.5px">Branch negative-stock policy</span>`+["allow_and_flag","block"].map(p=>`<button type="button" class="chip${p===policy?" on":""}" data-p="${p}">${p}</button>`).join("");
+    const sumMoves=S.moves.reduce((t,m)=>t+m.qty,0);
+    $("#sk-recon").textContent=sumMoves===S.on?"balance = sum of moves ✓":"out of step";
+    $("#sk-kpis").innerHTML=`<div class="kpi"><span>On hand</span><b>${S.on/1000}</b></div><div class="kpi"><span>Average cost</span><b>${peso(S.avg)}</b></div><div class="kpi"><span>Book value</span><b>${peso(value(S.on,S.avg))}</b></div>`;
+    $("#sk-msg").innerHTML=S.msg;
+    $("#sk-moves").innerHTML=`<thead><tr><th>#</th><th>Type</th><th class="r">Qty</th><th class="r">Unit cost</th><th class="r">Value</th><th></th></tr></thead><tbody>`+
+      S.moves.map((m,i)=>`<tr class="${flashLast&&i===S.moves.length-1?"flash":""}" data-m="${m.i}"><td>${m.i}</td><td>${m.type}</td><td class="r">${m.qty>0?"+":"−"}${Math.abs(m.qty)/1000}</td><td class="r">${peso(m.cost)}</td><td class="r">${peso(m.mv)}</td><td>${m.neg?`<span class="pill warn">negative</span>`:""}</td></tr>`).join("")+"</tbody>";
+    $("#sk-jes").innerHTML=S.jes.map(jeHtml).join("");
+  }
+  document.querySelector("#stock .bar").addEventListener("click",e=>{
+    const b=e.target.closest("[data-sk]"); if(!b) return; const a=b.dataset.sk;
+    const q=Math.round((parseFloat($("#sk-q").value)||0)*1000), c=Math.round((parseFloat($("#sk-c").value)||0)*100);
+    let ok=false;
+    if(a==="reset"){reset();return paint();}
+    if(a==="tamper"){const r=$("#sk-moves tbody tr");if(r){r.classList.remove("shake");void r.offsetWidth;r.classList.add("shake");}
+      S.msg=`<span class="pill bad">SQLSTATE 23001</span> UPDATE refused by the trigger <code>forbid_append_only_mutation()</code>. A move is corrected with a compensating move, never an edit.`;$("#sk-msg").innerHTML=S.msg;return;}
+    if(a!=="count"&&q<=0){S.msg=`<span class="pill warn">422 validation</span> Quantity must be greater than zero.`;return paint();}
+    if(a==="receipt") ok=post("receipt",q,c,`Goods received: ${q/1000} at ${peso(c)}`);
+    if(a==="issue") ok=post("issue",-q,null,`Issued to a work order line: ${q/1000} at the average`);
+    if(a==="count"){const v=q-S.on; if(v===0){S.msg=`<span class="pill ok">in step</span> The count matches the books, so nothing is posted.`;} else ok=post("adjustment",v,null,`Count variance ${v>0?"+":"−"}${Math.abs(v)/1000} against the books`);}
+    paint(ok);
+  });
+  $("#sk-policy").addEventListener("click",e=>{const c=e.target.closest("[data-p]");if(c){policy=c.dataset.p;paint();}});
+  reset(); paint();
+})();
+
+/* ---------- 6 books ---------- */
+(function(){
+  const PARTS=683000, LABOUR=182000, GROSS=PARTS+LABOUR, RATE=12;
+  const METHODS={cash:["Cash","Cash on Hand"],bank_transfer:["Bank transfer","Cash in Bank"],check:["Check","Cash in Bank"],gcash:["GCash","GCash Clearing"],maya:["Maya","Maya Clearing"],card:["Card","Card Clearing"]};
+  const VAT={excl:"Prices exclude VAT",incl:"Prices include VAT",nonvat:"Branch not VAT-registered"};
+  function totals(mode){
+    if(mode==="nonvat") return {vat:0,total:GROSS,parts:PARTS,labour:LABOUR,label:"Non-VAT sales",sales:GROSS};
+    const vat=mode==="incl"?divRound(GROSS*RATE,100+RATE):divRound(GROSS*RATE,100), sales=mode==="incl"?GROSS-vat:GROSS;
+    // Largest remainder: Parts + Labour always add up to the stored sales figure.
+    let p=Math.floor(sales*PARTS/GROSS), l=Math.floor(sales*LABOUR/GROSS);
+    if(p+l<sales){(sales*PARTS%GROSS)>=(sales*LABOUR%GROSS)?p++:l++;}
+    return {vat,total:sales+vat,parts:p,labour:l,label:"VATable sales",sales};
+  }
+  let S;
+  function reset(mode){S={mode:mode||"excl",inv:{status:"draft",number:null,paid:0},pays:[],jes:[],acc:{},n:0,pn:0,b:0,msg:""};S.t=totals(S.mode);}
+  function post(event,memo,lines,rev){
+    S.jes.unshift({no:"JE-2026-"+String(++S.n).padStart(4,"0"),event,memo,lines,rev});
+    lines.forEach(l=>{const a=S.acc[l.acc]||(S.acc[l.acc]={dr:0,cr:0,hit:0});a.dr+=l.dr||0;a.cr+=l.cr||0;a.hit=S.b;});
+  }
+  const refresh=()=>{ // InvoiceSettlement::refresh: re-summed from the standing allocations
+    S.inv.paid=S.pays.filter(p=>!p.void).reduce((t,p)=>t+p.alloc,0);
+    if(S.inv.status!=="void"&&S.inv.status!=="draft") S.inv.status=S.inv.paid===0?"issued":S.inv.paid<S.t.total?"partially_paid":"paid";
+  };
+  function invoiceLines(mirror){
+    const L=[{acc:"Accounts Receivable",dr:S.t.total},{acc:"Sales – Parts",cr:S.t.parts},{acc:"Sales – Labour",cr:S.t.labour}];
+    if(S.t.vat) L.push({acc:"Output VAT",cr:S.t.vat});
+    return mirror?L.map(l=>({acc:l.acc,dr:l.cr,cr:l.dr})).sort((a,b)=>(b.dr||0)-(a.dr||0)):L;
+  }
+  function issue(){S.inv.status="issued";S.inv.number="INV-2026-0001";S.msg="";post("invoice_issued",`${S.inv.number} · numbered at issue, then frozen`,invoiceLines());}
+  function pay(){
+    const amt=Math.round((parseFloat($("#bk-amt").value)||0)*100); if(amt<=0){S.msg=`<span class="pill warn">422 validation</span> The amount must be greater than zero.`;return;}
+    const m=$("#bk-method").value, cashAcc=METHODS[m][1], no="PAY-2026-"+String(++S.pn).padStart(4,"0");
+    const open=["issued","partially_paid"].includes(S.inv.status)?S.t.total-S.inv.paid:0, alloc=Math.min(amt,open);
+    S.pays.push({no,amt,m,cashAcc,alloc,void:false});
+    post("payment_received",`${no} · ${METHODS[m][0]}`,[{acc:cashAcc,dr:amt},{acc:"Customer Deposits",cr:amt}]);
+    if(alloc) post("credit_applied",`${no} applied to ${S.inv.number}`,[{acc:"Customer Deposits",dr:alloc},{acc:"Accounts Receivable",cr:alloc}]);
+    refresh();
+    S.msg=amt>alloc?`<span class="pill info">credit</span> ${peso(amt-alloc)} is not allocated. It stays in Customer Deposits as the customer's credit.`:"";
+  }
+  function voidPay(){
+    const p=[...S.pays].reverse().find(x=>!x.void); if(!p){S.msg=`<span class="pill bad">409 conflict</span> There is no standing payment to void.`;return;}
+    p.void=true;
+    if(p.alloc) post("credit_reversed",`${p.no} taken back from ${S.inv.number}`,[{acc:"Accounts Receivable",dr:p.alloc},{acc:"Customer Deposits",cr:p.alloc}],1);
+    post("payment_voided",`${p.no} voided · the original entry is never touched`,[{acc:"Customer Deposits",dr:p.amt},{acc:p.cashAcc,cr:p.amt}],1);
+    const was=S.inv.status; refresh();
+    S.msg=was==="paid"?`<span class="pill warn">collected_at cleared</span> The invoice fell back below paid, so the work order is no longer settled.`:"";
+  }
+  function voidInv(){
+    if(!["issued","partially_paid","paid"].includes(S.inv.status)){S.msg=`<span class="pill bad">409 conflict</span> Only an issued invoice can be voided. A draft is simply discarded.`;return;}
+    if(S.inv.paid>0){S.msg=`<span class="pill bad">409 conflict</span> This invoice has payments against it. Void those first.`;return;}
+    S.inv.status="void"; post("invoice_voided",`${S.inv.number} voided · keeps its number, releases its work orders`,invoiceLines(true),1);
+    S.msg=`<span class="pill info">released</span> The work orders go back to the billing queue.`;
+  }
+  const ACCS=["Accounts Receivable","Customer Deposits","Sales – Parts","Sales – Labour","Output VAT"];
+  const SP={draft:"",issued:"info",partially_paid:"warn",paid:"ok",void:"bad"};
+  function paint(){
+    const frozen=S.inv.status!=="draft";
+    $("#bk-vat").innerHTML=Object.entries(VAT).map(([k,l])=>`<button type="button" class="chip${k===S.mode?" on":""}" data-v="${k}" ${frozen?"disabled style=\"opacity:.5;cursor:not-allowed\"":""}>${l}</button>`).join("")+(frozen?`<span class="pill" style="align-self:center">frozen at issue</span>`:"");
+    $("#bk-issue").disabled=frozen;
+    const t=S.t, bal=S.inv.status==="void"?0:t.total-S.inv.paid;
+    $("#bk-inv").innerHTML=`<h3>Invoice ${S.inv.number||"(draft, no number)"} <span class="pill ${SP[S.inv.status]}">${S.inv.status}</span></h3>
+      <table><tbody>
+      <tr><td>Parts</td><td class="r">${peso(PARTS)}</td></tr><tr><td>Labour</td><td class="r">${peso(LABOUR)}</td></tr>
+      <tr><td>${t.label}</td><td class="r">${peso(t.sales)}</td></tr>
+      <tr><td>VAT ${S.mode==="nonvat"?"(none)":S.mode==="incl"?"12% extracted: round(gross × 12 / 112)":"12% on top: round(sales × 12 / 100)"}</td><td class="r">${peso(t.vat)}</td></tr>
+      <tr><td><b>Total due</b></td><td class="r"><b>${peso(t.total)}</b></td></tr>
+      <tr><td>Paid (sum of standing allocations)</td><td class="r">${peso(S.inv.paid)}</td></tr>
+      <tr><td><b>Balance</b></td><td class="r"><b>${peso(bal)}</b></td></tr></tbody></table>
+      ${S.mode==="nonvat"?`<p style="margin-top:8px;font:600 12px var(--mono)">THIS DOCUMENT IS NOT VALID FOR CLAIM OF INPUT TAX.</p>`:""}
+      <p style="margin-top:8px;font-size:13.5px">Work order <code>collected_at</code>: <span class="pill ${S.inv.status==="paid"?"ok":""}">${S.inv.status==="paid"?"stamped":"not set"}</span></p>
+      <p style="margin-top:8px;font-size:13.5px;min-height:20px">${S.msg}</p>`;
+    const names=[...ACCS,...Object.keys(S.acc).filter(a=>!ACCS.includes(a))];
+    $("#bk-taccs").innerHTML=names.map(n=>{const a=S.acc[n]||{dr:0,cr:0,hit:-1},b=a.dr-a.cr;
+      return `<div class="tacc${a.hit===S.b&&S.b?" flash":""}"><h4>${n}</h4><div class="cols"><div><small>Debit</small>${a.dr?peso(a.dr):""}</div><div><small>Credit</small>${a.cr?peso(a.cr):""}</div></div><div class="bal">${b===0?"nil":peso(Math.abs(b))+(b>0?" Dr":" Cr")}</div></div>`;}).join("");
+    const g=n=>S.acc[n]||{dr:0,cr:0}, ar=g("Accounts Receivable").dr-g("Accounts Receivable").cr, dep=g("Customer Deposits").cr-g("Customer Deposits").dr;
+    const openInv=["issued","partially_paid"].includes(S.inv.status)?S.t.total-S.inv.paid:0, unapplied=S.pays.filter(p=>!p.void).reduce((t,p)=>t+p.amt-p.alloc,0);
+    const dr=Object.values(S.acc).reduce((t,a)=>t+a.dr,0), cr=Object.values(S.acc).reduce((t,a)=>t+a.cr,0);
+    const chk=(ok,l)=>`<span class="pill ${ok?"ok":"bad"}">${ok?"✓":"✕"} ${l}</span>`;
+    $("#bk-checks").innerHTML=chk(dr===cr,`debits = credits (${peso(dr)})`)+chk(ar===openInv,`open invoices = Accounts Receivable (${peso(ar)})`)+chk(dep===unapplied,`unapplied payments = Customer Deposits (${peso(dep)})`);
+    $("#bk-jes").innerHTML=S.jes.length?S.jes.map(jeHtml).join(""):`<p style="color:var(--muted)">No entries yet. A draft invoice posts nothing.</p>`;
+  }
+  $("#bk-method").innerHTML=Object.entries(METHODS).map(([k,[l]])=>`<option value="${k}">${l}</option>`).join("");
+  $("#bk-vat").addEventListener("click",e=>{const c=e.target.closest("[data-v]");if(c&&S.inv.status==="draft"){reset(c.dataset.v);paint();}});
+  $("#bk-issue").addEventListener("click",()=>{S.b++;issue();paint();});
+  $("#bk-pay").addEventListener("click",()=>{S.b++;pay();paint();});
+  $("#bk-voidpay").addEventListener("click",()=>{S.b++;voidPay();paint();});
+  $("#bk-voidinv").addEventListener("click",()=>{S.b++;voidInv();paint();});
+  $("#bk-reset").addEventListener("click",()=>{reset(S.mode);paint();});
+  reset(); paint();
+})();
+
+/* ---------- 7 detailing ---------- */
+(function(){
+  const SLOTS=[]; for(let m=480;m<=1260;m+=30){if(m>=720&&m<780)continue;SLOTS.push(m);}
+  const label=m=>{const h=Math.floor(m/60)%24,h12=h%12===0?12:h%12;return `${h12}:${String(m%60).padStart(2,"0")} ${h>=12?"PM":"AM"}`;};
+  function nearest(m){ // SlotGrid::nearest: ties go forward
+    if(SLOTS.includes(m))return m; if(m<=SLOTS[0])return SLOTS[0]; const last=SLOTS[SLOTS.length-1]; if(m>=last)return last;
+    let best=SLOTS[0],bd=Infinity; for(const s of SLOTS){const d=Math.abs(s-m);if(d<=bd){bd=d;best=s;}} return best;
+  }
+  function plan(start,budget,closing){ // DayPlanner::plan
+    const working=SLOTS.filter(s=>s<closing), first=nearest(start), days=[]; let remaining=budget,day=0,isFirst=true,passes=60;
+    while(remaining>0&&passes-->0){
+      const avail=isFirst?working.filter(s=>s>=first):working, taken=avail.slice(0,remaining);
+      if(!taken.length){if(isFirst){isFirst=false;day++;continue;}break;}
+      days.push({day,slots:taken}); remaining-=taken.length; isFirst=false; if(remaining>0)day++;
+    }
+    return days;
+  }
+  const P={start:960,budget:8,closing:1020,pool:2,heads:1,min:1};
+  let occ,blocked;
+  const key=(d,s)=>d+":"+s;
+  function seed(){occ={};blocked=new Set();
+    [[0,540,4,1],[0,840,4,2],[1,480,4,1]].forEach(([d,from,n,h])=>{let i=SLOTS.indexOf(from);for(let j=0;j<n;j++)occ[key(d,SLOTS[i+j])]=(occ[key(d,SLOTS[i+j])]||0)+h;});}
+  function admit(){
+    const days=plan(P.start,P.budget,P.closing), cells=days.flatMap(d=>d.slots.map(s=>({d:d.day,s})));
+    if(!cells.length) return {days,cells,ok:false,code:"invalid_slot",msg:"No slot could be planned."};
+    const over=cells.filter(c=>c.d>3);
+    const hit=cells.find(c=>blocked.has(key(c.d,c.s)));
+    if(hit) return {days,cells,ok:false,code:"blocked",tight:hit,msg:`The plan touches a blocked slot (${label(hit.s)} on day ${hit.d+1}).`};
+    let remaining=Infinity,tight=null; cells.forEach(c=>{const r=P.pool-(occ[key(c.d,c.s)]||0);if(r<remaining){remaining=r;tight=c;}});
+    const min=Math.max(1,P.min);
+    if(remaining<min) return {days,cells,ok:false,code:"full",tight,msg:`The tightest slot (${label(tight.s)} on day ${tight.d+1}) has ${Math.max(0,remaining)} free and the package needs ${min}.`};
+    const wanted=Math.max(P.heads,min,1), heads=Math.max(Math.min(wanted,remaining),min);
+    return {days,cells,ok:true,heads,wanted,remaining,over:over.length};
+  }
+  const dayName=i=>addDays(TODAY,i).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short",timeZone:"UTC"});
+  const times=[]; for(let m=450;m<=1110;m+=15)times.push(m);
+  $("#dt-ctl").innerHTML=`<h3>Booking request</h3>
+    <label class="ctl"><span>Start time asked</span><select data-k="start">${times.map(m=>`<option value="${m}"${m===P.start?" selected":""}>${label(m)}</option>`).join("")}</select><output data-o="start"></output></label>
+    <label class="ctl"><span>Work to do</span><input type="range" data-k="budget" min="1" max="36" value="${P.budget}"><output data-o="budget"></output></label>
+    <label class="ctl"><span>Branch closing</span><select data-k="closing">${[900,1020,1140].map(m=>`<option value="${m}"${m===P.closing?" selected":""}>${label(m)}</option>`).join("")}</select><output></output></label>
+    <label class="ctl"><span>Detailer pool</span><input type="range" data-k="pool" min="1" max="4" value="${P.pool}"><output data-o="pool"></output></label>
+    <label class="ctl"><span>Heads asked for</span><input type="range" data-k="heads" min="1" max="4" value="${P.heads}"><output data-o="heads"></output></label>
+    <label class="ctl"><span>Package minimum</span><input type="range" data-k="min" min="1" max="3" value="${P.min}"><output data-o="min"></output></label>`;
+  function paint(){
+    const out=(k,v)=>{$(`#dt-ctl [data-o="${k}"]`).textContent=v;};
+    out("start","slot "+label(nearest(P.start))); out("budget",`${P.budget/2} h · ${P.budget} slots`); out("pool",P.pool); out("heads",P.heads); out("min",P.min);
+    const a=admit(), inPlan=new Map(a.cells.map((c,i)=>[key(c.d,c.s),i]));
+    $("#dt-result").innerHTML=`<h3>Decision <span class="pill ${a.ok?"ok":"bad"}">${a.ok?"admitted":"409 "+a.code}</span></h3>`+
+      (a.ok?`<p>Reserves <b>${a.heads}</b> ${a.heads===1?"head":"heads"} on every slot of the plan${a.heads<a.wanted?`, trimmed from ${a.wanted} because only ${a.remaining} ${a.remaining===1?"is":"are"} free at the tightest slot`:""}.</p>`:`<p style="color:var(--bad)">${esc(a.msg)}</p>`)+
+      `<p style="margin-top:6px;color:var(--muted);font-size:13.5px">${a.days.map(d=>`Day ${d.day+1}: ${label(d.slots[0])} to ${label(d.slots[d.slots.length-1]+30)} (${d.slots.length} slots)`).join(" · ")||"no days"}</p>`+
+      (nearest(P.start)>=P.closing?`<p style="margin-top:6px;font-size:13.5px"><span class="pill info">rolls over</span> A start at or after closing takes nothing today and begins the next morning.</p>`:"")+
+      (a.over?`<p style="margin-top:6px;font-size:13.5px;color:var(--muted)">The plan continues past the four days shown.</p>`:"");
+    $("#dt-book").disabled=!a.ok;
+    let h=`<div></div>`+[0,1,2,3].map(i=>`<div class="hd">${dayName(i)}</div>`).join("");
+    SLOTS.forEach(s=>{
+      if(s===780) h+=`<div class="lunch">lunch hour: no slot</div>`;
+      h+=`<div class="tm">${label(s).replace(" ","")}</div>`;
+      for(let d=0;d<4;d++){
+        const k=key(d,s), used=occ[k]||0, pi=inPlan.get(k), isPlan=pi!==undefined, tight=a.tight&&a.tight.d===d&&a.tight.s===s;
+        const add=isPlan&&a.ok?a.heads:0;
+        let pips=""; for(let i=0;i<P.pool;i++) pips+=`<i class="pip ${i<used?"used":i<used+add?"new":""}"></i>`;
+        h+=`<button type="button" class="slot${s>=P.closing?" late":""}${blocked.has(k)?" blocked":""}${isPlan?" plan":""}${tight?" tight":""}" data-c="${k}" style="${isPlan&&!reduced?`animation-delay:${pi*28}ms`:""}" title="${label(s)} · ${used} of ${P.pool} taken${blocked.has(k)?" · blocked":""}">${blocked.has(k)?"":pips}</button>`;
+      }
+    });
+    $("#dt-grid").innerHTML=h;
+  }
+  $("#dt-ctl").addEventListener("input",e=>{const k=e.target.dataset.k;if(k){P[k]=+e.target.value;paint();}});
+  $("#dt-grid").addEventListener("click",e=>{const c=e.target.closest("[data-c]");if(!c)return;const k=c.dataset.c;blocked.has(k)?blocked.delete(k):blocked.add(k);paint();});
+  $("#dt-book").addEventListener("click",()=>{const a=admit();if(!a.ok)return;a.cells.forEach(c=>{const k=key(c.d,c.s);occ[k]=(occ[k]||0)+a.heads;});paint();});
+  $("#dt-clear").addEventListener("click",()=>{seed();paint();});
+  seed(); paint();
+})();
+
+/* ---------- 8 gate ---------- */
+(function(){
+  const NEED={service_reminder:"service_reminders",feedback:"service_reminders",marketing:"marketing",transactional:null};
+  const P={purpose:"service_reminder",address:true,c_service:true,c_marketing:false,opted:false,last:"never",now:1350};
+  const QS=1260, QE=480, COOL=14;
+  const hm=m=>String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0");
+  function decide(){
+    const need=NEED[P.purpose], consented=need===null||(need==="marketing"?P.c_marketing:P.c_service);
+    const lastDays=P.last==="never"?null:+P.last, quiet=P.now>=QS||P.now<QE;
+    const steps=[
+      {t:"Address",ok:P.address,why:P.address?"an address on the channel":"nowhere to send it",reason:"no_address"},
+      {t:"Consent",ok:consented,why:need===null?"this purpose needs none":consented?`${need} is on record`:`${need} is not on record`,reason:"no_consent"},
+      {t:"Opt-out",ok:!P.opted,why:P.opted?"the address unsubscribed":"not on the suppression list",reason:"opted_out"},
+      {t:"Cooldown",ok:lastDays===null||lastDays>=COOL,why:lastDays===null?"never sent before":`last sent ${lastDays} days ago, cooldown ${COOL}`,reason:"recently_sent"},
+    ];
+    const fail=steps.findIndex(s=>!s.ok);
+    return {steps,fail,quiet};
+  }
+  $("#gt-opts").innerHTML=`
+    <label class="col"><span>Purpose</span><select data-k="purpose">${Object.keys(NEED).map(k=>`<option value="${k}"${k===P.purpose?" selected":""}>${k}</option>`).join("")}</select></label>
+    <label class="col"><span>Same message last sent</span><select data-k="last">${[["never","never"],["3","3 days ago"],["13","13 days ago"],["14","14 days ago"],["40","40 days ago"]].map(([v,l])=>`<option value="${v}"${v===P.last?" selected":""}>${l}</option>`).join("")}</select></label>
+    <label class="col"><span>Time now in Manila: <b id="gt-now"></b></span><input type="range" data-k="now" min="0" max="1439" step="15" value="${P.now}"></label>
+    <label><input type="checkbox" data-k="address" ${P.address?"checked":""}> Recipient has an address</label>
+    <label><input type="checkbox" data-k="c_service" ${P.c_service?"checked":""}> Consent: service_reminders</label>
+    <label><input type="checkbox" data-k="c_marketing" ${P.c_marketing?"checked":""}> Consent: marketing</label>
+    <label><input type="checkbox" data-k="opted" ${P.opted?"checked":""}> Address has unsubscribed</label>`;
+  function paint(){
+    $("#gt-now").textContent=hm(P.now);
+    const d=decide(), sent=d.fail<0;
+    $("#gt-chain").innerHTML=d.steps.map((s,i)=>{const cls=d.fail>=0&&i>d.fail?"skip":s.ok?"pass":"fail";
+      return `<div class="${cls}" style="animation-delay:${reduced?0:i*110}ms"><b>${s.t}</b><small>${cls==="skip"?"not reached":s.why}</small></div>`;}).join("")+
+      `<div class="${!sent?"skip":d.quiet?"hold":"pass"}" style="animation-delay:${reduced?0:440}ms"><b>Quiet hours</b><small>${!sent?"not reached":d.quiet?"inside 21:00 to 08:00: held, not refused":"outside the window"}</small></div>`;
+    const row=sent?{status:"queued",purpose:P.purpose,skip_reason:null,send_after:d.quiet?(P.now<QE?"today 08:00 Manila":"tomorrow 08:00 Manila"):null,outcome:d.quiet?"crm:run deliver picks it up when the window ends":"handed to SendMessage after commit"}
+      :{status:"skipped",purpose:P.purpose,skip_reason:d.steps[d.fail].reason,send_after:null,outcome:"logged once per cooldown, never sent"};
+    $("#gt-row").textContent="messages row\n"+JSON.stringify(row,null,2);
+  }
+  $("#gt-opts").addEventListener("input",e=>{const t=e.target,k=t.dataset.k;if(!k)return;P[k]=t.type==="checkbox"?t.checked:t.type==="range"?+t.value:t.value;paint();});
+  paint();
+})();
+
+go(location.hash.slice(1)||"pipeline");
+</script>
+</body>
+</html>

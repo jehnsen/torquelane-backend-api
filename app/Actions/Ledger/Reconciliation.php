@@ -24,8 +24,10 @@ use Illuminate\Support\Facades\DB;
 /**
  * Do the books agree with the things they summarise? Receivables against the
  * open invoices, Inventory against the stock room's valuation, Customer
- * Deposits against unapplied payments, and the trial balance against itself;
- * and is any invoice, payment or stock move still waiting to be posted.
+ * Deposits against unapplied credit, Payables against the open vendor bills,
+ * GR/IR against the goods received and not yet billed, and the trial balance
+ * against itself; and is any document or stock move still waiting to be
+ * posted.
  *
  * Whole-organization, not the caller's branches: a reconciliation that depends
  * on who asks is not a reconciliation. Every figure is "as of" a business date
@@ -53,6 +55,10 @@ final class Reconciliation
             $this->accountBalance(RuleKey::Inventory, $asOf),
             $this->unappliedCredit($asOf),
             $this->accountBalance(RuleKey::CustomerDeposits, $asOf),
+            $this->payablesSubledger($asOf),
+            $this->accountBalance(RuleKey::Payables, $asOf),
+            $this->unbilledReceipts($asOf),
+            $this->accountBalance(RuleKey::GoodsReceivedClearing, $asOf),
             $totals['debits'],
             $totals['credits'],
         );
@@ -76,6 +82,21 @@ final class Reconciliation
         $payments = fn (): Builder => DB::table('payments')->where('payments.organization_id', $org);
         $allocations = fn (): Builder => DB::table('payment_allocations')->where('payment_allocations.organization_id', $org);
 
+        // A document that is posted when it is made and reversed when it is voided: [table, dated by, posted event, void event, the status that means void].
+        $documents = [
+            'vendor bills' => ['vendor_bills', 'bill_date', 'vendor_bill_posted', 'vendor_bill_voided', 'void'],
+            'vendor payments' => ['vendor_payments', 'paid_on', 'vendor_payment_made', 'vendor_payment_voided', 'void'],
+            'credit notes' => ['credit_notes', 'issued_on', 'credit_note_issued', 'credit_note_voided', 'void'],
+            'refunds' => ['refunds', 'refunded_on', 'refund_paid', 'refund_voided', 'void'],
+            'withholding certificates' => ['withholding_certificates', 'received_on', 'withholding_received', 'withholding_voided', 'void'],
+        ];
+        $later = [];
+        foreach ($documents as $kind => [$table, $dated, $posted, $voided, $void]) {
+            $rows = fn (): Builder => DB::table($table)->where("{$table}.organization_id", $org);
+            $later[$kind] = $entryFor($rows()->where("{$table}.{$dated}", '<=', $upTo), $table, $posted)->count();
+            $later[rtrim($kind, 's').' voids'] = $entryFor($rows()->where("{$table}.status", $void)->where("{$table}.voided_at", '<', $next), $table, $voided)->count();
+        }
+
         return [
             'invoices' => $entryFor($invoices()->where('invoices.status', '<>', 'draft')->where('invoices.issue_date', '<=', $upTo), 'invoices', 'invoice_issued')->count(),
             'invoice voids' => $entryFor($invoices()->where('invoices.status', 'void')->where('invoices.voided_at', '<', $next), 'invoices', 'invoice_voided')->count(),
@@ -89,10 +110,14 @@ final class Reconciliation
             )->count(),
             'stock moves' => DB::table('stock_moves')->where('stock_moves.organization_id', $org)->where('stock_moves.occurred_at', '<', $next)
                 ->whereNotExists(fn (Builder $l) => $l->select(DB::raw('1'))->from('journal_lines as l')->whereColumn('l.stock_move_id', 'stock_moves.id'))->count(),
-        ];
+        ] + $later;
     }
 
-    /** What customers owe on issued, unvoided invoices, less what had been applied to them, as of the date. */
+    /**
+     * What customers owe on issued, unvoided invoices as of the date: less the
+     * payments applied to them, the credit notes taken off them and the tax
+     * withheld from them by then.
+     */
     public function receivablesSubledger(string $asOf): int
     {
         $org = $this->organizationId();
@@ -112,10 +137,17 @@ final class Reconciliation
             ->where(fn (Builder $q) => $q->whereNull('i.voided_at')->orWhere('i.voided_at', '>=', $next))
             ->sum('a.amount_cents');
 
-        return $invoiced - $applied;
+        $credited = (int) $this->standing('credit_notes', 'issued_on', $asOf)->sum('applied_cents');
+        $withheld = (int) $this->standing('withholding_certificates', 'received_on', $asOf)->sum('amount_cents');
+
+        return $invoiced - $applied - $credited - $withheld;
     }
 
-    /** Money received and not yet applied to an invoice, as of the date. */
+    /**
+     * The credit customers hold as of the date: money received and not yet
+     * applied to an invoice, plus what credit notes left over, less what has
+     * been refunded.
+     */
     public function unappliedCredit(string $asOf): int
     {
         $org = $this->organizationId();
@@ -132,7 +164,67 @@ final class Reconciliation
             ->where(fn (Builder $q) => $q->whereNull('p.voided_at')->orWhere('p.voided_at', '>=', $next))
             ->sum('a.amount_cents');
 
-        return $received - $applied;
+        $credited = (int) $this->standing('credit_notes', 'issued_on', $asOf)->sum('credit_cents');
+        $refunded = (int) $this->standing('refunds', 'refunded_on', $asOf)->sum('amount_cents');
+
+        return $received - $applied + $credited - $refunded;
+    }
+
+    /** What is owed to vendors as of the date: the bills standing then, less what had been paid on them. */
+    public function payablesSubledger(string $asOf): int
+    {
+        $next = $this->endOfDay($asOf);
+        $billed = (int) $this->standing('vendor_bills', 'bill_date', $asOf)->sum('payable_cents');
+        $paid = (int) DB::table('vendor_payment_allocations as a')
+            ->join('vendor_payments as p', 'p.id', '=', 'a.vendor_payment_id')
+            ->where('a.organization_id', $this->organizationId())->where('p.paid_on', '<=', $asOf)
+            ->where(fn (Builder $q) => $q->whereNull('p.voided_at')->orWhere('p.voided_at', '>=', $next))
+            ->sum('a.amount_cents');
+
+        return $billed - $paid;
+    }
+
+    /**
+     * Goods received into stock that no vendor bill had claimed as of the
+     * date, at the value their receipts credited GR/IR with: every receipt
+     * received by then, less the receipts voided and the receipt lines
+     * billed by then, plus the bills voided by then (their lines wait again).
+     */
+    public function unbilledReceipts(string $asOf): int
+    {
+        $org = $this->organizationId();
+        $next = $this->endOfDay($asOf);
+
+        $lines = fn (): Builder => DB::table('goods_receipt_lines as l')
+            ->join('goods_receipts as r', 'r.id', '=', 'l.goods_receipt_id')
+            ->where('l.organization_id', $org)->whereNotNull('l.item_id');
+        $value = function (Builder $query): int {
+            $total = 0;
+            foreach ($query->get(['l.stock_quantity', 'l.stock_unit_cost_cents']) as $row) {
+                $total += StockLedger::moveValue(Cell::string($row->stock_quantity), Cell::int($row->stock_unit_cost_cents));
+            }
+
+            return $total;
+        };
+        $received = $value($lines()->where('r.received_on', '<=', $asOf));
+        $voided = $value($lines()->where('r.received_on', '<=', $asOf)->whereNotNull('r.voided_at')->where('r.voided_at', '<', $next));
+
+        $bills = fn (): Builder => DB::table('vendor_bill_lines as bl')
+            ->join('vendor_bills as b', 'b.id', '=', 'bl.vendor_bill_id')
+            ->where('bl.organization_id', $org)->whereNotNull('bl.received_value_cents');
+        $billed = (int) $bills()->where('b.bill_date', '<=', $asOf)->sum('bl.received_value_cents');
+        $unbilled = (int) $bills()->whereNotNull('b.voided_at')->where('b.voided_at', '<', $next)->sum('bl.received_value_cents');
+
+        return $received - $voided - $billed + $unbilled;
+    }
+
+    /** A table's documents dated on or before the date and not voided by the end of it. */
+    private function standing(string $table, string $dated, string $asOf): Builder
+    {
+        $next = $this->endOfDay($asOf);
+
+        return DB::table($table)->where('organization_id', $this->organizationId())->where($dated, '<=', $asOf)
+            ->where(fn (Builder $q) => $q->whereNull('voided_at')->orWhere('voided_at', '>=', $next));
     }
 
     /**

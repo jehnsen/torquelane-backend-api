@@ -21,6 +21,7 @@ use App\Models\CustomerAccount;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
+use App\Models\Refund;
 use App\Tenancy\TenantManager;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -88,7 +89,7 @@ final class RecordPayment
             $this->journal->auditPayment($payment, 'received', null);
             event(new PaymentReceived($payment->organization_id, $payment->id, $payment->number));
 
-            return $payment->load('allocations');
+            return $payment->load(['allocations', 'refunds']);
         });
     }
 
@@ -101,7 +102,7 @@ final class RecordPayment
     {
         return DB::transaction(function () use ($payment, $allocations): Payment {
             $open = $this->lockOpenInvoices($payment->customer_account_id);
-            $locked = $this->journal->lockPayment($payment)->load('allocations');
+            $locked = $this->journal->lockPayment($payment)->load(['allocations', 'refunds']);
             if ($locked->status !== PaymentStatus::Posted) {
                 throw new InvalidTransitionException("Payment {$locked->number} is void; it has nothing to allocate.");
             }
@@ -116,7 +117,7 @@ final class RecordPayment
             }
             $this->journal->auditPayment($locked, 'allocated', $before);
 
-            return $locked->load('allocations');
+            return $locked->load(['allocations', 'refunds']);
         });
     }
 
@@ -129,6 +130,9 @@ final class RecordPayment
             $locked = $this->journal->lockPayment($payment);
             if ($locked->status !== PaymentStatus::Posted) {
                 throw new InvalidTransitionException("Payment {$locked->number} is already void.");
+            }
+            if (Refund::query()->where('payment_id', $locked->id)->where('status', PaymentStatus::Posted->value)->exists()) {
+                throw new InvalidTransitionException("Payment {$locked->number} has been refunded in part; void the refund first.");
             }
             $before = BillingJournal::paymentSnapshot($locked);
 
@@ -146,7 +150,7 @@ final class RecordPayment
             $this->loyalty->reverseFor($locked);
             $this->journal->auditPayment($locked, 'voided', $before);
 
-            return $locked->load('allocations');
+            return $locked->load(['allocations', 'refunds']);
         });
     }
 
@@ -158,13 +162,15 @@ final class RecordPayment
      */
     private function apply(Payment $payment, array $open, ?array $requested, string $allocatedOn, CarbonImmutable $now): int
     {
-        $available = $payment->amount_cents - (int) PaymentAllocation::query()->where('payment_id', $payment->id)->sum('amount_cents');
+        $available = $payment->amount_cents
+            - (int) PaymentAllocation::query()->where('payment_id', $payment->id)->sum('amount_cents')
+            - (int) Refund::query()->where('payment_id', $payment->id)->where('status', PaymentStatus::Posted->value)->sum('amount_cents');
         $candidates = [];
         foreach ($open as $invoice) {
             if (! $invoice->status->isOpen()) {
                 continue;
             }
-            $candidates[$invoice->id] = new OpenInvoice($invoice->id, (string) $invoice->number, $invoice->customer_account_id, (string) $invoice->issue_date?->toDateString(), (string) $invoice->due_date?->toDateString(), $invoice->total_due_cents, $invoice->paid_cents);
+            $candidates[$invoice->id] = new OpenInvoice($invoice->id, (string) $invoice->number, $invoice->customer_account_id, (string) $invoice->issue_date?->toDateString(), (string) $invoice->due_date?->toDateString(), $invoice->total_due_cents, $invoice->settledCents());
         }
 
         try {

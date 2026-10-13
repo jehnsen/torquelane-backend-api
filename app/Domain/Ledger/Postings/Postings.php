@@ -29,6 +29,13 @@ final class Postings
             $facts instanceof ReversalFacts => self::reversal($facts),
             $facts instanceof PrepaidSaleFacts => self::prepaidSold($facts),
             $facts instanceof PrepaidRedemptionFacts => self::prepaidRedeemed($facts),
+            $facts instanceof VendorBillFacts => SubledgerPostings::vendorBill($facts),
+            $facts instanceof VendorPaymentFacts => SubledgerPostings::vendorPayment($facts),
+            $facts instanceof CreditNoteFacts => SubledgerPostings::creditNote($facts),
+            $facts instanceof RefundFacts => SubledgerPostings::refund($facts),
+            $facts instanceof WithholdingFacts => SubledgerPostings::withholding($facts),
+            $facts instanceof ManualJournalFacts => SubledgerPostings::manualJournal($facts),
+            $facts instanceof YearCloseFacts => SubledgerPostings::yearClose($facts),
             default => throw new InvalidArgumentException('No postings for '.$facts::class.'.'),
         };
     }
@@ -47,7 +54,9 @@ final class Postings
 
     /**
      * A prepaid package sold: Dr the cash-side account of the method / Cr
-     * Unearned Revenue. Nothing is earned until a credit is used.
+     * Unearned Revenue for the price before VAT, Cr Output VAT for the VAT
+     * inside it (the sale is the taxable event). Nothing is earned until a
+     * credit is used.
      */
     private static function prepaidSold(PrepaidSaleFacts $facts): JournalDraft
     {
@@ -62,7 +71,8 @@ final class Postings
             $memo,
             [
                 PostingLine::debit(self::receivedInto($facts->method), $facts->priceCents, $facts->branchId, memo: $memo),
-                PostingLine::credit(RuleKey::UnearnedRevenue, $facts->priceCents, $facts->branchId, $facts->customerAccountId, memo: $memo),
+                PostingLine::credit(RuleKey::UnearnedRevenue, $facts->priceCents - $facts->vatCents, $facts->branchId, $facts->customerAccountId, memo: $memo),
+                ...($facts->vatCents > 0 ? [PostingLine::credit(RuleKey::OutputVat, $facts->vatCents, $facts->branchId, memo: $memo)] : []),
             ],
             paymentMethod: $facts->method->value,
         );

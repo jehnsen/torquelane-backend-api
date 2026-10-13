@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Actions\Billing\ManageInvoices;
-use App\Documents\BillingPdf;
 use App\Domain\Invoicing\Invoicing;
 use App\Events\InvoiceIssued;
 use App\Events\InvoiceVoided;
@@ -82,7 +81,7 @@ function issueInvoice(string $id, array $body = [], ?string $key = null): TestRe
     return test()->postJson("/api/v1/invoices/{$id}/issue", $body, ['Idempotency-Key' => $key ?? 'issue-'.$id.'-'.bin2hex(random_bytes(4))]);
 }
 
-it('takes a job from draft through approval and work to an invoice, paid, with its PDFs', function () {
+it('takes a job from draft through approval and work to an invoice, paid, with what its printed documents carry', function () {
     Event::fake([InvoiceIssued::class, InvoiceVoided::class, PaymentReceived::class]);
 
     // Raised and sent: inside Actimed's auto-approval band, so it opens approved.
@@ -180,13 +179,22 @@ it('takes a job from draft through approval and work to an invoice, paid, with i
     $this->postJson("/api/v1/work-orders/{$job}/collect")->assertOk()->assertJsonPath('data.lifecycle_stage', 'completed');
     expect($this->getJson("/api/v1/work-orders/{$job}")->json('data.released_at'))->not->toBeNull();
 
-    // The printed documents, for staff and the customer alike.
-    foreach (["/api/v1/invoices/{$issued['id']}/pdf", "/api/v1/payments/{$payment['id']}/pdf", '/api/v1/customer-accounts/'.$this->world->id('fc-actimed').'/statement/pdf?from=2026-07-01&to=2026-10-08'] as $uri) {
-        foreach (['advisor@mekanikomore.ph', 'donmiguel@mekanikomor.ph'] as $who) {
-            billAs($who);
-            $pdf = $this->get($uri)->assertOk()->assertHeader('Content-Type', 'application/pdf');
-            expect(substr((string) $pdf->getContent(), 0, 5))->toBe('%PDF-');
-        }
+    // The API prints nothing: the frontend lays the documents out from JSON. Staff and the customer alike get
+    // who each document is from and to, and the wording it must carry.
+    foreach (['advisor@mekanikomore.ph', 'donmiguel@mekanikomor.ph'] as $who) {
+        billAs($who);
+        $receipt = $this->getJson("/api/v1/payments/{$payment['id']}")->assertOk()->json('data');
+        expect($receipt['notices'])->toBe([Invoicing::NOT_AN_INVOICE, Invoicing::NON_VAT_NOTICE])
+            ->and($receipt['seller']['name'])->not->toBe('')
+            ->and(array_keys($receipt['seller']))->toBe(['name', 'business_style', 'tin', 'branch_code', 'tin_printed', 'address'])
+            ->and($receipt['buyer']['name'])->toBe($issued['buyer']['name']);
+        $statement = $this->getJson('/api/v1/customer-accounts/'.$this->world->id('fc-actimed').'/statement?from=2026-07-01&to=2026-10-08')->assertOk()->json('data');
+        expect($statement['notices'])->toBe([Invoicing::NOT_AN_INVOICE])
+            ->and($statement['seller']['name'])->not->toBe('');
+        $this->getJson("/api/v1/invoices/{$issued['id']}")->assertOk()->assertJsonPath('data.seller.name', $issued['seller']['name']);
+        // No PDF endpoint is left to call.
+        $this->get("/api/v1/invoices/{$issued['id']}/pdf")->assertNotFound();
+        $this->get("/api/v1/payments/{$payment['id']}/pdf")->assertNotFound();
     }
 
     expect(asSystem(fn () => AuditLog::query()->where('entity_id', $issued['id'])->orderBy('occurred_at')->orderBy('id')->pluck('action')->all()))->toBe(['created', 'issued'])
@@ -231,12 +239,9 @@ it('extracts VAT where the branch\'s prices include it, and charges none where t
         ->json('data');
     expect($issued['totals']['non_vat_sales_cents'])->toBe($issued['totals']['total_due_cents']);
 
-    // The printed invoice carries the required wording, and never claims accreditation.
-    $html = asSystem(fn () => app(BillingPdf::class)->invoiceHtml(Invoice::query()->findOrFail($issued['id'])));
-    expect($html)->toContain('THIS DOCUMENT IS NOT VALID FOR CLAIM OF INPUT TAX.')
-        ->toContain('Non-VAT Reg. TIN')
-        ->not->toContain('VATable sales')
-        ->and(mb_strtolower($html))->not->toContain('accredit');
+    // What the frontend prints carries the required wording, and nothing in it claims accreditation.
+    expect($issued['non_vat_notice'])->toBe('THIS DOCUMENT IS NOT VALID FOR CLAIM OF INPUT TAX.')
+        ->and(mb_strtolower((string) json_encode($issued)))->not->toContain('accredit');
 });
 
 it('prints a VAT-registered invoice with its VAT breakdown and the branch\'s own header and footer', function () {
@@ -258,14 +263,15 @@ it('prints a VAT-registered invoice with its VAT breakdown and the branch\'s own
         ->assertJsonPath('data.seller.branch_code', '00002')
         ->json('data');
 
-    $html = asSystem(fn () => app(BillingPdf::class)->invoiceHtml(Invoice::query()->findOrFail($invoice['id'])));
-    expect($html)->toContain('VAT Reg. TIN: 123-456-789-00002')
-        ->toContain('VATable sales')
-        ->toContain('VAT (12%)')
-        ->toContain('Permit and series details as registered.')
-        ->toContain($invoice['number'])
-        ->not->toContain('NOT VALID FOR CLAIM')
-        ->and(mb_strtolower($html))->not->toContain('accredit');
+    // The TIN with its branch code, the VAT breakdown and the branch's own wording all arrive as data.
+    expect($invoice['seller']['tin_printed'])->toBe('123-456-789-00002')
+        ->and($invoice['seller']['footer'])->toBe('Permit and series details as registered.')
+        ->and($invoice['seller']['header'])->toBe('Brgy. San Antonio, Biñan, Laguna')
+        ->and($invoice['vat_rate_pct'])->toBe('12')
+        ->and($invoice['totals']['vatable_sales_cents'])->toBeGreaterThan(0)
+        ->and($invoice['totals']['vat_amount_cents'])->toBeGreaterThan(0)
+        ->and($invoice['non_vat_notice'])->toBeNull()
+        ->and(mb_strtolower((string) json_encode($invoice)))->not->toContain('accredit');
 
     // The snapshot is frozen: correcting the branch later never reprints an issued invoice differently.
     $this->patchJson("/api/v1/branches/{$branch}", ['registered_name' => 'Renamed Corp.'])->assertOk();

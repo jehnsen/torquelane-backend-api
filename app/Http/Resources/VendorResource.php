@@ -29,6 +29,13 @@ final class VendorResource extends JsonResource
             'id' => $vendor->id,
             'name' => $vendor->name,
             'is_active' => $vendor->is_active,
+            'registered_name' => $vendor->registered_name,
+            'tin' => $vendor->tin,
+            'address' => $vendor->address,
+            'is_vat_registered' => $vendor->is_vat_registered,
+            'payment_terms_days' => $vendor->payment_terms_days,
+            'default_atc_code' => $vendor->default_atc_code,
+            'default_withholding_rate_pct' => $vendor->default_withholding_rate_pct === null ? null : (string) $vendor->default_withholding_rate_pct->strippedOfTrailingZeros(),
             'created_at' => $vendor->created_at->toIso8601ZuluString(),
             'updated_at' => $vendor->updated_at->toIso8601ZuluString(),
         ];

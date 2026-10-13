@@ -5,17 +5,14 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\Billing\BillingQueries;
-use App\Documents\BillingPdf;
 use App\Http\Requests\BillingQueueRequest;
 use App\Http\Requests\ReceivablesRequest;
 use App\Http\Resources\InvoiceResource;
 use App\Http\Resources\WorkOrderCollection;
 use App\Models\CustomerAccount;
 use App\Models\Invoice;
-use App\Models\Organization;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
 
 /**
@@ -96,18 +93,5 @@ final class ReceivablesController
         Gate::authorize('viewBilling', $customerAccount);
 
         return new JsonResponse(['data' => $billing->statement($customerAccount, $request->from(), $request->to())]);
-    }
-
-    /**
-     * Statement of account PDF
-     */
-    public function statementPdf(ReceivablesRequest $request, CustomerAccount $customerAccount, BillingQueries $billing, BillingPdf $pdf): Response
-    {
-        Gate::authorize('viewBilling', $customerAccount);
-
-        return $pdf->statement(
-            $billing->statement($customerAccount, $request->from(), $request->to()),
-            Organization::query()->findOrFail($customerAccount->organization_id),
-        );
     }
 }

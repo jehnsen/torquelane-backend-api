@@ -51,10 +51,11 @@ final class PeriodController
     /**
      * Close checklist
      *
-     * `ledger:view`, `period` `YYYY-MM`. The five checks for that month (every
-     * source posted; receivables = Accounts Receivable; stock valuation =
-     * Inventory; unapplied credit = Customer Deposits; trial balance
-     * balanced), whether the month can be closed now and, if not, why.
+     * `ledger:view`, `period` `YYYY-MM`. The seven checks for that month
+     * (every source posted; receivables = Accounts Receivable; stock valuation
+     * = Inventory; unapplied credit = Customer Deposits; open vendor bills =
+     * Accounts Payable; unbilled goods receipts = GR/IR Clearing; trial
+     * balance balanced), whether the month can be closed now and, if not, why.
      * Read-only.
      */
     public function checklist(ClosePeriodRequest $request, ClosePeriod $close): JsonResponse

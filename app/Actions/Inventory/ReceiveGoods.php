@@ -21,6 +21,7 @@ use App\Models\GoodsReceiptLine;
 use App\Models\Item;
 use App\Models\ShopPurchaseOrder;
 use App\Models\ShopPurchaseOrderLine;
+use App\Models\VendorBillLine;
 use Brick\Math\BigDecimal;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -135,6 +136,16 @@ final class ReceiveGoods
             $locked = GoodsReceipt::query()->lockForUpdate()->findOrFail($receipt->id);
             if ($locked->status !== ReceiptStatus::Posted) {
                 throw new InvalidTransitionException("Goods receipt {$locked->reference} is already void.");
+            }
+            // A billed receipt has left GR/IR for Accounts Payable: the bill is undone first.
+            $bill = VendorBillLine::query()
+                ->join('vendor_bills', 'vendor_bills.id', '=', 'vendor_bill_lines.vendor_bill_id')
+                ->join('goods_receipt_lines', 'goods_receipt_lines.id', '=', 'vendor_bill_lines.goods_receipt_line_id')
+                ->where('goods_receipt_lines.goods_receipt_id', $locked->id)
+                ->where('vendor_bills.status', '<>', 'void')
+                ->value('vendor_bills.number');
+            if (is_string($bill)) {
+                throw new InvalidTransitionException("Goods receipt {$locked->reference} is on vendor bill {$bill}; void the bill first.");
             }
             // The order first, then the balances: the same order every receipt locks them in.
             $order = $this->journal->lock(ShopPurchaseOrder::query()->findOrFail($locked->shop_purchase_order_id));

@@ -26,6 +26,12 @@ enum DocumentType: string
     case DetailingBooking = 'detailing_booking';
     /** Prepaid packages sold (Phase 11). */
     case PrepaidPackage = 'prepaid_package';
+    /** Vendor bills recorded (Phase 12): our own number for a vendor's invoice. */
+    case VendorBill = 'vendor_bill';
+    /** Payments to vendors: the cash-out voucher. */
+    case VendorPayment = 'vendor_payment';
+    case CreditNote = 'credit_note';
+    case Refund = 'refund';
 
     public function defaultPrefix(): string
     {
@@ -42,6 +48,10 @@ enum DocumentType: string
             self::Payment => 'PAY',
             self::DetailingBooking => 'BK',
             self::PrepaidPackage => 'PP',
+            self::VendorBill => 'VB',
+            self::VendorPayment => 'PV',
+            self::CreditNote => 'CN',
+            self::Refund => 'RF',
         };
     }
 }

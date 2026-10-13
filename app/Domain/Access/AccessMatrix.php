@@ -39,7 +39,10 @@ namespace App\Domain\Access;
  *  - CRM (Phase 11, never a portal role): `crm:view` and `crm:work` for
  *    provider_admin, branch_manager, service_advisor and cashier (the people
  *    who talk to customers); `crm:manage` for provider_admin and
- *    branch_manager. The technician holds none.
+ *    branch_manager. The technician holds none;
+ *  - payables (Phase 12, never a portal role): `payables:view` and
+ *    `payables:manage` for provider_admin and branch_manager (the people who
+ *    already receive goods and void invoices), within their branches.
  */
 final class AccessMatrix
 {
@@ -139,6 +142,8 @@ final class AccessMatrix
             'crm:view',
             'crm:work',
             'crm:manage',
+            'payables:view',
+            'payables:manage',
         ],
         'provider_admin' => [
             'vehicle:update',
@@ -171,6 +176,8 @@ final class AccessMatrix
             'crm:view',
             'crm:work',
             'crm:manage',
+            'payables:view',
+            'payables:manage',
         ],
     ];
 

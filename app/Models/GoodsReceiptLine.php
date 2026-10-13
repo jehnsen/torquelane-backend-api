@@ -31,6 +31,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable $created_at
  * @property-read Item|null $item
  * @property-read ShopPurchaseOrderLine $orderLine
+ * @property-read GoodsReceipt $receipt
  */
 final class GoodsReceiptLine extends Model
 {

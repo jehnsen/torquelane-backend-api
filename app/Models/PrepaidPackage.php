@@ -22,6 +22,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $reference
  * @property string $plan_name
  * @property int $price_cents
+ * @property int $vat_cents
  * @property int $credits_total
  * @property int $credits_used
  * @property string|null $detailing_package_id
@@ -40,18 +41,25 @@ final class PrepaidPackage extends Model
     use BelongsToOrganization;
     use HasUlids;
 
-    protected $attributes = ['credits_used' => 0];
+    protected $attributes = ['credits_used' => 0, 'vat_cents' => 0];
 
     protected function casts(): array
     {
         return [
             'price_cents' => 'integer',
+            'vat_cents' => 'integer',
             'credits_total' => 'integer',
             'credits_used' => 'integer',
             'sold_on' => 'immutable_date',
             'expires_on' => 'immutable_date',
             'payment_method' => PaymentMethod::class,
         ];
+    }
+
+    /** What the package earns as it is used: its price less the VAT inside it. */
+    public function netPriceCents(): int
+    {
+        return $this->price_cents - $this->vat_cents;
     }
 
     /** @return BelongsTo<CustomerAccount, $this> */

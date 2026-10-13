@@ -16,7 +16,7 @@ final readonly class CreditPosition
         public ?int $creditLimitCents,
         /** Balance of the open invoices. */
         public int $outstandingCents,
-        /** Payments received and not allocated. */
+        /** Payments received and not allocated, and what credit notes left over, less refunds. */
         public int $creditCents,
     ) {}
 

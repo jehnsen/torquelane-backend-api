@@ -105,6 +105,15 @@ function parityPlaceholders(World $world, string $document): array
         'prepaid_package' => '01j00000000000000000000000',
         'membership' => '01j00000000000000000000001',
         'kind' => 'pms_due',
+        // Phase 12: the seed holds no bill, credit note, refund, certificate, voucher or reconciliation, so the
+        // writes that name one are ids that match nothing (404).
+        'vendor_bill' => '01j00000000000000000000002',
+        'vendor_payment' => '01j00000000000000000000003',
+        'credit_note' => '01j00000000000000000000004',
+        'refund' => '01j00000000000000000000005',
+        'withholding_certificate' => '01j00000000000000000000006',
+        'manual_journal' => '01j00000000000000000000007',
+        'bank_reconciliation' => '01j00000000000000000000008',
         'token' => str_repeat('a', 40),
     ]);
 }

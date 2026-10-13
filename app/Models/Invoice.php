@@ -25,7 +25,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * draft; numbered from the `invoice` series when issued, and from then on an
  * issued financial document (R7): only its payment status and the void stamp
  * move (triggers). Its status between issue and void follows the allocations
- * of the payments that still stand (`paid_cents`).
+ * of the payments that still stand (`paid_cents`), what its standing credit
+ * notes take off it (`credited_cents`) and what the customer withheld at
+ * source on a 2307 (`withheld_cents`): together, what is settled.
  *
  * @property string $id
  * @property string $organization_id
@@ -58,6 +60,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $vat_amount_cents
  * @property int $total_due_cents
  * @property int $paid_cents
+ * @property int $credited_cents
+ * @property int $withheld_cents
  * @property string $notes
  * @property string|null $created_by
  * @property string $created_by_name
@@ -91,6 +95,8 @@ final class Invoice extends Model
         'vat_amount_cents' => 0,
         'total_due_cents' => 0,
         'paid_cents' => 0,
+        'credited_cents' => 0,
+        'withheld_cents' => 0,
     ];
 
     protected function casts(): array
@@ -112,6 +118,8 @@ final class Invoice extends Model
             'vat_amount_cents' => 'integer',
             'total_due_cents' => 'integer',
             'paid_cents' => 'integer',
+            'credited_cents' => 'integer',
+            'withheld_cents' => 'integer',
             'issued_at' => 'immutable_datetime',
             'voided_at' => 'immutable_datetime',
         ];
@@ -135,9 +143,15 @@ final class Invoice extends Model
         $query->whereIn($this->qualifyColumn('branch_id'), $context->allowedBranchIds);
     }
 
+    /** Paid, credited and withheld: everything that stands against the total. */
+    public function settledCents(): int
+    {
+        return $this->paid_cents + $this->credited_cents + $this->withheld_cents;
+    }
+
     public function balanceCents(): int
     {
-        return $this->status->isOpen() ? $this->total_due_cents - $this->paid_cents : 0;
+        return $this->status->isOpen() ? $this->total_due_cents - $this->settledCents() : 0;
     }
 
     public function vat(): VatTreatment
@@ -182,6 +196,22 @@ final class Invoice extends Model
     public function allocations(): HasMany
     {
         return $this->hasMany(PaymentAllocation::class)->orderBy('allocated_at')->orderBy('id');
+    }
+
+    /**
+     * @return HasMany<CreditNote, $this>
+     */
+    public function creditNotes(): HasMany
+    {
+        return $this->hasMany(CreditNote::class)->orderBy('id');
+    }
+
+    /**
+     * @return HasMany<WithholdingCertificate, $this>
+     */
+    public function withholdingCertificates(): HasMany
+    {
+        return $this->hasMany(WithholdingCertificate::class)->orderBy('id');
     }
 
     /**

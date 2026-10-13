@@ -111,7 +111,7 @@ it('balances on the seeded activity, and every control account reconciles', func
     foreach ($checklist['checklist'] as $check) {
         expect($check['passed'])->toBeTrue("{$check['key']}: {$check['detail']}");
     }
-    expect(lgChecks())->toBe(['unposted_sources' => true, 'receivables' => true, 'inventory' => true, 'customer_deposits' => true, 'trial_balance' => true]);
+    expect(lgChecks())->toBe(['unposted_sources' => true, 'receivables' => true, 'inventory' => true, 'customer_deposits' => true, 'payables' => true, 'goods_received_not_billed' => true, 'trial_balance' => true]);
 
     // Receivables: Actimed's 0001 less its part payment, 0003, and Northwind's 0002.
     expect(lgAccountBalance('1100'))->toBe((961_520 - 384_608) + 208_880 + 527_520);

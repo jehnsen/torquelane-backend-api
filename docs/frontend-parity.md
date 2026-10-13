@@ -217,15 +217,15 @@ a write the browser did not drive says so, and `tests/Feature/Billing` covers it
 | Billing queue: invoice selected jobs (one account, one branch) | `POST /invoices` | staff | done | `work_order_ids`; each approved line billed at its STORED cost (parts and labour as two lines, then the job's fee). A job already on a standing invoice is 409. | ✓ PA (one job → draft) |
 | `/invoices`: invoices, by status (incl. `open`, `overdue`), account, search | `GET /invoices?status=open` | both | done | Portal: own account, issued only. | ✓ PA FM (own account only; Northwind's not listed) |
 | `/invoices/[id]`: invoice detail | `GET /invoices/{invoice}` | both | done | Totals (VATable / exempt / zero-rated / non-VAT sales, VAT, total due), payments applied, `can_*`. | ✓ PA C FM |
-| Invoice detail: PDF | `GET /invoices/{invoice}/pdf` | both | done | `application/pdf`; same policy as the invoice. | ✓ C FM (download) |
+| Invoice detail: print | `GET /invoices/{invoice}` | both | done | The API serves no PDF (removed in Phase 12): the frontend lays the invoice out from this JSON. `seller` (with `tin_printed`, `header`, `footer`), `buyer`, `totals` and `non_vat_notice` are everything the printed invoice carries. | Was ✓ C FM as a PDF download; the print view is the frontend's to build |
 | Invoice detail: edit a draft (notes, discounts, typed-in lines), discard | `PATCH /invoices/{invoice}`, `DELETE /invoices/{invoice}` | staff | done | Only a draft; an issued invoice is 409. | API-tested only (Pest); discount editor built |
 | Invoice detail: issue | `POST /invoices/{invoice}/issue` | staff | done | `Idempotency-Key` required; `INV-YYYY-NNNN` from the invoice series; due date from the account's terms. | ✓ PA |
 | Invoice detail: void | `POST /invoices/{invoice}/void` | staff | done | `billing:void`; only with nothing paid against it; keeps its number; its jobs return to the queue. | API-tested only (Pest) |
 | Record payment | `POST /payments` | staff | done | `Idempotency-Key` required; spread as asked, else oldest due first; the rest is credit. A paid invoice stamps its jobs collected. | ✓ C (cash, invoice paid) |
-| `/payments`: payments; detail; acknowledgment receipt PDF | `GET /payments`, `GET /payments/{payment}`, `GET /payments/{payment}/pdf` | both | done | Portal: own account. | ✓ PA C (list, receipt download); FM: list |
+| `/payments`: payments; detail; acknowledgment receipt | `GET /payments`, `GET /payments/{payment}` | both | done | Portal: own account. The receipt is printed by the frontend from the payment's JSON: `seller`, `buyer`, `allocations` and `notices` ("This is not an invoice." and the input-tax notice). No PDF endpoint. | ✓ PA C (list); FM: list. The receipt was a PDF download; the print view is the frontend's to build |
 | Payment: apply credit, void | `POST /payments/{payment}/allocations`, `POST /payments/{payment}/void` | staff | done | Void: `billing:void`; its invoices are owed again. | API-tested only (Pest); void control built |
 | Customer balance tab (`/shop/clients/[id]`, portal `/invoices`) | `GET /customer-accounts/{customer_account}/balance` | both | done | Outstanding, overdue, credit, credit limit (`over_limit` warns, never blocks). | ✓ PA (Northwind, over limit) FM (own) |
-| Statement of account, and its PDF | `GET /customer-accounts/{customer_account}/statement?from=2026-07-01&to=2026-10-08`, `GET /customer-accounts/{customer_account}/statement/pdf` | both | done | Balance brought forward, each invoice / payment / void, running and closing balance. | ✓ PA FM (statement, PDF download) |
+| Statement of account | `GET /customer-accounts/{customer_account}/statement?from=2026-07-01&to=2026-10-08` | both | done | Balance brought forward, each invoice / payment / credit note / refund / withholding / void, running and closing balance; `seller` and `notices` for the printed copy, which the frontend lays out. No PDF endpoint. | ✓ PA FM (statement). The PDF download is gone; the print view is the frontend's to build |
 | `/shop/receivables`: AR aging | `GET /receivables/aging?as_of=2026-10-08` | staff | done | Per account: current, 1–30, 31–60, 61–90, over 90, credit. | ✓ PA |
 | Receivables: revenue, accrual and cash | `GET /receivables/revenue?from=2026-10-01&to=2026-10-08` | staff | done | Invoiced (net, VAT, total) and received (by method). | ✓ PA |
 | Raise a work order for an account over its credit limit | `POST /work-orders` | both | done | Still created; `warnings[].code = credit_limit_exceeded`; the override is audited. | API-tested only (Pest); the dialog and check-in show the warning |
@@ -255,7 +255,7 @@ what the browser did not drive.
 | Journal: open an entry | `GET /ledger/journal/{journal_entry}` | staff | done | Lines with accounts and branches; a reversal names the entry it undoes. A branch-limited caller gets 404 for another branch's entry. | ✓ PA (an invoice's entry, balanced) |
 | Journal: export | `GET /ledger/journal/export?from=2026-07-01&to=2026-10-08` | staff | done | `format` csv, or xero / quickbooks when that is the accounting target and every account is mapped (409 `unmapped_accounts`). | ✓ PA (CSV download) |
 | `/shop/books/periods`: months | `GET /ledger/periods` | staff | done | Newest first, with status and who closed it. | ✓ PA |
-| Period close: checklist | `GET /ledger/periods/checklist?period=2026-09` | staff | done | Unposted sources = 0, receivables = AR, stock valuation = Inventory, unapplied credit = Customer Deposits, trial balance balanced. | ✓ PA |
+| Period close: checklist | `GET /ledger/periods/checklist?period=2026-09` | staff | done | Unposted sources = 0, receivables = AR, stock valuation = Inventory, unapplied credit = Customer Deposits, open vendor bills = Accounts Payable and unbilled receipts = GR/IR (both Phase 12), trial balance balanced. | ✓ PA |
 | Period close: close the month | `POST /ledger/periods/close` | staff | done | `ledger:manage`, not branch-limited; month over, earlier months closed, checklist passing. Final. | ✓ PA (oldest month closed); BM: control disabled |
 | `/shop/books/reports`: trial balance | `GET /ledger/reports/trial-balance?as_of=2026-10-08` | staff | done | `balanced` is the API's. | ✓ PA |
 | Reports: general ledger | `GET /ledger/reports/general-ledger/{account}?from=2026-07-01&to=2026-10-08` | staff | done | Running balance on the account's own side after the balance brought forward; paged. | ✓ PA |
@@ -384,6 +384,52 @@ Public pages (no session; the token in the link is the credential):
 | `/r/[token]`: a reminder's booking link | `GET /public/crm/reminders/{token}`, `POST /public/crm/reminders/{token}/book` | Opens the branch's online booking where one applies; otherwise leaves a booking request on the staff's task list. |
 | `/feedback/[token]` | `GET /public/crm/feedback/{token}`, `POST /public/crm/feedback/{token}` | One 0–10 answer, once. |
 | `/unsubscribe/[token]` | `GET /public/crm/unsubscribe/{token}`, `POST /public/crm/unsubscribe/{token}` | Suppresses the address and withdraws the consent. |
+
+## Payables, credits, tax and closing (Phase 12, API only)
+
+No screen exists for any of this yet: Phase 12 was built as an API, and every
+row below is "API-tested only (Pest)". The rows are here so the frontend has
+one map to build against, and so the smoke test calls them. Records are read
+one at a time at `/vendor-bills/{id}`, `/vendor-payments/{id}`,
+`/credit-notes/{id}`, `/refunds/{id}`, `/withholding-certificates/{id}`,
+`/ledger/vouchers/{id}` and `/ledger/bank-reconciliations/{id}`; the demo seed
+holds none of them, so those reads are covered by `tests/Feature/Payables`,
+`tests/Feature/Billing/CreditNotesTest.php`, `tests/Feature/Ledger/ClosingTest.php`
+and the isolation suite instead of this table.
+
+Payables are core and staff-only (`payables:view`, `payables:manage`: provider
+admin and branch manager). Credit notes and refunds need `billing:void`;
+recording a 2307 needs `billing:manage`. Vouchers, bank reconciliation and the
+year-end close need `ledger:manage`; the tax papers `ledger:view`. A customer's
+portal users read their own account's credit notes, refunds and withholding
+certificates.
+
+| Screen / action | Endpoint(s) | Side | Status | Notes | Phase 12 |
+|---|---|---|---|---|---|
+| Vendors: tax details | `PATCH /vendors/{vendor}` | staff | done | `registered_name`, `tin`, `address`, `is_vat_registered`, `payment_terms_days`, and the usual `default_atc_code` + `default_withholding_rate_pct` (both or neither). | API-tested only (Pest) |
+| Vendor bills: list | `GET /vendor-bills` | staff | done | `status` (also `open`, `overdue`), `vendor_id`, `branch_id`, `q`. | API-tested only (Pest) |
+| Vendor bills: goods received, not yet billed | `GET /vendor-bills/unbilled-receipts` | staff | done | Receipt lines no standing bill has claimed, with what each left in GR/IR. | API-tested only (Pest) |
+| Vendor bills: record, void | `POST /vendor-bills`, `POST /vendor-bills/{vendor_bill}/void` | staff | done | Idempotency-Key required. `goods` lines name a receipt line (billed whole, once); `expense` lines an account. Totals, input VAT and withholding are the API's. `payment` pays it on the spot. Void only with nothing paid. | API-tested only (Pest) |
+| Payments to vendors: list | `GET /vendor-payments` | staff | done | `status`, `method`, `vendor_id`, `branch_id`, `q`. | API-tested only (Pest) |
+| Payments to vendors: pay, void | `POST /vendor-payments`, `POST /vendor-payments/{vendor_payment}/void` | staff | done | Idempotency-Key required. Allocated in full to the vendor's bills at the branch, as named or oldest due first. | API-tested only (Pest) |
+| Payables aging | `GET /payables/aging?as_of=2026-10-08` | staff | done | Per vendor: current, 1–30, 31–60, 61–90, over 90. | API-tested only (Pest) |
+| Credit notes: list | `GET /credit-notes` | both | done | Portal: their own account's. | API-tested only (Pest) |
+| Credit notes: credit an invoice, void | `POST /invoices/{invoice}/credit-notes`, `POST /credit-notes/{credit_note}/void` | staff | done | `billing:void`; Idempotency-Key required. `applied_cents` came off the invoice, `credit_cents` is the customer's credit. Void only while nothing of it is refunded. | API-tested only (Pest) |
+| Refunds: list | `GET /refunds` | both | done | Portal: their own account's. | API-tested only (Pest) |
+| Refunds: pay, void | `POST /refunds`, `POST /refunds/{refund}/void` | staff | done | `billing:void`; Idempotency-Key required. One source: `payment_id` (its unallocated money) or `credit_note_id` (its credit). | API-tested only (Pest) |
+| Withholding certificates received: list | `GET /withholding-certificates` | both | done | The 2307s customers handed over. Portal: their own account's. | API-tested only (Pest) |
+| Withholding: record against an invoice, void | `POST /invoices/{invoice}/withholding`, `POST /withholding-certificates/{withholding_certificate}/void` | staff | done | `billing:manage` to record (the amount is the API's: base × rate), `billing:void` to void. | API-tested only (Pest) |
+| Journal vouchers: list | `GET /ledger/vouchers` | staff | done | In the caller's branches. | API-tested only (Pest) |
+| Journal vouchers: post, reverse | `POST /ledger/vouchers`, `POST /ledger/vouchers/{manual_journal}/reverse` | staff | done | `ledger:manage`; Idempotency-Key required. Debits equal credits; a control account is refused. | API-tested only (Pest) |
+| Bank reconciliations: list | `GET /ledger/bank-reconciliations` | staff | done | Not from a branch-limited sign-in. | API-tested only (Pest) |
+| Bank reconciliation: open, tick, complete, discard | `POST /ledger/bank-reconciliations`, `PUT /ledger/bank-reconciliations/{bank_reconciliation}/lines`, `POST /ledger/bank-reconciliations/{bank_reconciliation}/complete`, `DELETE /ledger/bank-reconciliations/{bank_reconciliation}` | staff | done | `ledger:manage`. Completes only when the statement balance equals everything cleared; final after that. | API-tested only (Pest) |
+| Fiscal years | `GET /ledger/years`, `GET /ledger/years?year=2026` | staff | done | Revenue, expenses, profit, whether the year can be closed and what is in the way. | API-tested only (Pest) |
+| Year-end close | `POST /ledger/years/close` | staff | done | `ledger:manage`, not branch-limited. Posts the closing entry to Retained Earnings and closes December. Final. | API-tested only (Pest) |
+| Tax: ATC pick-list | `GET /tax/options` | staff | done | A convenience list; any well-formed code is accepted. | API-tested only (Pest) |
+| Tax: VAT position | `GET /tax/vat?year=2026&quarter=3` | staff | done | Sales and output VAT, purchases and input VAT, VAT payable, and the VAT accounts' own movement. | API-tested only (Pest) |
+| Tax: summary lists of sales and purchases | `GET /tax/sales?year=2026&quarter=3`, `GET /tax/purchases?year=2026&quarter=3` | staff | done | One row per customer / vendor; `file=csv` downloads. | API-tested only (Pest) |
+| Tax: withholding alphalists | `GET /tax/withholding/expanded?year=2026&quarter=3`, `GET /tax/withholding/creditable?year=2026&quarter=3` | staff | done | Withheld from vendors (QAP) and by customers (SAWT); `file=csv` downloads. | API-tested only (Pest) |
+| Tax: a vendor's 2307 | `GET /tax/withholding/certificates/{vendor}?year=2026&quarter=3` | staff | done | Payor, payee, and per ATC the income payments of each month with the tax withheld. Data, not a printed form. | API-tested only (Pest) |
 
 ## What moved from the browser to the server
 

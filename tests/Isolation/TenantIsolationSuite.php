@@ -149,6 +149,21 @@ final class TenantIsolationSuite
         'prepaid_packages' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
         'prepaid_redemptions' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
         'loyalty_entries' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
+        // Phase 12: payables are branch-owned and staff-only; credit notes, refunds and withholding certificates belong
+        // to their account AND their branch, like the invoices they settle; a voucher to its branch; a bank
+        // reconciliation and a fiscal year to the whole organization (staff-only).
+        'vendor_bills' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id'],
+        'vendor_bill_lines' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'vendor_bill' => 'vendor_bill_id'],
+        'vendor_payments' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id'],
+        'vendor_payment_allocations' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'vendor_payment' => 'vendor_payment_id'],
+        'credit_notes' => ['org' => 'organization_id', 'account' => 'customer_account_id', 'branch' => 'branch_id'],
+        'credit_note_lines' => ['org' => 'organization_id', 'account' => null, 'branch' => null, 'credit_note' => 'credit_note_id'],
+        'refunds' => ['org' => 'organization_id', 'account' => 'customer_account_id', 'branch' => 'branch_id'],
+        'withholding_certificates' => ['org' => 'organization_id', 'account' => 'customer_account_id', 'branch' => 'branch_id'],
+        'manual_journals' => ['org' => 'organization_id', 'account' => null, 'branch' => 'branch_id'],
+        'bank_reconciliations' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
+        'bank_reconciliation_lines' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
+        'fiscal_years' => ['org' => 'organization_id', 'account' => null, 'branch' => null],
     ];
 
     /**
@@ -165,13 +180,14 @@ final class TenantIsolationSuite
         'work_orders', 'work_order_lines', 'work_order_tasks', 'work_order_parts', 'work_order_events', 'approval_log',
         'fleet_parts', 'fleet_part_usages', 'purchase_orders', 'purchase_order_lines', 'purchase_order_events',
         'invoices', 'invoice_lines', 'invoice_work_orders', 'payments', 'payment_allocations',
+        'credit_notes', 'credit_note_lines', 'refunds', 'withholding_certificates',
     ];
 
     /** Organization-wide records a portal user may see (the catalogue they are measured against). */
     private const array ORGANIZATION_WIDE = ['organizations', 'service_tasks'];
 
     /** Child tables whose owner is their parent row's (column alias → parent). */
-    private const array PARENTS = ['vehicle', 'work_order', 'fleet_part', 'purchase_order', 'shop_purchase_order', 'goods_receipt', 'stock_count', 'stock_transfer', 'invoice', 'payment', 'journal_entry', 'detailing_package', 'detailing_addon', 'detailing_booking', 'detailing_inspection'];
+    private const array PARENTS = ['vehicle', 'work_order', 'fleet_part', 'purchase_order', 'shop_purchase_order', 'goods_receipt', 'stock_count', 'stock_transfer', 'invoice', 'payment', 'journal_entry', 'vendor_bill', 'vendor_payment', 'credit_note', 'detailing_package', 'detailing_addon', 'detailing_booking', 'detailing_inspection'];
 
     /** @var array<string, array{org: string, account: string|null, branch: string|null, branches: list<string>, table: string, parents: array<string, string>}> */
     private array $rows = [];

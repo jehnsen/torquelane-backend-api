@@ -118,7 +118,7 @@ final class CrmLoyaltyController
         $page = PrepaidPackage::query()->with('customerAccount')
             ->when($request->id('customer_account_id') !== null, fn ($q) => $q->where('customer_account_id', $request->id('customer_account_id')))
             ->orderByDesc('sold_on')->orderByDesc('id')->paginate($request->perPage());
-        $all = PrepaidPackage::query()->get(['id', 'price_cents', 'credits_total', 'credits_used']);
+        $all = PrepaidPackage::query()->get(['id', 'price_cents', 'vat_cents', 'credits_total', 'credits_used']);
 
         return new JsonResponse([
             'data' => array_map(CrmPresenter::package(...), array_values($page->items())),
@@ -126,7 +126,7 @@ final class CrmLoyaltyController
             'summary' => [
                 'sold' => $all->count(),
                 'sold_cents' => array_sum(array_map(fn (PrepaidPackage $p): int => $p->price_cents, array_values($all->all()))),
-                'unearned_cents' => array_sum(array_map(fn (PrepaidPackage $p): int => Prepaid::unearnedCents($p->price_cents, $p->credits_total, $p->credits_used), array_values($all->all()))),
+                'unearned_cents' => array_sum(array_map(fn (PrepaidPackage $p): int => Prepaid::unearnedCents($p->netPriceCents(), $p->credits_total, $p->credits_used), array_values($all->all()))),
             ],
         ]);
     }

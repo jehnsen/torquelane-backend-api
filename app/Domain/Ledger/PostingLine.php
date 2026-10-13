@@ -17,6 +17,8 @@ final readonly class PostingLine
         public ?string $customerAccountId = null,
         public ?string $stockMoveId = null,
         public string $memo = '',
+        /** The payables subledger key: whose bill or payment the line is. */
+        public ?string $vendorId = null,
     ) {
         if ($debitCents < 0 || $creditCents < 0) {
             throw new InvalidArgumentException('A journal line is never negative; put the amount on the other side.');
@@ -26,19 +28,19 @@ final readonly class PostingLine
         }
     }
 
-    public static function debit(RuleKey|AccountRef $account, int $cents, string $branchId, ?string $customerAccountId = null, ?string $stockMoveId = null, string $memo = ''): self
+    public static function debit(RuleKey|AccountRef $account, int $cents, string $branchId, ?string $customerAccountId = null, ?string $stockMoveId = null, string $memo = '', ?string $vendorId = null): self
     {
-        return new self($account instanceof RuleKey ? AccountRef::rule($account) : $account, $cents, 0, $branchId, $customerAccountId, $stockMoveId, $memo);
+        return new self($account instanceof RuleKey ? AccountRef::rule($account) : $account, $cents, 0, $branchId, $customerAccountId, $stockMoveId, $memo, $vendorId);
     }
 
-    public static function credit(RuleKey|AccountRef $account, int $cents, string $branchId, ?string $customerAccountId = null, ?string $stockMoveId = null, string $memo = ''): self
+    public static function credit(RuleKey|AccountRef $account, int $cents, string $branchId, ?string $customerAccountId = null, ?string $stockMoveId = null, string $memo = '', ?string $vendorId = null): self
     {
-        return new self($account instanceof RuleKey ? AccountRef::rule($account) : $account, 0, $cents, $branchId, $customerAccountId, $stockMoveId, $memo);
+        return new self($account instanceof RuleKey ? AccountRef::rule($account) : $account, 0, $cents, $branchId, $customerAccountId, $stockMoveId, $memo, $vendorId);
     }
 
     /** The same amount on the other side. */
     public function mirrored(): self
     {
-        return new self($this->account, $this->creditCents, $this->debitCents, $this->branchId, $this->customerAccountId, null, $this->memo);
+        return new self($this->account, $this->creditCents, $this->debitCents, $this->branchId, $this->customerAccountId, null, $this->memo, $this->vendorId);
     }
 }

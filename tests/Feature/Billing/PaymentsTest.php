@@ -129,7 +129,7 @@ it('replays a retried payment, never takes it twice, and demands the key', funct
         ->assertJsonPath('data.number', 'PAY-2026-0002');
     recordPayment(['amount_cents' => 50_001] + $body, 'counter-retry')->assertStatus(409)->assertJsonPath('error.code', 'conflict');
 
-    expect(asSystem(fn () => Payment::query()->count()))->toBe(3)  // the seed's, the rival's, and this one
+    expect(asSystem(fn () => Payment::query()->count()))->toBe(4)  // the seed's, the rival's two, and this one
         ->and(invoiceState($this->overdue)['paid_cents'])->toBe(384608 + 50_000);
     Event::assertDispatchedTimes(PaymentReceived::class, 1);
 
@@ -254,6 +254,10 @@ it('reports revenue two ways: invoiced (accrual) and received (cash)', function 
     payAs('owner@mekanikomore.ph');
 
     $revenue = $this->getJson('/api/v1/receivables/revenue?from=2026-07-01&to=2026-10-08')->assertOk()->json('data');
-    expect($revenue['accrual'])->toBe(['invoices' => 3, 'net_sales_cents' => 858500 + 471000 + 186500, 'vat_cents' => 103020 + 56520 + 22380, 'total_cents' => 961520 + 527520 + 208880])
-        ->and($revenue['cash'])->toBe(['payments' => 1, 'received_cents' => 384608, 'by_method' => [['method' => 'bank_transfer', 'received_cents' => 384608]]]);
+    expect($revenue['accrual'])->toBe([
+        'invoices' => 3, 'net_sales_cents' => 858500 + 471000 + 186500, 'vat_cents' => 103020 + 56520 + 22380, 'total_cents' => 961520 + 527520 + 208880,
+        // Nothing has been credited back or refunded in the seed (Phase 12).
+        'credited' => ['credit_notes' => 0, 'net_sales_cents' => 0, 'vat_cents' => 0, 'total_cents' => 0],
+        'net_of_credits_cents' => 858500 + 471000 + 186500,
+    ])->and($revenue['cash'])->toBe(['payments' => 1, 'refunded_cents' => 0, 'net_received_cents' => 384608, 'received_cents' => 384608, 'by_method' => [['method' => 'bank_transfer', 'received_cents' => 384608]]]);
 });

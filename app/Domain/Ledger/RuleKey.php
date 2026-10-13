@@ -42,6 +42,14 @@ enum RuleKey: string
     case InventoryAdjustments = 'inventory.adjustments';
     case PurchasePriceVariance = 'inventory.price_variance';
     case EquipmentRepairs = 'expense.equipment_repairs';
+    /** Credit notes: what was sold and taken back, shown against sales (Phase 12). */
+    case SalesReturns = 'sales.returns';
+    /** Tax customers withheld from us (their 2307s): a credit against our income tax. */
+    case CreditableWithholding = 'tax.creditable_withholding';
+    /** Tax we withheld from vendors, owed to the BIR. */
+    case WithholdingPayable = 'tax.withholding_payable';
+    /** Where each closed year's profit or loss ends up. */
+    case RetainedEarnings = 'equity.retained_earnings';
 
     public function label(): string
     {
@@ -73,6 +81,10 @@ enum RuleKey: string
             self::InventoryAdjustments => 'Stock count differences and costing rounding',
             self::PurchasePriceVariance => 'Purchase price differences',
             self::EquipmentRepairs => 'Equipment repairs and maintenance',
+            self::SalesReturns => 'Sales credited back (credit notes)',
+            self::CreditableWithholding => 'Tax withheld from us by customers',
+            self::WithholdingPayable => 'Tax withheld from vendors',
+            self::RetainedEarnings => 'Profit or loss of closed years',
         };
     }
 
@@ -105,6 +117,10 @@ enum RuleKey: string
             self::InventoryAdjustments => '5100',
             self::PurchasePriceVariance => '5110',
             self::EquipmentRepairs => '6000',
+            self::SalesReturns => '4910',
+            self::CreditableWithholding => '1310',
+            self::WithholdingPayable => '2210',
+            self::RetainedEarnings => '3100',
         };
     }
 
@@ -113,10 +129,10 @@ enum RuleKey: string
     {
         return match ($this) {
             self::CashOnHand, self::CashBank, self::ClearingGcash, self::ClearingMaya, self::ClearingCard,
-            self::Receivables, self::Inventory, self::InputVat => AccountType::Asset,
-            self::Payables, self::GoodsReceivedClearing, self::OutputVat, self::CustomerDeposits, self::UnearnedRevenue => AccountType::Liability,
-            self::OpeningBalanceEquity => AccountType::Equity,
-            self::SalesLabour, self::SalesParts, self::SalesDetailing, self::SalesCafe, self::SalesFees, self::SalesManual, self::SalesDiscounts => AccountType::Revenue,
+            self::Receivables, self::Inventory, self::InputVat, self::CreditableWithholding => AccountType::Asset,
+            self::Payables, self::GoodsReceivedClearing, self::OutputVat, self::CustomerDeposits, self::UnearnedRevenue, self::WithholdingPayable => AccountType::Liability,
+            self::OpeningBalanceEquity, self::RetainedEarnings => AccountType::Equity,
+            self::SalesLabour, self::SalesParts, self::SalesDetailing, self::SalesCafe, self::SalesFees, self::SalesManual, self::SalesDiscounts, self::SalesReturns => AccountType::Revenue,
             self::CogsParts, self::CogsConsumables, self::CogsCafe, self::InventoryAdjustments, self::PurchasePriceVariance, self::EquipmentRepairs => AccountType::Expense,
         };
     }
@@ -130,16 +146,33 @@ enum RuleKey: string
         };
     }
 
+    /**
+     * Whether a subledger stands behind the account this key names: open
+     * invoices, the stock room, unapplied credit, open bills, unbilled
+     * receipts, prepaid packages. Only that subledger's own documents post to
+     * it, or the close checklist could never reconcile: a typed-in voucher
+     * and a bill's expense line are refused.
+     */
+    public function isControl(): bool
+    {
+        return match ($this) {
+            self::Receivables, self::Inventory, self::CustomerDeposits, self::Payables,
+            self::GoodsReceivedClearing, self::UnearnedRevenue => true,
+            default => false,
+        };
+    }
+
     /** The group a rules screen lists it under. */
     public function group(): string
     {
         return match ($this) {
             self::CashOnHand, self::CashBank, self::ClearingGcash, self::ClearingMaya, self::ClearingCard => 'Money received',
-            self::Receivables, self::CustomerDeposits, self::UnearnedRevenue, self::OutputVat => 'Sales and receivables',
-            self::SalesLabour, self::SalesParts, self::SalesDetailing, self::SalesCafe, self::SalesFees, self::SalesManual, self::SalesDiscounts => 'Sales',
+            self::Receivables, self::CustomerDeposits, self::UnearnedRevenue, self::OutputVat, self::CreditableWithholding => 'Sales and receivables',
+            self::SalesLabour, self::SalesParts, self::SalesDetailing, self::SalesCafe, self::SalesFees, self::SalesManual, self::SalesDiscounts, self::SalesReturns => 'Sales',
             self::Inventory, self::GoodsReceivedClearing, self::OpeningBalanceEquity, self::InventoryAdjustments, self::PurchasePriceVariance => 'Stock',
             self::CogsParts, self::CogsConsumables, self::CogsCafe => 'Cost of sales',
-            self::InputVat, self::Payables, self::EquipmentRepairs => 'Purchasing and expenses',
+            self::InputVat, self::Payables, self::EquipmentRepairs, self::WithholdingPayable => 'Purchasing and expenses',
+            self::RetainedEarnings => 'Year end',
         };
     }
 }

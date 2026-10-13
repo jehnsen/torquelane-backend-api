@@ -19,8 +19,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * Money received from a customer account at a branch, numbered from the
  * `payment` series (`PAY-…`). An issued document (R7): never edited or
- * deleted, only voided, once. What its allocations do not cover is the
- * customer's credit.
+ * deleted, only voided, once. What its allocations do not cover, less what
+ * has been refunded out of it, is the customer's credit.
  *
  * @property string $id
  * @property string $organization_id
@@ -41,6 +41,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
  * @property-read Collection<int, PaymentAllocation> $allocations
+ * @property-read Collection<int, Refund> $refunds
  * @property-read CustomerAccount $customerAccount
  * @property-read Branch $branch
  */
@@ -84,10 +85,16 @@ final class Payment extends Model
         return array_sum($this->allocations->map(fn (PaymentAllocation $allocation): int => $allocation->amount_cents)->all());
     }
 
-    /** What is left to apply: the customer's credit from this payment. A void payment has none. */
+    /** Given back out of what was not allocated (relation loaded). */
+    public function refundedCents(): int
+    {
+        return array_sum($this->refunds->filter(fn (Refund $refund): bool => $refund->isStanding())->map(fn (Refund $refund): int => $refund->amount_cents)->all());
+    }
+
+    /** What is left to apply or refund: the customer's credit from this payment. A void payment has none. */
     public function unallocatedCents(): int
     {
-        return $this->status === PaymentStatus::Posted ? $this->amount_cents - $this->allocatedCents() : 0;
+        return $this->status === PaymentStatus::Posted ? $this->amount_cents - $this->allocatedCents() - $this->refundedCents() : 0;
     }
 
     /**
@@ -96,6 +103,14 @@ final class Payment extends Model
     public function allocations(): HasMany
     {
         return $this->hasMany(PaymentAllocation::class)->orderBy('allocated_at')->orderBy('id');
+    }
+
+    /**
+     * @return HasMany<Refund, $this>
+     */
+    public function refunds(): HasMany
+    {
+        return $this->hasMany(Refund::class)->orderBy('id');
     }
 
     /**

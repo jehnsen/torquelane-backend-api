@@ -9,7 +9,6 @@ use App\Actions\Billing\BillingQueries;
 use App\Actions\Billing\ManageInvoices;
 use App\Actions\Fleet\FleetQueries;
 use App\Actions\WorkOrders\WorkOrderQueries;
-use App\Documents\BillingPdf;
 use App\Http\Requests\IssueInvoiceRequest;
 use App\Http\Requests\ListInvoicesRequest;
 use App\Http\Requests\SaveInvoiceRequest;
@@ -148,18 +147,5 @@ final class InvoiceController
         Gate::authorize('void', $invoice);
 
         return new InvoiceResource($invoices->void($invoice, $request->reason()));
-    }
-
-    /**
-     * Invoice PDF
-     *
-     * The printed invoice (`application/pdf`), behind the same policy as the
-     * invoice. A draft prints marked as not issued; a void one, as void.
-     */
-    public function pdf(Invoice $invoice, BillingPdf $pdf): Response
-    {
-        Gate::authorize('view', $invoice);
-
-        return $pdf->invoice($invoice);
     }
 }

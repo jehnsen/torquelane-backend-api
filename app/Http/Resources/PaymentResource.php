@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Resources;
 
+use App\Actions\Billing\InvoiceParties;
 use App\Domain\Access\Capability;
+use App\Domain\Invoicing\Invoicing;
 use App\Domain\Receivables\PaymentStatus;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
@@ -14,7 +16,10 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * A payment and where it went. `unallocated_cents` is the customer's credit
- * from it (none once void). Money in centavos.
+ * from it: what it has neither allocated nor refunded (none once void).
+ * `seller`, `buyer` and `notices` are what its acknowledgment receipt prints:
+ * the frontend lays the receipt out, the wording and the parties are the
+ * API's. Money in centavos.
  *
  * @property Payment $resource
  */
@@ -31,7 +36,8 @@ final class PaymentResource extends JsonResource
     public function toArray(Request $request): array
     {
         $payment = $this->resource;
-        $payment->loadMissing(['allocations.invoice', 'customerAccount']);
+        $payment->loadMissing(['allocations.invoice', 'refunds', 'customerAccount', 'branch']);
+        $parties = app(InvoiceParties::class);
         $context = app(TenantManager::class)->context();
         $staff = $context?->isStaff() ?? false;
         $posted = $payment->status === PaymentStatus::Posted;
@@ -45,12 +51,18 @@ final class PaymentResource extends JsonResource
             'reference_no' => $payment->reference_no,
             'amount_cents' => $payment->amount_cents,
             'allocated_cents' => $payment->allocatedCents(),
+            // Given back out of what was not allocated (refunds that still stand).
+            'refunded_cents' => $payment->refundedCents(),
             'unallocated_cents' => $payment->unallocatedCents(),
             'received_on' => $payment->received_on->toDateString(),
             'received_by_name' => $payment->received_by_name,
             'branch_id' => $staff ? $payment->branch_id : null,
             'customer_account_id' => $payment->customer_account_id,
             'customer_name' => $payment->customerAccount->display_name,
+            // What its acknowledgment receipt prints: who received the money, from whom, and what the receipt is not.
+            'seller' => $parties->seller($payment->organization_id, $payment->branch),
+            'buyer' => $parties->buyer($payment->customerAccount),
+            'notices' => [Invoicing::NOT_AN_INVOICE, Invoicing::NON_VAT_NOTICE],
             'notes' => $payment->notes,
             'allocations' => array_values($payment->allocations->map(fn (PaymentAllocation $allocation): array => [
                 'id' => $allocation->id,

@@ -13,7 +13,9 @@ namespace App\Domain\Ledger;
  *  2. the receivables subledger (open invoices) equals the Accounts Receivable account;
  *  3. the stock room's valuation equals the Inventory account;
  *  4. customer credit not yet applied equals the Customer Deposits account;
- *  5. the trial balance balances.
+ *  5. the payables subledger (open vendor bills) equals the Accounts Payable account;
+ *  6. goods received and not yet billed equal the GR/IR Clearing account;
+ *  7. the trial balance balances.
  */
 final class CloseChecklist
 {
@@ -29,6 +31,10 @@ final class CloseChecklist
         int $inventoryAccount,
         int $unappliedCredit,
         int $depositsAccount,
+        int $payablesSubledger,
+        int $payablesAccount,
+        int $unbilledReceipts,
+        int $clearingAccount,
         int $trialDebits,
         int $trialCredits,
     ): array {
@@ -38,7 +44,7 @@ final class CloseChecklist
         return [
             [
                 'key' => 'unposted_sources',
-                'label' => 'Every invoice, payment and stock move is posted',
+                'label' => 'Every invoice, payment, bill and stock move is posted',
                 'passed' => $count === 0,
                 'expected_cents' => null,
                 'actual_cents' => null,
@@ -48,6 +54,8 @@ final class CloseChecklist
             self::compare('receivables', 'Receivables subledger equals Accounts Receivable', $receivablesSubledger, $receivablesAccount, 'Open invoices', 'Accounts Receivable'),
             self::compare('inventory', 'Stock valuation equals Inventory', $inventoryValuation, $inventoryAccount, 'Stock room valuation', 'Inventory account'),
             self::compare('customer_deposits', 'Unapplied customer credit equals Customer Deposits', $unappliedCredit, $depositsAccount, 'Unapplied credit', 'Customer Deposits account'),
+            self::compare('payables', 'Payables subledger equals Accounts Payable', $payablesSubledger, $payablesAccount, 'Open vendor bills', 'Accounts Payable'),
+            self::compare('goods_received_not_billed', 'Unbilled goods receipts equal GR/IR Clearing', $unbilledReceipts, $clearingAccount, 'Goods received, not yet billed', 'GR/IR Clearing account'),
             self::compare('trial_balance', 'The trial balance balances', $trialDebits, $trialCredits, 'Debits', 'Credits'),
         ];
     }

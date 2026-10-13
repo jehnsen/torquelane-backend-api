@@ -232,8 +232,9 @@ final class LedgerQueries
             }
         }
 
+        // The closing entry empties these accounts into Retained Earnings; a year's profit is what they held before it.
         $balances = array_values(array_filter(
-            $this->balances($from, $to, byBranch: true),
+            $this->balances($from, $to, byBranch: true, beforeClosing: true),
             fn (AccountBalance $b): bool => $b->type === AccountType::Revenue || $b->type === AccountType::Expense,
         ));
 
@@ -259,8 +260,9 @@ final class LedgerQueries
     public function dailySales(string $from, string $to): array
     {
         // A prepaid credit used is revenue earned that day; a prepaid package sold is money taken.
-        $invoiceEvents = [LedgerEvent::InvoiceIssued->value, LedgerEvent::InvoiceVoided->value, LedgerEvent::PrepaidRedeemed->value];
-        $paymentEvents = [LedgerEvent::PaymentReceived->value, LedgerEvent::PaymentVoided->value, LedgerEvent::PrepaidSold->value];
+        // A credit note takes sales back the day it is issued; a prepaid package's VAT is charged the day it is sold; a refund is money given back.
+        $invoiceEvents = [LedgerEvent::InvoiceIssued->value, LedgerEvent::InvoiceVoided->value, LedgerEvent::PrepaidRedeemed->value, LedgerEvent::PrepaidSold->value, LedgerEvent::CreditNoteIssued->value, LedgerEvent::CreditNoteVoided->value];
+        $paymentEvents = [LedgerEvent::PaymentReceived->value, LedgerEvent::PaymentVoided->value, LedgerEvent::PrepaidSold->value, LedgerEvent::RefundPaid->value, LedgerEvent::RefundVoided->value];
         $outputVat = $this->rules->accountId($this->tenancy->require()->organizationId(), RuleKey::OutputVat);
 
         $sales = $this->lines()
@@ -354,12 +356,17 @@ final class LedgerQueries
      * Debits and credits per account (and per branch if asked), over the
      * caller's branches, for entries dated from `$from` (or the beginning)
      * to `$to`. Every account is returned, active or not, even with nothing posted.
+     * `$beforeClosing` leaves the year-end closing entries out: what the
+     * revenue and expense accounts held before they were emptied.
      *
      * @return list<AccountBalance>
      */
-    public function balances(?string $from, string $to, bool $byBranch = false): array
+    public function balances(?string $from, string $to, bool $byBranch = false, bool $beforeClosing = false): array
     {
         $query = $this->lines()->where('e.entry_date', '<=', $to);
+        if ($beforeClosing) {
+            $query->where('e.event', '<>', LedgerEvent::YearClosed->value);
+        }
         if ($from !== null) {
             $query->where('e.entry_date', '>=', $from);
         }

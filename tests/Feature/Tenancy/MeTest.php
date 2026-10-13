@@ -27,7 +27,7 @@ function expectedCapabilities(): array
     }
 
     return [
-        'provider_admin' => [...$web['provider_admin'], 'customer:manage', 'organization:manage', 'inventory:view', 'inventory:manage', 'billing:view', 'billing:manage', 'billing:void', 'ledger:view', 'ledger:manage', 'detailing:view', 'detailing:book', 'detailing:work', 'detailing:qc', 'detailing:manage', 'equipment:view', 'equipment:manage', 'crm:view', 'crm:work', 'crm:manage'],
+        'provider_admin' => [...$web['provider_admin'], 'customer:manage', 'organization:manage', 'inventory:view', 'inventory:manage', 'billing:view', 'billing:manage', 'billing:void', 'ledger:view', 'ledger:manage', 'detailing:view', 'detailing:book', 'detailing:work', 'detailing:qc', 'detailing:manage', 'equipment:view', 'equipment:manage', 'crm:view', 'crm:work', 'crm:manage', 'payables:view', 'payables:manage'],
         'service_advisor' => [...$web['service_advisor'], 'customer:manage', 'inventory:view', 'billing:view', 'billing:manage', 'detailing:view', 'detailing:book', 'detailing:work', 'detailing:qc', 'equipment:view', 'crm:view', 'crm:work'],
         'provider_technician' => [...$web['provider_technician'], 'inventory:view', 'detailing:view', 'detailing:work', 'equipment:view'],
         'fleet_manager' => [...$web['fleet_manager'], 'customer:manage', 'billing:view'],
@@ -36,7 +36,7 @@ function expectedCapabilities(): array
         'purchasing_officer' => [...$web['purchasing_officer'], 'billing:view'],
         'viewer' => [...$web['viewer'], 'billing:view'],
         // Proposed grants for the API-only roles (see CLAUDE.md, "Roles").
-        'branch_manager' => ['vehicle:update', 'vehicle:manage', 'workorder:create', 'workorder:update', 'workorder:complete', 'workorder:approve', 'po:issue', 'document:upload', 'document:delete', 'settings:manage', 'access:manage', 'customer:manage', 'inventory:view', 'inventory:manage', 'billing:view', 'billing:manage', 'billing:void', 'ledger:view', 'detailing:view', 'detailing:book', 'detailing:work', 'detailing:qc', 'detailing:manage', 'equipment:view', 'equipment:manage', 'crm:view', 'crm:work', 'crm:manage'],
+        'branch_manager' => ['vehicle:update', 'vehicle:manage', 'workorder:create', 'workorder:update', 'workorder:complete', 'workorder:approve', 'po:issue', 'document:upload', 'document:delete', 'settings:manage', 'access:manage', 'customer:manage', 'inventory:view', 'inventory:manage', 'billing:view', 'billing:manage', 'billing:void', 'ledger:view', 'detailing:view', 'detailing:book', 'detailing:work', 'detailing:qc', 'detailing:manage', 'equipment:view', 'equipment:manage', 'crm:view', 'crm:work', 'crm:manage', 'payables:view', 'payables:manage'],
         'cashier' => ['customer:manage', 'inventory:view', 'billing:view', 'billing:manage', 'detailing:view', 'detailing:book', 'equipment:view', 'crm:view', 'crm:work'],
     ];
 }

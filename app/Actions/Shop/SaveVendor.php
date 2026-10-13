@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Actions\Shop;
 
 use App\Actions\Audit\AuditTrail;
+use App\Exceptions\ConflictException;
 use App\Models\Vendor;
+use App\Models\VendorBill;
+use App\Models\VendorPayment;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -20,7 +23,7 @@ final class SaveVendor
     public function __construct(private readonly AuditTrail $audit) {}
 
     /**
-     * @param  array{name: string, is_active?: bool}  $attributes
+     * @param  array{name: string, is_active?: bool, registered_name?: string|null, tin?: string|null, address?: string|null, is_vat_registered?: bool, payment_terms_days?: int, default_atc_code?: string|null, default_withholding_rate_pct?: string|null}  $attributes
      */
     public function create(array $attributes): Vendor
     {
@@ -36,7 +39,7 @@ final class SaveVendor
     }
 
     /**
-     * @param  array{name?: string, is_active?: bool}  $attributes
+     * @param  array{name?: string, is_active?: bool, registered_name?: string|null, tin?: string|null, address?: string|null, is_vat_registered?: bool, payment_terms_days?: int, default_atc_code?: string|null, default_withholding_rate_pct?: string|null}  $attributes
      */
     public function update(Vendor $vendor, array $attributes): Vendor
     {
@@ -58,6 +61,10 @@ final class SaveVendor
     {
         DB::transaction(function () use ($vendor): void {
             $locked = Vendor::query()->lockForUpdate()->findOrFail($vendor->id);
+            // A vendor with bills or payments is part of the books: deactivate it instead.
+            if (VendorBill::query()->where('vendor_id', $locked->id)->exists() || VendorPayment::query()->where('vendor_id', $locked->id)->exists()) {
+                throw new ConflictException("{$locked->name} has bills or payments on record; deactivate the vendor instead of removing it.", ['reason' => 'vendor_in_use']);
+            }
             $before = AuditTrail::snapshot($locked);
             $locked->delete();
             $this->audit->record($locked, 'deleted', $before, null);

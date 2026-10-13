@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Support;
 
+use App\Actions\Billing\ManageCreditNotes;
 use App\Actions\Billing\ManageInvoices;
+use App\Actions\Billing\ManageRefunds;
+use App\Actions\Billing\ManageWithholding;
 use App\Actions\Billing\RecordPayment;
 use App\Actions\Inventory\ManageStockCounts;
 use App\Actions\Inventory\ProgressShopPurchaseOrder;
@@ -14,13 +17,21 @@ use App\Actions\Inventory\SaveItem;
 use App\Actions\Inventory\SaveShopPurchaseOrder;
 use App\Actions\Inventory\StockLocations;
 use App\Actions\Inventory\TransferStock;
+use App\Actions\Ledger\ManageBankReconciliations;
+use App\Actions\Ledger\ManageManualJournals;
+use App\Actions\Ledger\PostingRules;
+use App\Actions\Payables\ManageVendorBills;
+use App\Actions\Payables\PayVendors;
 use App\Domain\Access\Role;
 use App\Domain\Approvals\ApprovalSettings;
 use App\Domain\Crm\ConsentChannel;
 use App\Domain\Crm\ConsentPurpose;
 use App\Domain\Documents\DocumentKind;
+use App\Domain\Ledger\RuleKey;
 use App\Domain\Maintenance\MeterKind;
 use App\Domain\Modules\Module;
+use App\Domain\Shared\Calendar;
+use App\Models\Account;
 use App\Models\ApprovalLogEntry;
 use App\Models\ApprovalSetting;
 use App\Models\Bay;
@@ -43,7 +54,9 @@ use App\Models\Equipment;
 use App\Models\EquipmentPackageProfile;
 use App\Models\FleetPart;
 use App\Models\FleetPartUsage;
+use App\Models\GoodsReceiptLine;
 use App\Models\Invitation;
+use App\Models\Invoice;
 use App\Models\MaintenanceState;
 use App\Models\MessageTemplate;
 use App\Models\MeterReading;
@@ -380,6 +393,55 @@ final class World
         $this->purchasing($organizationId, $accountId, 'rival', $task->id, $this->id('rival:admin'), 'PO-2026-0001');
         $this->rivalInventory($organizationId);
         $this->rivalBilling($accountId);
+        $this->rivalBooks($accountId);
+    }
+
+    /**
+     * The rival's Phase 12 documents, through the real Actions as its admin: a
+     * vendor bill for its goods receipt with a part payment, a credit note and
+     * a withholding certificate on its invoice, an overpayment refunded in
+     * part, a journal voucher and an open bank reconciliation.
+     */
+    private function rivalBooks(string $accountId): void
+    {
+        $context = app(TenantContextResolver::class)->resolve($this->user('rival:admin'), null)->context;
+        app(TenantManager::class)->actingAs($context, function () use ($accountId): void {
+            $branchId = $this->id('rival:branch');
+            $receiptLineId = (string) GoodsReceiptLine::query()->where('goods_receipt_id', $this->id('rival:goods-receipt'))->value('id');
+            $rules = app(PostingRules::class);
+            $bank = $rules->accountId($this->id('rival'), RuleKey::CashBank);
+            $charges = (string) Account::query()->where('organization_id', $this->id('rival'))->where('code', '6010')->value('id');
+
+            $bill = app(ManageVendorBills::class)->record(Vendor::query()->findOrFail($this->id('rival:vendor')), [
+                'branch_id' => $branchId,
+                'vendor_invoice_no' => 'RPC-1001',
+                'lines' => [
+                    ['kind' => 'goods', 'goods_receipt_line_id' => $receiptLineId],
+                    ['kind' => 'expense', 'account_id' => $charges, 'description' => 'Delivery', 'unit_cost_cents' => 5000],
+                ],
+            ]);
+            $this->ids['rival:vendor-bill'] = $bill->id;
+            $this->ids['rival:vendor-bill-line'] = $bill->lines[0]->id;
+            $payment = app(PayVendors::class)->record(Vendor::query()->findOrFail($this->id('rival:vendor')), ['branch_id' => $branchId, 'method' => 'cash', 'amount_cents' => 10000]);
+            $this->ids['rival:vendor-payment'] = $payment->id;
+            $this->ids['rival:vendor-payment-allocation'] = $payment->allocations[0]->id;
+
+            $invoice = Invoice::query()->findOrFail($this->id('rival:invoice'));
+            $note = app(ManageCreditNotes::class)->issue($invoice, ['reason' => 'Rival goodwill', 'lines' => [['description' => 'Goodwill allowance', 'unit_price_cents' => 20000]]]);
+            $this->ids['rival:credit-note'] = $note->id;
+            $this->ids['rival:credit-note-line'] = $note->lines[0]->id;
+            $this->ids['rival:withholding'] = app(ManageWithholding::class)->record($invoice, ['atc_code' => 'WC160', 'rate_pct' => '2'])->id;
+
+            $overpaid = app(RecordPayment::class)->record(CustomerAccount::query()->findOrFail($accountId), ['branch_id' => $branchId, 'method' => 'cash', 'amount_cents' => 200000, 'allocations' => []]);
+            $this->ids['rival:refund'] = app(ManageRefunds::class)->pay($overpaid, ['method' => 'cash', 'amount_cents' => 10000, 'reason' => 'Rival overpayment'])->id;
+
+            $voucher = app(ManageManualJournals::class)->post(['branch_id' => $branchId, 'memo' => 'Rival bank charge', 'lines' => [
+                ['account_id' => $charges, 'debit_cents' => 1500],
+                ['account_id' => $bank, 'credit_cents' => 1500],
+            ]]);
+            $this->ids['rival:voucher'] = $voucher->id;
+            $this->ids['rival:bank-reconciliation'] = app(ManageBankReconciliations::class)->open(Account::query()->findOrFail($bank), ['statement_date' => Calendar::toDate(CarbonImmutable::now()), 'statement_balance_cents' => -1500])->id;
+        });
     }
 
     /** The rival's receivables, through the real Actions as its admin: an issued invoice, part-paid. */
